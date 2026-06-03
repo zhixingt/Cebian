@@ -8,6 +8,7 @@ import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/p
 import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessage } from '@/lib/recorder/protocol';
 import { isInjectablePage } from '@/lib/tab-helpers';
 import { vfs } from '@/lib/vfs';
+import { registerCookieService } from '@/lib/ai-config/web-provider-cookie-service';
 
 /**
  * Grace period after the last subscribed port disconnects before the agent
@@ -28,6 +29,7 @@ export default defineBackground(() => {
     .catch((error) => console.error(error));
 
   setupOAuthRefresh();
+  registerCookieService();
 
   // Dev-only: seed a custom provider from .env.local if configured.
   // No-op in production builds and when WXT_DEV_API_KEY is empty.
