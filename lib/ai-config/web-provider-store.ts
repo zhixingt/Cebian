@@ -1,9 +1,11 @@
-import type { WebProvider, LoginStatus } from '../types';
+import type { WebProvider, LoginStatus, LoginAuditEntry, WebProviderUserOverrides } from '../types';
 import { getDb } from '../db';
 import { WEB_PROVIDER_PRESETS } from './web-provider-presets';
 
 /** Inferred type of the Dexie database instance. */
 type CebianDB = ReturnType<typeof getDb>;
+
+const MAX_AUDIT_LOG_ENTRIES = 5;
 
 export class WebProviderRepository {
   constructor(private db: CebianDB) {}
@@ -61,6 +63,67 @@ export class WebProviderRepository {
       else provider.supportsReasoning = value;
       provider.updatedAt = new Date().toISOString();
       return true;
+    });
+  }
+
+  // ===== ② additions: encrypted bundle + A2 overrides + A4 audit =====
+
+  /**
+   * Store the encrypted cookie bundle. Overwrites any previous value.
+   * Used after successful login.
+   */
+  async setEncryptedCookieBundle(
+    presetId: WebProvider['presetId'],
+    ciphertext: string,
+  ): Promise<void> {
+    await this.db.webProviders.update(presetId, {
+      encryptedCookieBundle: ciphertext,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Clear the encrypted cookie bundle (e.g. user logged out or session invalidated).
+   * Does NOT change loginStatus; caller decides whether to set loggedOut.
+   */
+  async clearEncryptedCookieBundle(
+    presetId: WebProvider['presetId'],
+  ): Promise<void> {
+    await this.db.webProviders.update(presetId, {
+      encryptedCookieBundle: null,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Persist per-provider user overrides (A2 KEY ONE).
+   * Pass null to clear all overrides (reset to preset defaults).
+   */
+  async setUserOverrides(
+    presetId: WebProvider['presetId'],
+    overrides: WebProviderUserOverrides | null,
+  ): Promise<void> {
+    await this.db.webProviders.update(presetId, {
+      userOverrides: overrides,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  /**
+   * Append an entry to the login audit log (A4).
+   * Newest entry at index 0; FIFO eviction at MAX_AUDIT_LOG_ENTRIES.
+   */
+  async appendAuditEntry(
+    presetId: WebProvider['presetId'],
+    entry: LoginAuditEntry,
+  ): Promise<void> {
+    const existing = await this.db.webProviders.get(presetId);
+    const log = existing?.loginAuditLog ?? [];
+    log.unshift(entry);
+    while (log.length > MAX_AUDIT_LOG_ENTRIES) log.pop();
+    await this.db.webProviders.update(presetId, {
+      loginAuditLog: log,
+      updatedAt: new Date().toISOString(),
     });
   }
 
