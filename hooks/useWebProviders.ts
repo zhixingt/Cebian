@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getWebProviderRepository } from '@/lib/ai-config/web-provider-store';
-import type { LoginStatus, WebProvider } from '@/lib/types';
+import type { LoginStatus, WebProvider, WebProviderUserOverrides } from '@/lib/types';
 
 export interface UseWebProvidersResult {
   providers: WebProvider[];
@@ -23,6 +23,11 @@ export interface UseWebProvidersResult {
       id: WebProvider['presetId'],
       cap: 'supportsToolCalls' | 'supportsReasoning',
       value: boolean,
+    ) => Promise<void>;
+    /** ⭐ ② A2: persist user overrides; null clears all overrides */
+    setUserOverrides: (
+      id: WebProvider['presetId'],
+      overrides: WebProviderUserOverrides | null,
     ) => Promise<void>;
   };
 }
@@ -118,10 +123,25 @@ export function useWebProviders(): UseWebProvidersResult {
     [repo, refresh],
   );
 
+  const setUserOverrides = useCallback(
+    async (
+      id: WebProvider['presetId'],
+      overrides: WebProviderUserOverrides | null,
+    ) => {
+      try {
+        await repo.setUserOverrides(id, overrides);
+        await refresh();
+      } catch (e) {
+        setError(e instanceof Error ? e : new Error(String(e)));
+      }
+    },
+    [repo, refresh],
+  );
+
   return {
     providers,
     isLoading,
     error,
-    update: { setEnabled, setLoginStatus, setModelId, setCapability },
+    update: { setEnabled, setLoginStatus, setModelId, setCapability, setUserOverrides },
   };
 }
