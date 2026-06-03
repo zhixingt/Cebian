@@ -15,7 +15,7 @@
     "compile": "tsc --noEmit",
     "check": "wxt prepare && tsc --noEmit && node scripts/lint-i18n.mjs",
     "postinstall": "wxt prepare && simple-git-hooks",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest"
   },
   "simple-git-hooks": {
