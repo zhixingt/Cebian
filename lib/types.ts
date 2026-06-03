@@ -64,3 +64,38 @@ export const TOOL_FS_SAVE_URL = 'fs_save_url' as const;
 export const TOOL_RUN_SKILL = 'run_skill' as const;
 /** Tool that calls Chrome browser APIs directly via structured parameters */
 export const TOOL_CHROME_API = 'chrome_api' as const;
+
+// ──────────────────────────────────────────────────────────────
+// Web (Browser Session) providers
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Login state for a web provider.
+ * - 'unknown'   : user has never checked
+ * - 'checking'  : transient — NEVER persisted to Dexie
+ * - 'loggedIn'  : confirmed (mocked in MVP, real in ②)
+ * - 'loggedOut' : unconfirmed (mocked in MVP, real in ②)
+ */
+export type LoginStatus =
+  | 'unknown'
+  | 'checking'
+  | 'loggedIn'
+  | 'loggedOut';
+
+/**
+ * Persisted configuration for one web provider.
+ * `encryptedCookieBundle` is RESERVED for ② (real cookie storage);
+ * MVP always writes `null`.
+ */
+export interface WebProvider {
+  presetId: 'glm' | 'kimi' | 'deepseek';
+  enabled: boolean;
+  loginStatus: Exclude<LoginStatus, 'checking'>;
+  modelId: string;
+  supportsToolCalls: boolean;
+  supportsReasoning: boolean;
+  lastCheckedAt: string | null;
+  encryptedCookieBundle: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
