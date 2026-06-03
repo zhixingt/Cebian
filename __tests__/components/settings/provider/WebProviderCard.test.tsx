@@ -27,6 +27,10 @@ const fakePreset: WebProviderPreset = {
   defaultModelId: 'GLM-4.6',
   defaultSupportsToolCalls: true,
   defaultSupportsReasoning: false,
+  cookieDomain: 'chatglm.cn',
+  sessionIndicators: ['chatglm_refresh_token', 'chatglm_token'],
+  useLocalStorageFallback: false,
+  refreshUrl: 'https://chatglm.cn/api/v1/auth/refresh',
 };
 
 describe('WebProviderCard', () => {
