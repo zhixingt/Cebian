@@ -37,3 +37,6 @@ site/dist/
 
 # Private notes folder, never committed
 docs/
+# Exception: superpowers design specs are committed artifacts, not private notes
+!docs/superpowers/
+!docs/superpowers/**
