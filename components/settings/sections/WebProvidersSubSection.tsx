@@ -1,3 +1,5 @@
+import { toast } from 'sonner';
+
 import { useWebProviders } from '@/hooks/useWebProviders';
 import { useWebProviderSimulatedLogin } from '@/hooks/useWebProviderSimulatedLogin';
 import { WEB_PROVIDER_PRESETS } from '@/lib/ai-config/web-provider-presets';
@@ -13,7 +15,13 @@ export function WebProvidersSubSection() {
   const { providers, update, isLoading, error } = useWebProviders();
   const { recheck, checkingId } = useWebProviderSimulatedLogin({
     onSuccess: (id) => update.setLoginStatus(id, 'loggedIn'),
-    onFailure: (id) => update.setLoginStatus(id, 'loggedOut'),
+    onFailure: (id) => {
+      // Persist the logged-out state to Dexie
+      void update.setLoginStatus(id, 'loggedOut');
+      // Also surface a transient toast so the user gets immediate
+      // feedback (per design doc section 8 acceptance scenario 5).
+      toast.error(t('webProviders.messages.recheckFailed'));
+    },
   });
 
   if (error) {
