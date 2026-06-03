@@ -554,6 +554,9 @@ webProviders:
     recheck: "Re-check login status"
     checking: "Checking…"
     openWebsite: "Open website"
+    # ⭐ ②: new strings
+    login: "Login"
+    loggingIn: "Logging in…"
   status:
     loggedIn: "Logged in"
     loggedOut: "Not logged in"
@@ -561,3 +564,6 @@ webProviders:
   messages:
     loadFailed: "Failed to load web providers. Please reopen the settings page."
     recheckFailed: "Login check failed. Please make sure you're signed in to the website."
+    # ⭐ ②: new error messages
+    loginFailed: "Login failed. Please try again."
+    loginTimedOut: "Login timed out after 5 minutes. Please try again."

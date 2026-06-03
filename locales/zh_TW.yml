@@ -543,6 +543,9 @@ webProviders:
     recheck: "重新檢查登入狀態"
     checking: "檢查中…"
     openWebsite: "開啟官網"
+    # ⭐ ②
+    login: "登入"
+    loggingIn: "登入中…"
   status:
     loggedIn: "已登入"
     loggedOut: "未登入"
@@ -550,3 +553,6 @@ webProviders:
   messages:
     loadFailed: "載入網頁版供應商失敗，請重新開啟設定頁。"
     recheckFailed: "登入檢查失敗，請確認你已在該網站登入。"
+    # ⭐ ②
+    loginFailed: "登入失敗，請重試。"
+    loginTimedOut: "登入逾時（5 分鐘），請重試。"
