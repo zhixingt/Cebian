@@ -518,3 +518,35 @@ errors:
     # $1 = 技能名稱
     reservedName: "此技能名稱為系統保留：$1"
     parseFrontmatter: "無法解析 SKILL.md 的 frontmatter。"
+
+# ───── Web (Browser Session) providers ─────
+webProviders:
+  sectionTitle: "網頁版（瀏覽器會話）"
+  sectionDescription: "複用瀏覽器已登入狀態，無需 API Key。"
+  presets:
+    glm:
+      name: "GLM（智譜）"
+      description: "智譜 ChatGLM 網頁版"
+    kimi:
+      name: "Kimi（月之暗面）"
+      description: "月之暗面 Moonshot 網頁版"
+    deepseek:
+      name: "DeepSeek（深度求索）"
+      description: "深度求索網頁版"
+  fields:
+    enabled: "已啟用"
+    modelIdLabel: "模型 ID"
+    modelIdHelp: "預設填入推薦模型。了解後再修改。"
+    capabilities: "能力"
+    toolCalls: "工具呼叫"
+    reasoning: "推理"
+    recheck: "重新檢查登入狀態"
+    checking: "檢查中…"
+    openWebsite: "開啟官網"
+  status:
+    loggedIn: "已登入"
+    loggedOut: "未登入"
+    neverChecked: "從未檢查"
+  messages:
+    loadFailed: "載入網頁版供應商失敗，請重新開啟設定頁。"
+    recheckFailed: "登入檢查失敗，請確認你已在該網站登入。"

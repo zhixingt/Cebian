@@ -39,6 +39,7 @@ const ALLOWED_TOP_KEYS = new Set([
   'extName', 'extDescription', 'actionTitle',
   // Namespaces.
   'common', 'chat', 'settings', 'provider', 'tools', 'vfs', 'dialogs', 'errors', 'agent',
+  'webProviders',
 ]);
 
 async function* walk(dir) {

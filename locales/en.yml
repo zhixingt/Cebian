@@ -529,3 +529,35 @@ errors:
     # $1 = skill name
     reservedName: "Skill name is reserved: $1"
     parseFrontmatter: "Failed to parse SKILL.md frontmatter."
+
+# ───── Web (Browser Session) providers ─────
+webProviders:
+  sectionTitle: "Web (Browser Session)"
+  sectionDescription: "Reuse your browser's login state. No API key required."
+  presets:
+    glm:
+      name: "GLM (Zhipu)"
+      description: "ChatGLM web version"
+    kimi:
+      name: "Kimi (Moonshot)"
+      description: "Moonshot AI web version"
+    deepseek:
+      name: "DeepSeek"
+      description: "DeepSeek web version"
+  fields:
+    enabled: "Enabled"
+    modelIdLabel: "Model ID"
+    modelIdHelp: "Default is the recommended model. Edit only if you know what you're doing."
+    capabilities: "Capabilities"
+    toolCalls: "Tool calls"
+    reasoning: "Reasoning"
+    recheck: "Re-check login status"
+    checking: "Checking…"
+    openWebsite: "Open website"
+  status:
+    loggedIn: "Logged in"
+    loggedOut: "Not logged in"
+    neverChecked: "Never checked"
+  messages:
+    loadFailed: "Failed to load web providers. Please reopen the settings page."
+    recheckFailed: "Login check failed. Please make sure you're signed in to the website."
