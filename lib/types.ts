@@ -75,15 +75,60 @@ export const TOOL_CHROME_API = 'chrome_api' as const;
  * - 'checking'  : transient — NEVER persisted to Dexie
  * - 'loggedIn'  : confirmed (mocked in MVP, real in ②)
  * - 'loggedOut' : unconfirmed (mocked in MVP, real in ②)
+ * - 'expired'   : ⑤ — stored credential past expiresAt (forward-compat only; ② never sets)
  */
 export type LoginStatus =
   | 'unknown'
   | 'checking'
   | 'loggedIn'
-  | 'loggedOut';
+  | 'loggedOut'
+  | 'expired';
+
+/**
+ * Result categories for login attempts (②, used by audit log A4).
+ * ② writes all of these on every attempt; surfaced via loginAuditLog.
+ */
+export type LoginAttemptResult =
+  | 'success'
+  | 'timeout'
+  | 'tab-closed'
+  | 'no-cookies'
+  | 'refresh-failed'
+  | 'decryption-failed'
+  | 'permission-denied';
+
+/**
+ * One entry in a provider's login audit log (A4).
+ * Stored in WebProvider.loginAuditLog; max 5 entries, newest first, FIFO eviction.
+ */
+export interface LoginAuditEntry {
+  /** ISO 8601 timestamp */
+  timestamp: string;
+  result: LoginAttemptResult;
+  errorMessage?: string;
+  /** Where the session was detected from (only set when result === 'success') */
+  source?: 'cookie' | 'localStorage' | 'stored';
+  /** Number of cookies captured (only set when result === 'success') */
+  cookiesCaptured?: number;
+}
+
+/**
+ * User overrides for preset values (A2 KEY ONE).
+ * All fields optional; null at the WebProvider level = use preset defaults.
+ * When a field is undefined, the preset's value is used.
+ * When a field is set (even to empty string/false), the user's value wins.
+ */
+export interface WebProviderUserOverrides {
+  cookieDomain?: string;
+  sessionIndicators?: string[];
+  useLocalStorageFallback?: boolean;
+  refreshUrl?: string;
+}
 
 /**
  * Persisted configuration for one web provider.
+ * - MVP fields: presetId, enabled, loginStatus, modelId, capabilities, lastCheckedAt, encryptedCookieBundle
+ * - ② additions: userOverrides (A2), loginAuditLog (A4)
  * `encryptedCookieBundle` is RESERVED for ② (real cookie storage);
  * MVP always writes `null`.
  */
@@ -96,6 +141,10 @@ export interface WebProvider {
   supportsReasoning: boolean;
   lastCheckedAt: string | null;
   encryptedCookieBundle: string | null;
+  /** ⭐ ② A2: user overrides for preset values; null = use preset defaults */
+  userOverrides: WebProviderUserOverrides | null;
+  /** ⭐ ② A4: login attempt audit log, max 5 entries, newest first, FIFO */
+  loginAuditLog: LoginAuditEntry[];
   createdAt: string;
   updatedAt: string;
 }

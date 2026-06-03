@@ -54,9 +54,13 @@ export class WebProviderRepository {
     capability: 'supportsToolCalls' | 'supportsReasoning',
     value: boolean,
   ): Promise<void> {
-    await this.db.webProviders.update(presetId, {
-      [capability]: value,
-      updatedAt: new Date().toISOString(),
+    // Use Dexie's function form to avoid TS issues with computed-key updates
+    // colliding with UpdateSpec<InsertType<WebProvider>> array element index types.
+    await this.db.webProviders.update(presetId, (provider) => {
+      if (capability === 'supportsToolCalls') provider.supportsToolCalls = value;
+      else provider.supportsReasoning = value;
+      provider.updatedAt = new Date().toISOString();
+      return true;
     });
   }
 
@@ -71,6 +75,8 @@ export class WebProviderRepository {
       supportsReasoning: preset.defaultSupportsReasoning,
       lastCheckedAt: null,
       encryptedCookieBundle: null,
+      userOverrides: null,        // ⭐ ② A2: no user overrides initially
+      loginAuditLog: [],          // ⭐ ② A4: empty audit log initially
       createdAt: now,
       updatedAt: now,
     };
