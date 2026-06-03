@@ -47,7 +47,7 @@ The following are **out of scope for this MVP** and reserved for follow-up miles
 │  │ ProvidersSection（现有）                              │ │
 │  │   └── <WebProvidersSubSection>  ← 新增（容器）       │ │
 │  │         ├── <WebProviderCard /> × N  ← 新增（卡片）  │ │
-│  │         └── <EmptyState />           ← 新增（占位）  │ │
+│  │         └── <EmptyWebProvidersState />  ← 新增（仅 Dexie 错误时显示） │ │
 │  └─────────────────────────────────────────────────────┘ │
 ├──────────────────────────────────────────────────────────┤
 │  Layer 2: 状态管理层（React Hooks）                       │
@@ -274,6 +274,7 @@ export function isEncryptionEnabled(): boolean {
 import type { CebianDB } from '../db';
 import type { WebProvider, LoginStatus } from '../types';
 import { WEB_PROVIDER_PRESETS } from './web-provider-presets';
+import { getDb } from '../db';  // ESM top-level import; project uses "type": "module"
 
 export class WebProviderRepository {
   constructor(private db: CebianDB) {}
@@ -351,8 +352,7 @@ export class WebProviderRepository {
 let _instance: WebProviderRepository | null = null;
 export function getWebProviderRepository(): WebProviderRepository {
   if (!_instance) {
-    // Lazy require to avoid circular deps
-    const { getDb } = require('../db');
+    // getDb is imported at top of file (ESM); no circular dep concern
     _instance = new WebProviderRepository(getDb());
   }
   return _instance;
