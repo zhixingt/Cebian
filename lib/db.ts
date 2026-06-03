@@ -1,5 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import type { WebProvider } from './types';
 
 // ─── Schema ───
 
@@ -20,11 +21,31 @@ export interface SessionRecord {
 
 const db = new Dexie('cebian') as Dexie & {
   sessions: EntityTable<SessionRecord, 'id'>;
+  webProviders: EntityTable<WebProvider, 'presetId'>;
 };
 
 db.version(1).stores({
   sessions: 'id, updatedAt',
 });
+
+// version(2) is strictly additive — re-declares sessions to avoid data loss
+// and introduces the webProviders table for the new Web (Browser Session)
+// provider feature. See docs/superpowers/specs/2026-06-03-web-browser-session-provider-design.md
+// section 3.3 for the migration rationale.
+db.version(2).stores({
+  sessions: 'id, updatedAt',
+  webProviders: 'presetId, enabled, updatedAt',
+});
+
+/**
+ * Singleton accessor for the Dexie database. Matches the style expected by
+ * the WebProviderRepository (lib/ai-config/web-provider-store.ts) and other
+ * future repositories. Existing code continues to use the module-level
+ * `db` const directly; this function is additive.
+ */
+export function getDb(): typeof db {
+  return db;
+}
 
 // ─── Session CRUD ───
 
