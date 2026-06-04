@@ -9,6 +9,7 @@ import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessag
 import { isInjectablePage } from '@/lib/tab-helpers';
 import { vfs } from '@/lib/vfs';
 import { registerCookieService } from '@/lib/ai-config/web-provider-cookie-service';
+import { registerWebProviderStream } from '@/lib/ai-config/web-provider-stream';
 
 /**
  * Grace period after the last subscribed port disconnects before the agent
@@ -30,6 +31,9 @@ export default defineBackground(() => {
 
   setupOAuthRefresh();
   registerCookieService();
+  // T11: register the 'web-session' pi-ai provider so Model<'web-session'>
+  // dispatched by the agent lands in our stream function (tab-based fetch).
+  registerWebProviderStream();
 
   // Dev-only: seed a custom provider from .env.local if configured.
   // No-op in production builds and when WXT_DEV_API_KEY is empty.
