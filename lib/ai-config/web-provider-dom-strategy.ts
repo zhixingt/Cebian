@@ -400,31 +400,6 @@ export const GLM_DOM_STRATEGY: WebProviderDomStrategy = {
   },
 };
 
-export const KIMI_DOM_STRATEGY: WebProviderDomStrategy = {
-  input: {
-    // Kimi uses a Lexical contenteditable editor (NOT a textarea).
-    // Verified: `document.querySelector('.chat-input-editor')` returned the div.
-    selector: '.chat-input-editor',
-    setMethod: 'contenteditable-setter',
-    sendMethod: 'enter',
-    settleDelayMs: 200,
-    scrollIntoView: true,
-  },
-  reader: {
-    // Kimi renders assistant messages with class containing "markdown".
-    // Verified 2026-06-04: 4 `[class*="markdown"]` elements; the last contains
-    // the AI's reply text. Avoid `markdown-body` (not used) and exact
-    // `chat-content-item-assistant` (matches multiple ancestors).
-    assistantMessageSelector: '[class*="markdown"]:last-of-type',
-    // Kimi shows a typing indicator (3 dots) while generating.
-    thinkingIndicatorSelector: '[class*="typing"], [class*="loading"]',
-    pollIntervalMs: 100,
-    stableThresholdMs: 800,
-    maxTotalMs: 60_000,
-    textMode: 'innerText',
-  },
-};
-
 export const DEEPSEEK_DOM_STRATEGY: WebProviderDomStrategy = {
   input: {
     // DeepSeek uses a controlled <textarea>. Verified: page probe showed
@@ -451,6 +426,5 @@ export const DEEPSEEK_DOM_STRATEGY: WebProviderDomStrategy = {
 
 export const DOM_STRATEGIES: Record<WebProvider['presetId'], WebProviderDomStrategy> = {
   glm: GLM_DOM_STRATEGY,
-  kimi: KIMI_DOM_STRATEGY,
   deepseek: DEEPSEEK_DOM_STRATEGY,
 };

@@ -5,7 +5,6 @@ import {
   startReader,
   DOM_STRATEGIES,
   GLM_DOM_STRATEGY,
-  KIMI_DOM_STRATEGY,
   DEEPSEEK_DOM_STRATEGY,
   type ReaderStrategy,
   type ReaderCallbacks,
@@ -363,9 +362,8 @@ describe('startReader', () => {
 // ===== Per-provider strategies =====
 
 describe('DOM_STRATEGIES (verified via T1 DevTools, 2026-06-04)', () => {
-  it('has all 3 built-in providers', () => {
+  it('has both built-in providers (GLM + DeepSeek; Kimi removed)', () => {
     expect(DOM_STRATEGIES.glm).toBeDefined();
-    expect(DOM_STRATEGIES.kimi).toBeDefined();
     expect(DOM_STRATEGIES.deepseek).toBeDefined();
   });
 
@@ -373,12 +371,6 @@ describe('DOM_STRATEGIES (verified via T1 DevTools, 2026-06-04)', () => {
     expect(GLM_DOM_STRATEGY.input.selector).toBe('textarea');
     expect(GLM_DOM_STRATEGY.input.setMethod).toBe('textarea-setter');
     expect(GLM_DOM_STRATEGY.input.sendMethod).toBe('enter');
-  });
-
-  it('Kimi uses contenteditable-setter + enter (verified: <div class="chat-input-editor">)', () => {
-    expect(KIMI_DOM_STRATEGY.input.selector).toBe('.chat-input-editor');
-    expect(KIMI_DOM_STRATEGY.input.setMethod).toBe('contenteditable-setter');
-    expect(KIMI_DOM_STRATEGY.input.sendMethod).toBe('enter');
   });
 
   it('DeepSeek uses textarea-setter + enter (verified: <textarea placeholder="给 DeepSeek 发送消息">)', () => {

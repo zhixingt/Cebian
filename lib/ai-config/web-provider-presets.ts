@@ -77,24 +77,6 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     domStrategy: DOM_STRATEGIES.glm,
   },
   {
-    id: 'kimi',
-    displayNameKey: 'webProviders.presets.kimi.name',
-    descriptionKey: 'webProviders.presets.kimi.description',
-    loginUrl: 'https://kimi.com',
-    defaultModelId: 'kimi-k2-0711-preview',
-    defaultSupportsToolCalls: true,
-    defaultSupportsReasoning: false,
-    cookieDomain: 'kimi.moonshot.cn',
-    sessionIndicators: ['kimi-auth'],
-    useLocalStorageFallback: true,
-    // ⭐ ⑧: DOM strategy. Verified 2026-06-04.
-    //   - chat input: <div class="chat-input-editor" contenteditable="true"> (Lexical editor)
-    //   - send: Enter key
-    //   - assistant message: last .markdown-body in chat content
-    // Kimi's HTTP API is gRPC-web binary protocol. Not feasible for relay.
-    domStrategy: DOM_STRATEGIES.kimi,
-  },
-  {
     id: 'deepseek',
     displayNameKey: 'webProviders.presets.deepseek.name',
     descriptionKey: 'webProviders.presets.deepseek.description',

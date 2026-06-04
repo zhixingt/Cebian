@@ -29,9 +29,9 @@ describe('buildProviderGroups (T12: ③+④ Web (Logged in) group)', () => {
     expect(groups).toEqual([]);
   });
 
-  it('includes Web group at TOP when at least 1 provider is logged in', () => {
+  it('includes Web group at TOP when GLM provider is logged in', () => {
     const webProviders = [
-      makeWebProvider({ presetId: 'kimi', modelId: 'kimi-k2-0905-preview' }),
+      makeWebProvider({ presetId: 'deepseek', modelId: 'kimi-k2-0905-preview' }),
       makeWebProvider({ presetId: 'glm', modelId: 'GLM-4.6' }),
     ];
     const groups = buildProviderGroups({}, [], webProviders);
@@ -47,7 +47,7 @@ describe('buildProviderGroups (T12: ③+④ Web (Logged in) group)', () => {
 
   it('does NOT include Web group when no providers are logged in', () => {
     const webProviders = [
-      makeWebProvider({ presetId: 'kimi', loginStatus: 'loggedOut' }),
+      makeWebProvider({ presetId: 'deepseek', loginStatus: 'loggedOut' }),
       makeWebProvider({ presetId: 'glm', loginStatus: 'unknown' }),
     ];
     const groups = buildProviderGroups({}, [], webProviders);
@@ -74,7 +74,7 @@ describe('buildProviderGroups (T12: ③+④ Web (Logged in) group)', () => {
     const customProviders = [
       { id: 'custom-1', name: 'Custom 1', baseUrl: 'https://x', models: [{ modelId: 'm', name: 'M' }] } as any,
     ];
-    const webProviders = [makeWebProvider({ presetId: 'kimi' })];
+    const webProviders = [makeWebProvider({ presetId: 'deepseek' })];
 
     const groups = buildProviderGroups(configured, customProviders, webProviders);
     expect(groups[0].provider).toBe('web');
@@ -84,7 +84,7 @@ describe('buildProviderGroups (T12: ③+④ Web (Logged in) group)', () => {
 
   it('Web group is hidden when all web providers are disabled (even if logged in)', () => {
     const webProviders = [
-      makeWebProvider({ presetId: 'kimi', enabled: false, loginStatus: 'loggedIn' }),
+      makeWebProvider({ presetId: 'deepseek', enabled: false, loginStatus: 'loggedIn' }),
     ];
     const groups = buildProviderGroups({}, [], webProviders);
     expect(groups.find(g => g.provider === 'web')).toBeUndefined();
@@ -92,7 +92,7 @@ describe('buildProviderGroups (T12: ③+④ Web (Logged in) group)', () => {
 
   it('Web group renders i18n label key (resolved by Component, not buildProviderGroups)', () => {
     // The function returns a label KEY; the Component resolves via t().
-    const webProviders = [makeWebProvider({ presetId: 'kimi' })];
+    const webProviders = [makeWebProvider({ presetId: 'deepseek' })];
     const groups = buildProviderGroups({}, [], webProviders);
     expect(groups[0].label).toMatch(/^webProviders\./);
   });

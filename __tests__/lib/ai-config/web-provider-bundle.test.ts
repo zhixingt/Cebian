@@ -126,7 +126,7 @@ describe('resolveBundle (T4: ③+④ 5min cache + 7d stale detection)', () => {
     expect(b2!.sessionid).toBe('abc123');  // same content
   });
 
-  it('invalidateAllBundles clears ALL providers (new object refs)', async () => {
+  it('invalidateAllBundles clears both providers (new object refs)', async () => {
     const repo = getWebProviderRepository();
     await repo.list();
     // Set up 2 providers with bundles
@@ -134,16 +134,16 @@ describe('resolveBundle (T4: ③+④ 5min cache + 7d stale detection)', () => {
     const c2 = await encryptCookieBundle(JSON.stringify({ sessionid: 'b' }));
     await repo.setEncryptedCookieBundle('glm' as WebProvider['presetId'], c1);
     await repo.setLoginStatus('glm' as WebProvider['presetId'], 'loggedIn');
-    await repo.setEncryptedCookieBundle('kimi' as WebProvider['presetId'], c2);
-    await repo.setLoginStatus('kimi' as WebProvider['presetId'], 'loggedIn');
+    await repo.setEncryptedCookieBundle('deepseek' as WebProvider['presetId'], c2);
+    await repo.setLoginStatus('deepseek' as WebProvider['presetId'], 'loggedIn');
     const b1g = await resolveBundle('glm' as WebProvider['presetId']);
-    const b1k = await resolveBundle('kimi' as WebProvider['presetId']);
+    const b1d = await resolveBundle('deepseek' as WebProvider['presetId']);
     invalidateAllBundles();
     const b2g = await resolveBundle('glm' as WebProvider['presetId']);
-    const b2k = await resolveBundle('kimi' as WebProvider['presetId']);
+    const b2d = await resolveBundle('deepseek' as WebProvider['presetId']);
     expect(b2g).not.toBe(b1g);
-    expect(b2k).not.toBe(b1k);
+    expect(b2d).not.toBe(b1d);
     expect(b2g!.sessionid).toBe('a');
-    expect(b2k!.sessionid).toBe('b');
+    expect(b2d!.sessionid).toBe('b');
   });
 });

@@ -90,7 +90,7 @@ describe('useWebProviderWebLogin', () => {
 
     // Second login call should be ignored (inFlight lock)
     act(() => {
-      result.current.login('kimi');
+      result.current.login('deepseek');
     });
     expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);  // still 1
 

@@ -11,13 +11,12 @@ describe('WebProviderRepository', () => {
   });
 
   describe('list()', () => {
-    it('seeds 3 presets on empty DB', async () => {
+    it('seeds 2 presets on empty DB', async () => {
       const providers = await getWebProviderRepository().list();
-      expect(providers).toHaveLength(3);
+      expect(providers).toHaveLength(2);
       expect(providers.map((p) => p.presetId).sort()).toEqual([
         'deepseek',
         'glm',
-        'kimi',
       ]);
     });
 
@@ -75,8 +74,8 @@ describe('WebProviderRepository', () => {
     it('persists loggedIn and updates lastCheckedAt', async () => {
       const repo = getWebProviderRepository();
       await repo.list();
-      await repo.setLoginStatus('kimi', 'loggedIn');
-      const result = await repo.get('kimi');
+      await repo.setLoginStatus('deepseek', 'loggedIn');
+      const result = await repo.get('deepseek');
       expect(result?.loginStatus).toBe('loggedIn');
       expect(result?.lastCheckedAt).not.toBeNull();
     });
@@ -104,8 +103,8 @@ describe('WebProviderRepository', () => {
     it('updates supportsToolCalls', async () => {
       const repo = getWebProviderRepository();
       await repo.list();
-      await repo.setCapability('kimi', 'supportsToolCalls', false);
-      const result = await repo.get('kimi');
+      await repo.setCapability('glm', 'supportsToolCalls', false);
+      const result = await repo.get('glm');
       expect(result?.supportsToolCalls).toBe(false);
     });
 
@@ -142,13 +141,13 @@ describe('WebProviderRepository', () => {
     it('persists user overrides', async () => {
       const repo = getWebProviderRepository();
       await repo.list();
-      await repo.setUserOverrides('kimi', {
-        sessionIndicators: ['kimi-auth-v2'],
+      await repo.setUserOverrides('glm', {
+        sessionIndicators: ['chatglm_token-v2'],
         useLocalStorageFallback: false,
       });
-      const result = await repo.get('kimi');
+      const result = await repo.get('glm');
       expect(result?.userOverrides).toEqual({
-        sessionIndicators: ['kimi-auth-v2'],
+        sessionIndicators: ['chatglm_token-v2'],
         useLocalStorageFallback: false,
       });
     });
@@ -156,9 +155,9 @@ describe('WebProviderRepository', () => {
     it('null clears overrides', async () => {
       const repo = getWebProviderRepository();
       await repo.list();
-      await repo.setUserOverrides('kimi', { sessionIndicators: ['x'] });
-      await repo.setUserOverrides('kimi', null);
-      const result = await repo.get('kimi');
+      await repo.setUserOverrides('glm', { sessionIndicators: ['x'] });
+      await repo.setUserOverrides('glm', null);
+      const result = await repo.get('glm');
       expect(result?.userOverrides).toBeNull();
     });
   });

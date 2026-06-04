@@ -12,7 +12,7 @@ import type { WebProvider } from '@/lib/types';
 
 describe('getModelIdForProvider (T5: ③+④ model lookup)', () => {
   it('returns the preset defaultModelId for each built-in provider', () => {
-    expect(getModelIdForProvider('kimi')).toBe('kimi-k2-0711-preview');
+    expect(getModelIdForProvider('deepseek')).toBe('deepseek-chat');
     expect(getModelIdForProvider('glm')).toBe('glm-4.6');
     expect(getModelIdForProvider('deepseek')).toBe('deepseek-chat');
   });
@@ -24,11 +24,11 @@ describe('getModelIdForProvider (T5: ③+④ model lookup)', () => {
 });
 
 describe('resolveWebModel (T5: pi-ai Model<web-session> shape)', () => {
-  it('returns a Model with api=WEB_SESSION_API for Kimi', () => {
-    const model = resolveWebModel('kimi', 'kimi-k2-0905-preview');
+  it('returns a Model with api=WEB_SESSION_API for DeepSeek', () => {
+    const model = resolveWebModel('deepseek', 'deepseek-chat');
     expect(model.api).toBe(WEB_SESSION_API);
-    expect(model.id).toBe('web:kimi:kimi-k2-0905-preview');
-    expect(model.name).toContain('kimi-k2-0905-preview');
+    expect(model.id).toBe('web:deepseek:deepseek-chat');
+    expect(model.name).toContain('deepseek-chat');
     expect(model.provider).toBeTruthy();
     expect(model.baseUrl).toMatch(/^https:\/\//);
     expect(model.input).toEqual(['text']);  // MVP: no images
@@ -88,7 +88,7 @@ describe('getAvailableWebModels (T5: filter logged-in providers)', () => {
 
   it('returns one Model per logged-in + enabled provider', () => {
     const providers = [
-      makeProvider({ presetId: 'kimi', modelId: 'kimi-k2-0905-preview', loginStatus: 'loggedIn' }),
+      makeProvider({ presetId: 'deepseek', modelId: 'deepseek-chat', loginStatus: 'loggedIn' }),
       makeProvider({ presetId: 'glm', modelId: 'GLM-4.6', loginStatus: 'loggedIn' }),
       makeProvider({ presetId: 'deepseek', modelId: 'deepseek-chat', loginStatus: 'loggedIn' }),
     ];
@@ -97,29 +97,29 @@ describe('getAvailableWebModels (T5: filter logged-in providers)', () => {
     expect(models.map(m => m.id).sort()).toEqual([
       'web:deepseek:deepseek-chat',
       'web:glm:GLM-4.6',
-      'web:kimi:kimi-k2-0905-preview',
+      'web:deepseek:deepseek-chat',
     ]);
   });
 
   it('filters out non-logged-in providers', () => {
     const providers = [
-      makeProvider({ presetId: 'kimi', modelId: 'kimi-k2-0905-preview', loginStatus: 'loggedIn' }),
+      makeProvider({ presetId: 'deepseek', modelId: 'deepseek-chat', loginStatus: 'loggedIn' }),
       makeProvider({ presetId: 'glm', modelId: 'GLM-4.6', loginStatus: 'loggedOut' }),
       makeProvider({ presetId: 'deepseek', modelId: 'deepseek-chat', loginStatus: 'unknown' }),
     ];
     const models = getAvailableWebModels(providers);
     expect(models).toHaveLength(1);
-    expect(models[0].id).toBe('web:kimi:kimi-k2-0905-preview');
+    expect(models[0].id).toBe('web:deepseek:deepseek-chat');
   });
 
   it('filters out disabled providers', () => {
     const providers = [
-      makeProvider({ presetId: 'kimi', modelId: 'kimi-k2-0905-preview', loginStatus: 'loggedIn', enabled: true }),
+      makeProvider({ presetId: 'deepseek', modelId: 'deepseek-chat', loginStatus: 'loggedIn', enabled: true }),
       makeProvider({ presetId: 'glm', modelId: 'GLM-4.6', loginStatus: 'loggedIn', enabled: false }),
     ];
     const models = getAvailableWebModels(providers);
     expect(models).toHaveLength(1);
-    expect(models[0].id).toBe('web:kimi:kimi-k2-0905-preview');
+    expect(models[0].id).toBe('web:deepseek:deepseek-chat');
   });
 
   it('uses provider.modelId (not preset default) when set', () => {
@@ -152,21 +152,21 @@ describe('resolveSelectedWebModel (web activeModel resolution)', () => {
 
   it('resolves selected web model when provider is enabled + loggedIn', () => {
     const providers = [
-      makeProvider({ presetId: 'kimi', loginStatus: 'loggedIn', enabled: true }),
+      makeProvider({ presetId: 'deepseek', loginStatus: 'loggedIn', enabled: true }),
     ];
 
     const resolved = resolveSelectedWebModel(
-      { provider: 'web', modelId: 'web:kimi:kimi-k2-0905-preview' },
+      { provider: 'web', modelId: 'web:deepseek:deepseek-chat' },
       providers,
     );
 
     expect(resolved).not.toBeNull();
-    expect(resolved!.id).toBe('web:kimi:kimi-k2-0905-preview');
+    expect(resolved!.id).toBe('web:deepseek:deepseek-chat');
     expect(resolved!.api).toBe(WEB_SESSION_API);
   });
 
   it('returns null for non-web activeModel provider', () => {
-    const providers = [makeProvider({ presetId: 'kimi' })];
+    const providers = [makeProvider({ presetId: 'deepseek' })];
     const resolved = resolveSelectedWebModel(
       { provider: 'anthropic', modelId: 'claude-3-7-sonnet' },
       providers,
@@ -183,19 +183,21 @@ describe('resolveSelectedWebModel (web activeModel resolution)', () => {
   it('returns null when target provider is loggedOut or disabled', () => {
     const providers = [
       makeProvider({ presetId: 'deepseek', loginStatus: 'loggedOut' }),
-      makeProvider({ presetId: 'kimi', enabled: false, loginStatus: 'loggedIn' }),
+      makeProvider({ presetId: 'deepseek', enabled: false, loginStatus: 'loggedIn' }),
     ];
 
     const deepseek = resolveSelectedWebModel(
       { provider: 'web', modelId: 'web:deepseek:deepseek-chat' },
       providers,
     );
-    const kimi = resolveSelectedWebModel(
-      { provider: 'web', modelId: 'web:kimi:kimi-k2-0905-preview' },
+    // GLM is enabled + loggedIn, so should resolve
+    const glm = resolveSelectedWebModel(
+      { provider: 'web', modelId: 'web:glm:GLM-4.6' },
       providers,
     );
 
     expect(deepseek).toBeNull();
-    expect(kimi).toBeNull();
+    expect(glm).not.toBeNull();
+    expect(glm?.id).toBe('web:glm:GLM-4.6');
   });
 });

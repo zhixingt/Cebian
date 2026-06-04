@@ -133,7 +133,7 @@ export interface WebProviderUserOverrides {
  * MVP always writes `null`.
  */
 export interface WebProvider {
-  presetId: 'glm' | 'kimi' | 'deepseek';
+  presetId: 'glm' | 'deepseek';
   enabled: boolean;
   loginStatus: Exclude<LoginStatus, 'checking'>;
   modelId: string;

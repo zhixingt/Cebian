@@ -21,24 +21,20 @@ describe('WEB_PROVIDER_PRESETS', () => {
     }
   });
 
-  it('only GLM has refreshUrl set (others do not need token exchange)', () => {
+  it('only GLM has refreshUrl set (DeepSeek does not need token exchange)', () => {
     const glm = WEB_PROVIDER_PRESETS.find(p => p.id === 'glm')!;
-    const kimi = WEB_PROVIDER_PRESETS.find(p => p.id === 'kimi')!;
     const ds = WEB_PROVIDER_PRESETS.find(p => p.id === 'deepseek')!;
     expect(glm.refreshUrl).toBeDefined();
     expect(glm.refreshUrl).toMatch(/^https:\/\//);
-    expect(kimi.refreshUrl).toBeUndefined();
     expect(ds.refreshUrl).toBeUndefined();
   });
 
-  it('Kimi and DeepSeek use localStorage fallback (provider token may be localStorage-backed)', () => {
-    const kimi = WEB_PROVIDER_PRESETS.find(p => p.id === 'kimi')!;
-    expect(kimi.useLocalStorageFallback).toBe(true);
+  it('DeepSeek uses localStorage fallback (provider token may be localStorage-backed)', () => {
+    const ds = WEB_PROVIDER_PRESETS.find(p => p.id === 'deepseek')!;
+    expect(ds.useLocalStorageFallback).toBe(true);
     // GLM should NOT use localStorage fallback
     const glm = WEB_PROVIDER_PRESETS.find(p => p.id === 'glm')!;
-    const ds = WEB_PROVIDER_PRESETS.find(p => p.id === 'deepseek')!;
     expect(glm.useLocalStorageFallback).toBe(false);
-    expect(ds.useLocalStorageFallback).toBe(true);
   });
 
   it('T2: WebProviderDomStrategy interface has input + reader (TDD: compile-time check)', () => {
@@ -155,19 +151,15 @@ describe('resolveEffectiveConfig', () => {
     expect(effective.source.refreshUrl).toBe('preset');
   });
 
-  it('user can override refreshUrl (e.g. Kimi to enable GLM-like token exchange)', () => {
-    const kimi = WEB_PROVIDER_PRESETS.find(p => p.id === 'kimi')!;
-    const provider = baseProvider({
-      // (type-cast: provider is glm in helper, but preset can be kimi)
-    } as any);
-    // Re-cast to kimi
-    const kimiProvider = { ...provider, presetId: 'kimi' as const } as WebProvider;
+  it('user can override refreshUrl for GLM (custom token exchange endpoint)', () => {
+    const glm = WEB_PROVIDER_PRESETS.find(p => p.id === 'glm')!;
+    const provider = baseProvider({});
     const withRefresh = {
-      ...kimiProvider,
-      userOverrides: { refreshUrl: 'https://kimi.com/api/refresh' },
+      ...provider,
+      userOverrides: { refreshUrl: 'https://custom.chatglm.cn/api/refresh' },
     };
-    const effective = resolveEffectiveConfig(withRefresh, kimi);
-    expect(effective.refreshUrl).toBe('https://kimi.com/api/refresh');
+    const effective = resolveEffectiveConfig(withRefresh, glm);
+    expect(effective.refreshUrl).toBe('https://custom.chatglm.cn/api/refresh');
     expect(effective.source.refreshUrl).toBe('user');
   });
 });

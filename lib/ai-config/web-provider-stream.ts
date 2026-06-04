@@ -50,7 +50,6 @@ import { WEB_PROVIDER_PRESETS, type WebProviderPreset } from './web-provider-pre
 // their function bodies (chromeclaw-style HTTP-replay path). The export
 // `defaultMainWorldFetchByProvider` wires them up for the default deps.
 import { deepseekMainWorldFetch } from './web-provider-content-fetch-deepseek';
-import { kimiMainWorldFetch } from './web-provider-content-fetch-kimi';
 import { glmMainWorldFetch } from './web-provider-content-fetch-glm';
 import type { ContentFetchRequest } from './web-provider-content-fetch-main';
 import type { WebProvider } from '../types';
@@ -111,10 +110,6 @@ export const defaultMainWorldFetchByProvider: WebSessionStreamDeps['mainWorldFet
   deepseek: {
     request: { type: 'WEB_LLM_FETCH' } as unknown as object,
     func: deepseekMainWorldFetch as unknown as (request: unknown) => Promise<void>,
-  },
-  kimi: {
-    request: { type: 'WEB_LLM_FETCH' } as unknown as object,
-    func: kimiMainWorldFetch as unknown as (request: unknown) => Promise<void>,
   },
   glm: {
     request: { type: 'WEB_LLM_FETCH' } as unknown as object,
@@ -239,28 +234,50 @@ async function orchestrateStream(
 ): Promise<void> {
   let unregisterMsg: (() => void) | null = null;
 
+  // ⑫: DIAGNOSTIC — user flow vs E2E: E2E calls the adapter directly via
+  // page.evaluate, bypassing this entire orchestration layer. If GLM/DeepSeek
+  // fail in the real extension but pass in E2E, the failure is in one of
+  // these steps. Logs are prefixed with [WS-DIAG] for easy filtering.
+  const diag = (msg: string, extra?: unknown) => {
+    console.log(`[WS-DIAG] ${msg}`, extra ?? '');
+  };
+
   try {
     // 1. Parse model id
     const { providerId, modelId } = parseWebModelId(model.id);
+    diag(`step 1: parsed modelId`, { providerId, modelId });
 
     // 2. Look up preset
     const preset = deps.presets.find((p) => p.id === providerId);
     if (!preset) {
+      diag(`step 2 FAIL: no preset for ${providerId}`);
       throw new Error(`Unknown web provider: ${providerId}`);
     }
+    diag(`step 2: preset found`, { loginUrl: preset.loginUrl });
+
     // ⑧: domStrategy is required (replaces old chatApi check)
     if (!preset.domStrategy) {
+      diag(`step 2 FAIL: no domStrategy for ${providerId}`);
       throw new Error(`Provider ${providerId} has no domStrategy configured`);
     }
 
     // 3. Resolve bundle (validates login + decryption)
     const bundle = await deps.resolveBundle(providerId);
     if (!bundle) {
+      diag(`step 3 FAIL: resolveBundle returned null for ${providerId} (not logged in or decryption failed)`);
       throw new Error(`Provider ${providerId} has no valid session — please log in via Settings`);
     }
+    diag(`step 3: bundle resolved (keys: ${Object.keys(bundle).join(',')})`);
 
     // 4. Build request(s) and open/reuse tab
-    const tabId = await deps.openTab(providerId, preset.loginUrl);
+    let tabId: number;
+    try {
+      tabId = await deps.openTab(providerId, preset.loginUrl);
+      diag(`step 4: tabId=${tabId}`);
+    } catch (e) {
+      diag(`step 4 FAIL: openTab threw`, e);
+      throw e;
+    }
 
     // ⑪: Resolve content-fetch handler for this provider. If available, take
     // the chromeclaw-style HTTP-replay path; otherwise fall back to DOM relay.
@@ -376,10 +393,18 @@ async function orchestrateStream(
 
     // 8. Inject (DOM relay vs content-fetch, per provider capability)
     if (useContentFetch) {
-      await import('./web-provider-relay').then(({ injectContentFetch }) =>
-        injectContentFetch(tabId, providerId, fetchEntry!.func, fetchRequest!),
-      );
+      diag(`step 8: injecting content-fetch into tabId=${tabId}`);
+      try {
+        await import('./web-provider-relay').then(({ injectContentFetch }) =>
+          injectContentFetch(tabId, providerId, fetchEntry!.func, fetchRequest!),
+        );
+        diag(`step 8: injectContentFetch resolved (adapter invoked in MAIN world)`);
+      } catch (e) {
+        diag(`step 8 FAIL: injectContentFetch threw`, e);
+        throw e;
+      }
     } else {
+      diag(`step 8: injecting DOM relay into tabId=${tabId}`);
       await deps.injectScripts(tabId, relayRequest!);
     }
   } catch (err) {

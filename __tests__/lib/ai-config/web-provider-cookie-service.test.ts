@@ -111,16 +111,16 @@ describe('web-provider-cookie-service (login flow + A3 + A5 + A6 + A4)', () => {
       expect(chrome.tabs.update).toHaveBeenCalledWith(99, { active: true });
     });
 
-    it('localStorage fallback (Kimi) when no cookies but localStorage has tokens', async () => {
+    it('localStorage fallback (DeepSeek) when no cookies but localStorage has tokens', async () => {
       await getWebProviderRepository().list();
       mockCookies = [];
       // localStorage read returns non-empty value
       (chrome.scripting.executeScript as any) = vi.fn(() => Promise.resolve([
-        { result: { 'kimi-auth': 'ls-xyz' } },
+        { result: { 'userToken': 'ls-xyz' } },
       ]));
 
       const sendResponse = vi.fn();
-      messageHandler({ type: 'WEB_PROVIDER_LOGIN', presetId: 'kimi' }, {}, sendResponse);
+      messageHandler({ type: 'WEB_PROVIDER_LOGIN', presetId: 'deepseek' }, {}, sendResponse);
       await new Promise(r => setTimeout(r, 5500));
 
       const response = sendResponse.mock.calls[0][0];

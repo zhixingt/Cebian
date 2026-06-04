@@ -9,11 +9,11 @@ describe('useWebProviders', () => {
     await getDb().webProviders.clear();
   });
 
-  it('starts with isLoading=true, then resolves to 3 seeded providers', async () => {
+  it('starts with isLoading=true, then resolves to 2 seeded providers', async () => {
     const { result } = renderHook(() => useWebProviders());
     expect(result.current.isLoading).toBe(true);
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.providers).toHaveLength(3);
+    expect(result.current.providers).toHaveLength(2);
     expect(result.current.error).toBeNull();
   });
 
@@ -31,9 +31,9 @@ describe('useWebProviders', () => {
     const { result } = renderHook(() => useWebProviders());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     await act(async () => {
-      await result.current.update.setLoginStatus('kimi', 'loggedIn');
+      await result.current.update.setLoginStatus('deepseek', 'loggedIn');
     });
-    const kimi = result.current.providers.find((p) => p.presetId === 'kimi');
+    const kimi = result.current.providers.find((p) => p.presetId === 'deepseek');
     expect(kimi?.loginStatus).toBe('loggedIn');
   });
 
@@ -80,7 +80,7 @@ describe('useWebProviders', () => {
       }
     });
     // hook itself remains stable
-    expect(result.current.providers).toHaveLength(3);
+    expect(result.current.providers).toHaveLength(2);
   });
 
   it('cancelled unmount does not set state after unmount', async () => {

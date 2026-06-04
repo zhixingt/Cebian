@@ -2,8 +2,12 @@
 // Clean version of v2:
 //  1. Tag each run with a unique runId; filter out stale listeners
 //  2. Wrap window.fetch + Response to log the actual request/response
-//  3. Log kimi-auth cookie presence before calling the adapter
+//  3. Log provider cookies (chatglm_token, userToken) before calling the adapter
 //  4. Print a clear verdict per provider
+//
+// Note: Kimi was removed in the cleanup — server-side validation gap
+// (`invalid_argument`) cannot be resolved from client-side. This script
+// now exercises GLM and DeepSeek only.
 
 const PW_PATH = 'D:/Project/CebianX/cebian-web-provider/node_modules/.pnpm/playwright-core@1.60.0/node_modules/playwright-core';
 const { chromium } = require(PW_PATH);
@@ -13,7 +17,6 @@ const CDP_URL = 'http://127.0.0.1:9333';
 const BUNDLE_PATH = 'D:/Project/CebianX/cebian-web-provider/.output/chrome-mv3/background.js';
 const PROVIDER_LOGIN_URLS = {
   deepseek: 'https://chat.deepseek.com/',
-  kimi: 'https://www.kimi.com/',
   glm: 'https://chatglm.cn/',
 };
 const TIMEOUT_MS = 25_000;
@@ -21,7 +24,7 @@ const TIMEOUT_MS = 25_000;
 /**
  * Auto-detect adapter function symbols from the mainWorldFetchByProvider
  * dispatch table. The table has the shape:
- *   <sym>={deepseek:{request:{type:`WEB_LLM_FETCH`},func:wyt},kimi:{...func:Tyt},glm:{...func:Ryt}}
+ *   <sym>={deepseek:{request:{type:`WEB_LLM_FETCH`},func:wyt},glm:{...func:Ryt}}
  * Find each provider's func symbol independently (avoids needing to match
  * nested braces in a single regex).
  */
@@ -39,10 +42,9 @@ function detectAdapterSymbols(bundle) {
     return m ? m[1] : null;
   };
   const deepseek = find('deepseek');
-  const kimi = find('kimi');
   const glm = find('glm');
-  if (!deepseek || !kimi || !glm) return null;
-  return { deepseek, kimi, glm };
+  if (!deepseek || !glm) return null;
+  return { deepseek, glm };
 }
 
 function extractAdapterSource(bundle, symbol) {
@@ -89,8 +91,7 @@ async function runProviderE2E(page, providerId, adapterSource) {
       await cdpSession.send('Network.enable');
       cdpSession.on('Network.requestWillBeSent', (params) => {
         const url = params.request.url;
-        if (url.includes('kimi.gateway.chat.v1.ChatService/Chat') ||
-            url.includes('chatglm') || url.includes('deepseek')) {
+        if (url.includes('chatglm') || url.includes('deepseek')) {
           result.cdpRequests.push({
             runId,
             url,
@@ -163,7 +164,7 @@ async function runProviderE2E(page, providerId, adapterSource) {
       window.__cebFetchWrapped = true;
     }, runId);
 
-    // Probe cookies (for kimi-auth, chatglm_token, userToken) BEFORE the call
+    // Probe cookies (for chatglm_token, userToken) BEFORE the call
     const cookies = await page.evaluate(() => {
       const out = {};
       const all = document.cookie || '';
@@ -176,26 +177,14 @@ async function runProviderE2E(page, providerId, adapterSource) {
 
     // ⑪.7: Probe ALL cookies (including HttpOnly) via Playwright's
     // context.cookies() API — the SW uses the same chrome.cookies.getAll
-    // to read HttpOnly cookies like Kimi's `kimi-auth`. document.cookie
-    // (above) can't see HttpOnly, so we need this second probe to
-    // simulate the SW's view.
+    // to read HttpOnly cookies. document.cookie (above) can't see
+    // HttpOnly, so we need this second probe to simulate the SW's view.
     const allCookies = await page.context().cookies(...(function () {
-      if (providerId === 'kimi') return ['https://www.kimi.com'];
       if (providerId === 'glm') return ['https://chatglm.cn'];
       if (providerId === 'deepseek') return ['https://chat.deepseek.com'];
       return [];
     })());
     result.allCookies = allCookies.map(c => ({ name: c.name, httpOnly: c.httpOnly, len: c.value.length }));
-
-    // For Kimi, extract `kimi-auth` from the full cookie list and add
-    // it as `authHeader` on the stub request — simulating what the SW
-    // will do at runtime via chrome.cookies.getAll.
-    let authHeader = null;
-    if (providerId === 'kimi') {
-      const kimiAuth = allCookies.find(c => c.name === 'kimi-auth')?.value;
-      if (kimiAuth) authHeader = `Bearer ${kimiAuth}`;
-      result.authHeader = authHeader ? 'present' : 'absent';
-    }
 
     // Build stub request
     const stub = {
@@ -203,7 +192,6 @@ async function runProviderE2E(page, providerId, adapterSource) {
       requestId: runId,
       url: '',
       init: { method: 'POST', body: JSON.stringify({ prompt: '你好', chatId: '' }) },
-      ...(authHeader ? { authHeader } : {}),
     };
 
     // Call adapter
@@ -265,10 +253,10 @@ async function runProviderE2E(page, providerId, adapterSource) {
 
   const adapterSyms = detectAdapterSymbols(bundle);
   if (!adapterSyms) { console.error('[e2e] FATAL: dispatch table not found in bundle'); process.exit(1); }
-  console.log(`[e2e] auto-detected dispatch ${adapterSyms._dispatchSymbol} = { deepseek:${adapterSyms.deepseek}, kimi:${adapterSyms.kimi}, glm:${adapterSyms.glm} }`);
+  console.log(`[e2e] auto-detected dispatch ${adapterSyms._dispatchSymbol} = { deepseek:${adapterSyms.deepseek}, glm:${adapterSyms.glm} }`);
 
   const adapters = {};
-  for (const providerId of ['deepseek', 'kimi', 'glm']) {
+  for (const providerId of ['glm', 'deepseek']) {
     const symbol = adapterSyms[providerId];
     const src = extractAdapterSource(bundle, symbol);
     if (!src) { console.error(`[e2e] FATAL: cannot extract ${providerId} (${symbol})`); process.exit(1); }
@@ -282,16 +270,13 @@ async function runProviderE2E(page, providerId, adapterSource) {
   const pages = context.pages();
   const findByPattern = (re) => pages.find(p => re.test(p.url()));
   let dsPage = findByPattern(/^https?:\/\/(www\.)?chat\.deepseek\.com\//);
-  let kimiPage = findByPattern(/^https?:\/\/(www\.)?kimi\.com\/chat\//);
   let glmPage = findByPattern(/^https?:\/\/(www\.)?chatglm\.cn\//);
 
   if (!dsPage) { dsPage = await context.newPage(); try { await dsPage.goto(PROVIDER_LOGIN_URLS.deepseek, { waitUntil: 'domcontentloaded', timeout: 15_000 }); } catch (e) {} }
   if (!glmPage) { glmPage = await context.newPage(); try { await glmPage.goto(PROVIDER_LOGIN_URLS.glm, { waitUntil: 'domcontentloaded', timeout: 15_000 }); } catch (e) {} }
-  if (!kimiPage) { kimiPage = await context.newPage(); try { await kimiPage.goto(PROVIDER_LOGIN_URLS.kimi, { waitUntil: 'domcontentloaded', timeout: 15_000 }); } catch (e) {} }
 
   const results = {};
   for (const [providerId, page] of [
-    ['kimi', kimiPage],
     ['glm', glmPage],
     ['deepseek', dsPage],
   ]) {
@@ -312,7 +297,7 @@ async function runProviderE2E(page, providerId, adapterSource) {
 
   // Detail dump
   console.log('\n[e2e] === REQUEST DUMP (per provider) ===');
-  for (const providerId of ['kimi', 'glm', 'deepseek']) {
+  for (const providerId of ['glm', 'deepseek']) {
     const r = results[providerId];
     if (!r || !r.requests || r.requests.length === 0) {
       console.log(`\n[${providerId}] (no requests captured)`);
@@ -342,7 +327,7 @@ async function runProviderE2E(page, providerId, adapterSource) {
   // explicitly sets). CDP Network.requestWillBeSent sees the full
   // request as the browser sends it.
   console.log('\n[e2e] === CDP FULL REQUEST DUMP (browser-automatic headers included) ===');
-  for (const providerId of ['kimi', 'glm', 'deepseek']) {
+  for (const providerId of ['glm', 'deepseek']) {
     const r = results[providerId];
     if (!r || !r.cdpRequests || r.cdpRequests.length === 0) {
       console.log(`\n[${providerId}] (no CDP requests captured${r?.cdpError ? `, error=${r.cdpError}` : ''})`);
@@ -360,7 +345,7 @@ async function runProviderE2E(page, providerId, adapterSource) {
   }
 
   console.log('\n[e2e] === EVENT LOG (per provider) ===');
-  for (const providerId of ['kimi', 'glm', 'deepseek']) {
+  for (const providerId of ['glm', 'deepseek']) {
     const r = results[providerId];
     if (!r || !r.events || r.events.length === 0) {
       console.log(`\n[${providerId}] (no events)`);
@@ -378,7 +363,7 @@ async function runProviderE2E(page, providerId, adapterSource) {
   // Verdict
   console.log('\n[e2e] === VERDICT ===');
   let allOk = true;
-  for (const providerId of ['kimi', 'glm', 'deepseek']) {
+  for (const providerId of ['glm', 'deepseek']) {
     const r = results[providerId];
     const s = r.summary;
     const ok = s && s.chunkCount > 0 && s.done && !s.error;

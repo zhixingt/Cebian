@@ -26,11 +26,7 @@ export const WEB_SESSION_TIMEOUT_MS = 60_000;
 /**
  * ⑪.7: Read HttpOnly cookies for a provider that the MAIN world can't see
  * via `document.cookie`. Used to pass an Authorization header to adapters
- * that need the token as a Bearer header (chromeclaw parity for Kimi).
- *
- * Currently only Kimi needs this — its `kimi-auth` cookie is HttpOnly,
- * so `document.cookie` in MAIN world returns nothing useful. The SW has
- * `chrome.cookies` API which CAN read HttpOnly.
+ * that need the token as a Bearer header.
  *
  * Returns `'Bearer <token>'` (the full Authorization header value) or
  * `null` if no auth cookie is found for the provider.
@@ -38,14 +34,10 @@ export const WEB_SESSION_TIMEOUT_MS = 60_000;
 export async function getAuthHeadersForProvider(
   providerId: WebProvider['presetId'],
 ): Promise<string | null> {
-  if (providerId !== 'kimi') return null;
-  try {
-    const cookies = await chrome.cookies.getAll({ domain: '.kimi.com' });
-    const kimiAuth = cookies.find((c) => c.name === 'kimi-auth')?.value;
-    return kimiAuth ? `Bearer ${kimiAuth}` : null;
-  } catch {
-    return null;
-  }
+  // Reserved for future providers that need HttpOnly cookie auth.
+  // Currently GLM and DeepSeek read auth from localStorage / non-HttpOnly
+  // cookies, so no SW-side HttpOnly read is required.
+  return null;
 }
 
 export interface TabRegistryConfig {
@@ -292,21 +284,39 @@ export async function injectContentFetch(
   mainWorldFetch: MainWorldFetchFunction,
   request: unknown,
 ): Promise<unknown> {
+  // ⑫: DIAGNOSTIC — trace each executeScript call. User flow failures
+  // often manifest as silent chrome.scripting.executeScript rejections
+  // (host_permissions, CSP, wrong target tabId, etc.).
+  console.log(`[WS-DIAG] injectContentFetch: tabId=${tabId} providerId=${providerId}`);
+
   // 1. ISOLATED bridge first (so it can attach a window.message listener
   //    that forwards WEB_LLM_* events to chrome.runtime).
-  const isolatedResult = await chrome.scripting.executeScript({
-    target: { tabId },
-    world: 'ISOLATED',
-    func: installIsolatedBridge,
-    args: [providerId],
-  });
+  let isolatedResult: unknown;
+  try {
+    isolatedResult = await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'ISOLATED',
+      func: installIsolatedBridge,
+      args: [providerId],
+    });
+    console.log(`[WS-DIAG] ISOLATED bridge installed for ${providerId}`);
+  } catch (e) {
+    console.error(`[WS-DIAG] ISOLATED bridge FAILED for ${providerId}:`, e);
+    throw e;
+  }
   // 2. MAIN world per-provider fetch.
-  await chrome.scripting.executeScript({
-    target: { tabId },
-    world: 'MAIN',
-    func: mainWorldFetch,
-    args: [request],
-  });
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: mainWorldFetch,
+      args: [request],
+    });
+    console.log(`[WS-DIAG] MAIN adapter invoked for ${providerId}`);
+  } catch (e) {
+    console.error(`[WS-DIAG] MAIN adapter invoke FAILED for ${providerId}:`, e);
+    throw e;
+  }
   return isolatedResult;
 }
 

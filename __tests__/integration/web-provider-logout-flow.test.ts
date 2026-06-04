@@ -50,7 +50,7 @@ describe('T14 #7: Logout flow → next chat shows "please log in" error (no wast
     };
   });
 
-  async function setupLoggedInProvider(providerId: 'glm' | 'kimi' | 'deepseek' = 'glm') {
+  async function setupLoggedInProvider(providerId: 'glm' | 'deepseek' = 'glm') {
     const repo = getWebProviderRepository();
     await repo.list();  // creates default provider records
     const ciphertext = await encryptCookieBundle(JSON.stringify({ sessionid: 'old' }));
@@ -60,14 +60,14 @@ describe('T14 #7: Logout flow → next chat shows "please log in" error (no wast
     await resolveBundle(providerId);
   }
 
-  async function logout(providerId: 'glm' | 'kimi' | 'deepseek') {
+  async function logout(providerId: 'glm' | 'deepseek') {
     const repo = getWebProviderRepository();
     await repo.clearEncryptedCookieBundle(providerId);
     await repo.setLoginStatus(providerId, 'loggedOut');
     invalidateBundle(providerId);
   }
 
-  function makeModel(providerId: 'glm' | 'kimi' | 'deepseek' = 'glm'): Model<typeof WEB_SESSION_API> {
+  function makeModel(providerId: 'glm' | 'deepseek' = 'glm'): Model<typeof WEB_SESSION_API> {
     const preset = WEB_PROVIDER_PRESETS.find(p => p.id === providerId)!;
     return {
       id: `web:${providerId}:${preset.defaultModelId}`,
@@ -142,15 +142,15 @@ describe('T14 #7: Logout flow → next chat shows "please log in" error (no wast
   });
 
   it('logout invalidates the 5min bundle cache (next resolveBundle reads from DB, sees loggedOut)', async () => {
-    await setupLoggedInProvider('kimi');
+    await setupLoggedInProvider('deepseek');
     // Simulate the cache being populated
-    const cached = await resolveBundle('kimi' as any);
+    const cached = await resolveBundle('deepseek');
     expect(cached).not.toBeNull();
     // User logs out
-    await logout('kimi');
+    await logout('deepseek');
     // Even if the cache had the decrypted cookies, invalidateBundle clears them.
     // The next resolveBundle reads from DB → sees loginStatus=loggedOut → returns null.
-    const after = await resolveBundle('kimi' as any);
+    const after = await resolveBundle('deepseek');
     expect(after).toBeNull();
   });
 
@@ -174,7 +174,6 @@ describe('T14 #7: Logout flow → next chat shows "please log in" error (no wast
   it('parseWebModelId round-trips correctly (sanity for the id format)', () => {
     const cases = [
       { id: 'web:glm:GLM-4.6', expected: { providerId: 'glm', modelId: 'GLM-4.6' } },
-      { id: 'web:kimi:kimi-k2-0711-preview', expected: { providerId: 'kimi', modelId: 'kimi-k2-0711-preview' } },
       { id: 'web:deepseek:deepseek-chat', expected: { providerId: 'deepseek', modelId: 'deepseek-chat' } },
     ];
     for (const c of cases) {
