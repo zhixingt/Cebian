@@ -71,16 +71,33 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
 
   // ── Step 3: build the request body (Kimi's connect-json format) ──
   const scenario = 'SCENARIO_K2';
+  // ⑪.7: ALWAYS include chat_id (use existingChatId if we have one from
+  // a prior turn, else mint a new UUID for the server to create a new
+  // conversation). chromeclaw's older code omitted chat_id when empty
+  // ("Kimi may create a new conversation if missing"), but in practice
+  // Kimi returns 200 + END-trailer `{error:{code:"invalid_argument"}}`
+  // when chat_id is missing — the server treats it as a malformed
+  // create-chat payload. Generating a UUID up-front makes us behave
+  // like a fresh UI tab: server creates the conversation with that id
+  // and streams the reply.
+  const chatId = existingChatId || crypto.randomUUID();
+  // ⑪.7: also use a UUID for the inner `message_id` (chromeclaw left it
+  // as empty string). Server may reject the payload if it sees an
+  // empty client-generated identifier. UUIDs are safe.
+  const blockId = crypto.randomUUID();
+  // ⑪.7: try `options: {}` (empty) instead of `{thinking: false}`.
+  // The "thinking" key may have been removed/renamed in a recent
+  // Kimi server update — sending an unknown key triggers the same
+  // `invalid_argument` validation rejection.
   const kimiBody = JSON.stringify({
     scenario,
     message: {
       role: 'user',
-      blocks: [{ message_id: '', text: { content: kimiPrompt } }],
+      blocks: [{ message_id: blockId, text: { content: kimiPrompt } }],
       scenario,
     },
-    options: { thinking: false },
-    // Pass chat id as a hint (Kimi may create a new conversation if missing)
-    ...(existingChatId ? { chat_id: existingChatId } : {}),
+    options: {},
+    chat_id: chatId,
   });
 
   // The shared runtime will:

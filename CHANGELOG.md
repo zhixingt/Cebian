@@ -1,7 +1,7 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 40 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix + D GLM X-Sign rewrite + E DeepSeekHashV1 WASM + G Kimi HttpOnly cookie auth + H Kimi trailer parser + E2E response body capture)
+Total commits: 41 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix + D GLM X-Sign rewrite + E DeepSeekHashV1 WASM + G Kimi HttpOnly cookie auth + H Kimi trailer parser + E2E response body capture + H-remaining robustness attempts)
 Tests: 201/201 passing (was 64 at ② start; +137 new)
 Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓ • `pnpm check` clean • E2E infrastructure in `scripts/e2e-content-fetch.cjs`
 
@@ -633,12 +633,27 @@ field — see H-remaining below.
 
 ### H-remaining — Kimi server validation (deferred — needs DevTools)
 The adapter is correct; the server rejects with `invalid_argument`.
+**Code-based attempts tried** (all in same commit, all kept as
+robustness improvements even though they didn't fix the error):
+1. `chat_id` always included (use existingChatId if present, else
+   mint a UUID) — E2E: still `invalid_argument`
+2. `message_id` now a UUID (was empty string per chromeclaw) — E2E: still `invalid_argument`
+3. `options: {}` (empty, was `{thinking: false}`) — E2E: still `invalid_argument`
+
+These changes are still kept because they make the adapter more
+robust and match a fresh UI tab's behavior; the server-side
+validation rejection is a different problem (likely a field
+chromeclaw didn't document, or a scenario name drift).
+
 **Action**: capture a real working Kimi request from user's Chrome
 DevTools (Network tab → click an existing message → "Replay as cURL")
-and compare with what the adapter sends. Likely candidates:
-- `chat_id` may be required (not optional as chromeclaw assumed)
-- `message_id` may need to be a UUID (not empty string)
-- `options: {thinking: false}` shape may have changed
+and compare with what the adapter sends. Remaining likely candidates
+not yet tried:
+- `device_id` / `trace_id` / `parent_chat_id` (additional required fields)
+- `scenario` name may have drifted from `SCENARIO_K2`
+- Auth header format may have changed (e.g., header name, scheme, or
+  signature — the JWT in `kimi-auth` is HS512; some Kimi endpoints
+  may expect a different auth scheme)
 
 ---
 
