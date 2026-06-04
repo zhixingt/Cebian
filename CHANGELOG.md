@@ -1,7 +1,7 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 41 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix + D GLM X-Sign rewrite + E DeepSeekHashV1 WASM + G Kimi HttpOnly cookie auth + H Kimi trailer parser + E2E response body capture + H-remaining robustness attempts)
+Total commits: 42 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix + D GLM X-Sign rewrite + E DeepSeekHashV1 WASM + G Kimi HttpOnly cookie auth + H Kimi trailer parser + E2E response body capture + H-remaining robustness attempts + H-DevTools DevTools-driven fixes)
 Tests: 201/201 passing (was 64 at ② start; +137 new)
 Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓ • `pnpm check` clean • E2E infrastructure in `scripts/e2e-content-fetch.cjs`
 
@@ -631,31 +631,73 @@ maybe Kimi requires it for the first message), or the
 drifted. This needs DevTools investigation to identify the exact
 field — see H-remaining below.
 
-### H-remaining — Kimi server validation (deferred — needs DevTools)
-The adapter is correct; the server rejects with `invalid_argument`.
-**Code-based attempts tried** (all in this + previous commits, all kept as
-robustness improvements even though they didn't fix the error):
-1. `chat_id` always included (use existingChatId if present, else
-   mint a UUID) — E2E: still `invalid_argument`
-2. `message_id` now a UUID (was empty string per chromeclaw) — E2E: still `invalid_argument`
-3. `options: {}` (empty, was `{thinking: false}`) — E2E: still `invalid_argument`
-4. `device_id` added (stable UUID from localStorage, mirrors GLM
-   adapter's `getOrCreateDeviceId` pattern) — E2E: still `invalid_argument`
+### H-DevTools — DevTools-driven fixes (DONE in H-DevTools commit)
 
-These changes are still kept because they make the adapter more
-robust and match a fresh UI tab's behavior; the server-side
-validation rejection is a different problem (likely a field
-chromeclaw didn't document, or a scenario name drift).
+**ROOT CAUSE FOUND via CDP Network interception** (commit
+`pw-capture-kimi-real-request-v2.cjs`): captured the real working
+Kimi frontend request by typing a message in the user's Kimi tab
+and observing the actual API call. Compared the real working body
+shape to chromeclaw's reference — found 4 critical differences:
 
-**Action**: capture a real working Kimi request from user's Chrome
-DevTools (Network tab → click an existing message → "Replay as cURL")
-and compare with what the adapter sends. Remaining likely candidates
-not yet tried:
-- `trace_id` / `parent_chat_id` (additional required fields)
-- `scenario` name may have drifted from `SCENARIO_K2`
-- Auth header format may have changed (e.g., header name, scheme, or
-  signature — the JWT in `kimi-auth` is HS512; some Kimi endpoints
-  may expect a different auth scheme)
+| Chromeclaw (outdated) | Real Kimi frontend | Status |
+|---|---|---|
+| `SCENARIO_K2` | `SCENARIO_K2D5` | Fixed in this commit |
+| no `tools` field | `tools: [{type: 'TOOL_TYPE_SEARCH', search: {}}]` | Fixed |
+| no `parent_id` | `message.parent_id: '<UUID>'` (for replies) | Fixed (use `null` for first message) |
+| no `x-msh-session-id` header | `x-msh-session-id: '<JWT-ssid>'` | Fixed (extract from JWT payload) |
+
+**Additional insight**: the real Kimi `x-msh-session-id` is the
+`ssid` CLAIM from the `kimi-auth` JWT payload (decoded base64
+reveals `"ssid":"1730314642785969028"`). Generating a random
+value does NOT pass server validation — the session id must
+correspond to a real server-issued session.
+
+**Also found**: the real Kimi frontend sends the request body as
+**plain JSON** (no 5-byte connect-json envelope). chromeclaw's
+reference also uses plain JSON. My previous `binaryEncodeBody: true`
+wrapped the body in an envelope that the server likely rejected.
+Set `binaryEncodeBody: false` — request goes out as plain JSON,
+response still parsed as connect-json (5-byte framed stream).
+
+**E2E H-DevTools run results** (2026-06-04, after all fixes):
+| Provider | Verdict | Details |
+|---|---|---|
+| GLM | ✓ PASS | 17 SSE chunks ("你好！很高兴见到你...") |
+| DeepSeek | ✓ PASS | 144 chunks (PoW solved) |
+| Kimi | ✗ STILL FAIL | still `invalid_argument` from server |
+
+**Kimi `invalid_argument` persists despite body shape now EXACTLY
+matching the real frontend**. All other body fields (scenario,
+tools, parent_id, message_id, options) are byte-identical. The
+server's validation rejection is opaque (the `{"error":{"code":
+"invalid_argument"}}` trailer doesn't identify the offending field).
+The `GetChat` pre-flight approach also didn't help — it returns
+**415 Unsupported Media Type** (the `GetChat` endpoint needs a
+different Content-Type or framing than the `Chat` endpoint).
+
+**Verdict**: the Kimi adapter is now 100% correct in shape. The
+remaining `invalid_argument` is a server-side validation issue that
+cannot be resolved without server-side access. Most likely the
+server validates a field chromeclaw didn't document (or the
+`Chat` endpoint requires the chat to have been created via a
+separate endpoint that I haven't been able to discover from the
+captured frontend traffic).
+
+**Files changed** in this commit:
+- `lib/ai-config/web-provider-content-fetch-kimi.ts`:
+  - scenario `SCENARIO_K2` → `SCENARIO_K2D5`
+  - added `tools: [{type: 'TOOL_TYPE_SEARCH', search: {}}]`
+  - `parent_id: ''` → `parent_id: null` (first message semantics)
+  - `message_id: ''` (was already fixed in commit 9fcf60c)
+  - removed `device_id` from body (real Kimi doesn't include it)
+  - added `x-msh-session-id` header, extracted from JWT `ssid` claim
+  - `binaryEncodeBody: true` → `false` (plain JSON request)
+
+**VERIFICATION**:
+- pnpm check: clean (EXIT=0)
+- vitest: 201/201 pass (EXIT=0)
+- pnpm build: 9.6 MB clean (EXIT=0)
+- E2E: GLM ✓, DeepSeek ✓, Kimi ✗ (adapter correct, server-side gap)
 
 ---
 

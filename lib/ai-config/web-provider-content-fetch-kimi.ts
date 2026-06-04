@@ -70,50 +70,52 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
   }
 
   // ── Step 3: build the request body (Kimi's connect-json format) ──
-  const scenario = 'SCENARIO_K2';
+  // ⑪.7: REAL scenario name is `SCENARIO_K2D5`, NOT `SCENARIO_K2`.
+  // Discovered via CDP Network interception of the user's actual Kimi
+  // frontend (June 2026). chromeclaw's reference was outdated — using
+  // the wrong name caused the server to return
+  // `{error:{code:"invalid_argument"}}` on every request.
+  const scenario = 'SCENARIO_K2D5';
   // ⑪.7: ALWAYS include chat_id (use existingChatId if we have one from
   // a prior turn, else mint a new UUID for the server to create a new
-  // conversation). chromeclaw's older code omitted chat_id when empty
-  // ("Kimi may create a new conversation if missing"), but in practice
-  // Kimi returns 200 + END-trailer `{error:{code:"invalid_argument"}}`
-  // when chat_id is missing — the server treats it as a malformed
-  // create-chat payload. Generating a UUID up-front makes us behave
-  // like a fresh UI tab: server creates the conversation with that id
-  // and streams the reply.
+  // conversation).
   const chatId = existingChatId || crypto.randomUUID();
-  // ⑪.7: also use a UUID for the inner `message_id` (chromeclaw left it
-  // as empty string). Server may reject the payload if it sees an
-  // empty client-generated identifier. UUIDs are safe.
+  // ⑪.7: REAL Kimi frontend sends `message_id: ""` (empty string) for
+  // client-generated blocks, NOT a UUID. Using a UUID here was
+  // triggering the server's `invalid_argument` validation rejection.
+  // The `blockId` is preserved as a local variable for any callers
+  // that want it but the wire format uses empty string.
   const blockId = crypto.randomUUID();
-  // ⑪.7: try `options: {}` (empty) instead of `{thinking: false}`.
-  // The "thinking" key may have been removed/renamed in a recent
-  // Kimi server update — sending an unknown key triggers the same
-  // `invalid_argument` validation rejection.
-  // ⑪.7: include a stable `device_id` (UUID, persisted in localStorage
-  // per origin). Many web APIs require a device fingerprint for
-  // rate-limiting / abuse detection; omitting it commonly triggers
-  // `invalid_argument`. Mirrors the pattern from the GLM adapter's
-  // `getOrCreateDeviceId`.
-  const KIMI_DEVICE_ID_KEY = '__cebKimiDeviceId__';
-  let deviceId = '';
-  try {
-    const cached = localStorage.getItem(KIMI_DEVICE_ID_KEY);
-    if (cached && /^[0-9a-f-]{36}$/i.test(cached)) deviceId = cached;
-  } catch { /* ignore */ }
-  if (!deviceId) {
-    deviceId = crypto.randomUUID();
-    try { localStorage.setItem(KIMI_DEVICE_ID_KEY, deviceId); } catch { /* ignore */ }
-  }
+  // ⑪.7: For the FIRST message of a new conversation, the real Kimi
+  // frontend sends `parent_id: ""` (empty string), not a UUID. The
+  // chatId-as-parent_id guess was wrong. Subsequent messages in the
+  // same conversation would use the previous assistant message's UUID
+  // — but for first-message case, empty string is correct.
+  // ⑪.7: REAL Kimi frontend does NOT include `device_id` in the
+  // body (they put it in headers like GLM does, but Kimi apparently
+  // doesn't). Drop it from the body. The server was likely rejecting
+  // it as an unknown field.
+  // ⑪.7: `tools` array — at minimum the frontend includes
+  // `TOOL_TYPE_SEARCH` even when search is disabled (empty object).
+  // Server rejects requests without the `tools` field.
+  // ⑪.7: DevTools capture showed the real Kimi frontend sends
+  // `parent_id: "<prev-msg-UUID>"` for REPLIES. For the FIRST
+  // message of a new conversation, there is no previous message —
+  // the semantics should be "no parent" rather than "empty string
+  // parent_id". Try `parent_id: null` (JSON null) instead of `""`
+  // — the server may reject empty string as an invalid UUID format
+  // for a field that should be nullable.
   const kimiBody = JSON.stringify({
+    chat_id: chatId,
     scenario,
+    tools: [{ type: 'TOOL_TYPE_SEARCH', search: {} }],
     message: {
+      parent_id: null,
       role: 'user',
-      blocks: [{ message_id: blockId, text: { content: kimiPrompt } }],
+      blocks: [{ message_id: '', text: { content: kimiPrompt } }],
       scenario,
     },
-    options: {},
-    chat_id: chatId,
-    device_id: deviceId,
+    options: { thinking: false },
   });
 
   // The shared runtime will:
@@ -143,12 +145,50 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
   // in that interface, and annotating would widen `kimiRequest.url` to
   // `string | undefined`. We want the literal type with `url: string`
   // so the subsequent `fetch(kimiRequest.url, ...)` is type-safe.
+  // ⑪.7: CRITICAL — `x-msh-session-id` is NOT a random value, it is
+  // the `ssid` CLAIM from the `kimi-auth` JWT payload. Discovered by
+  // base64-decoding the captured Bearer token — the JWT payload
+  // contains `"ssid":"1730314642785969028"` which matches the real
+  // Kimi frontend's x-msh-session-id exactly. Generating a random
+  // number (Date.now() + random) does NOT pass server validation;
+  // the session id must correspond to a real server-issued session.
+  //
+  // JWT format: `header.payload.signature` (base64url encoded).
+  // We only need the payload; decode + JSON.parse + extract ssid.
+  let sessionId = '';
+  if (kimiAuth) {
+    try {
+      const parts = kimiAuth.split('.');
+      if (parts.length >= 2) {
+        // base64url → base64 (replace - with +, _ with /, add padding)
+        const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+        const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+        const json = atob(padded);
+        const payload = JSON.parse(json) as Record<string, unknown>;
+        if (typeof payload.ssid === 'string') sessionId = payload.ssid;
+      }
+    } catch { /* malformed JWT — fall through to no session id */ }
+  }
+  if (sessionId) {
+    (kimiInit.headers as Record<string, string>)['x-msh-session-id'] = sessionId;
+  }
+
+  // ⑪.7: CRITICAL — Send the request body as PLAIN JSON, NOT wrapped
+  // in a 5-byte connect-json envelope. chromeclaw's `kimi-web.ts`
+  // reference sends plain JSON (the binary envelope is only for
+  // response streaming, not request). My previous adapter used
+  // `binaryEncodeBody: true` which wrapped the body in a 5-byte
+  // header — the server likely rejected the envelope-wrapped
+  // payload as malformed (returning `invalid_argument` on every
+  // request, even with the correct scenario/tools/parent_id shape).
+  // Keep `binaryProtocol: 'connect-json'` so the RESPONSE is still
+  // parsed as a 5-byte framed stream.
   const kimiRequest = {
     ...request,
     url: `${origin}/apiv2/kimi.gateway.chat.v1.ChatService/Chat`,
     init: kimiInit,
     binaryProtocol: 'connect-json' as const,
-    binaryEncodeBody: true as const,
+    binaryEncodeBody: false as const,
   };
 
   // We hand off to the shared runtime. It will post WEB_LLM_CHUNK / DONE / ERROR.
