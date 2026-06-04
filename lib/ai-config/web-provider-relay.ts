@@ -16,6 +16,8 @@
 import type { WebProvider } from '../types';
 
 const TAB_IDLE_CLOSE_MS = 5 * 60 * 1000;  // 5 minutes
+/** Default timeout for a single chat stream (no end signal = stall = abort). */
+export const WEB_SESSION_TIMEOUT_MS = 60_000;
 
 export interface TabRegistryConfig {
   /** Override the idle close timeout. Production: 5min. Tests: small values. */
@@ -350,25 +352,87 @@ async function runMainFetcher(request: WebProviderChatRequest): Promise<void> {
 }
 
 /**
+ * Options for processChatStream (T9: cancellation + timeout).
+ */
+export interface ProcessChatStreamOptions {
+  /** External abort signal — aborting this stops the stream and emits WEB_LLM_ERROR */
+  abortSignal?: AbortSignal;
+  /** Stream timeout in ms (default 60s). Fires the internal abort if no end signal seen. */
+  timeoutMs?: number;
+}
+
+/**
  * Process a streaming response body, parsing SSE frames and emitting relay messages.
  *
  * Pure-ish: takes a ReadableStream, a chat request config, and an emit callback.
  * The MAIN-world fetcher wraps this with window.postMessage; tests can pass a mock
  * stream + a spy emit.
+ *
+ * Cancellation (T9):
+ *   - abortSignal: externally triggered (e.g., user clicks Stop)
+ *   - timeoutMs: fires internal abort if no end signal seen in this window
+ * Both paths emit WEB_LLM_ERROR with the reason and release the reader lock.
  */
 export async function processChatStream(
   body: ReadableStream<Uint8Array>,
   request: WebProviderChatRequest,
   emit: (msg: WebProviderRelayMessage) => void,
+  options: ProcessChatStreamOptions = {},
 ): Promise<void> {
+  const { abortSignal: externalSignal, timeoutMs = WEB_SESSION_TIMEOUT_MS } = options;
+
+  // Internal controller: linked to external signal + timeout
+  const controller = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
+  let abortReason: string | undefined;
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      abortReason = externalSignal.reason instanceof Error
+        ? externalSignal.reason.message
+        : String(externalSignal.reason ?? 'aborted');
+      controller.abort();
+    } else {
+      externalSignal.addEventListener('abort', () => {
+        abortReason = externalSignal.reason instanceof Error
+          ? externalSignal.reason.message
+          : String(externalSignal.reason ?? 'aborted');
+        controller.abort();
+      }, { once: true });
+    }
+  }
+  timeoutId = setTimeout(() => {
+    timedOut = true;
+    abortReason = `Stream timeout after ${timeoutMs}ms (no end signal received)`;
+    controller.abort();
+  }, timeoutMs);
+
   const reader = body.getReader();
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
   let doneEmitted = false;
 
   try {
-    while (true) {
-      const { value, done } = await reader.read();
+    while (!controller.signal.aborted) {
+      // Race reader.read() against the abort signal so a hanging stream
+      // doesn't block cancellation (reader.read() has no native AbortSignal support).
+      const readPromise = reader.read();
+      let abortHandler: (() => void) | undefined;
+      const abortPromise = new Promise<{ __aborted: true }>((resolve) => {
+        abortHandler = () => resolve({ __aborted: true });
+        if (controller.signal.aborted) {
+          resolve({ __aborted: true });
+        } else {
+          controller.signal.addEventListener('abort', abortHandler, { once: true });
+        }
+      });
+      const result = await Promise.race([readPromise, abortPromise]);
+      if (abortHandler) controller.signal.removeEventListener('abort', abortHandler);
+
+      if ('__aborted' in result) break;
+
+      const { value, done } = result as ReadableStreamReadResult<Uint8Array>;
       if (done) break;
       const chunk = decoder.decode(value, { stream: true });
       const { events, rest } = parseSseFrames(buffer, chunk);
@@ -379,7 +443,8 @@ export async function processChatStream(
         if (event.data.trim() === request.endSignal) {
           emit({ type: WEB_LLM_DONE, providerId: request.providerId });
           doneEmitted = true;
-          continue;
+          controller.abort();  // stop the loop
+          break;
         }
         // Try to extract delta
         const text = parseDelta(event.data, request.deltaPath);
@@ -404,15 +469,27 @@ export async function processChatStream(
               stopReason,
             });
             doneEmitted = true;
+            controller.abort();
+            break;
           }
         }
       }
     }
   } finally {
-    reader.releaseLock();
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    try { reader.releaseLock(); } catch { /* already released */ }
   }
 
-  // Always emit DONE at end of stream (some providers don't send [DONE])
+  // Emit error if aborted (and we didn't already emit DONE)
+  if (controller.signal.aborted && !doneEmitted) {
+    const message = timedOut
+      ? abortReason ?? 'Stream timeout'
+      : abortReason ?? 'Stream aborted';
+    emit({ type: WEB_LLM_ERROR, providerId: request.providerId, error: message });
+    return;
+  }
+
+  // Normal end: emit DONE if not already (some providers don't send [DONE])
   if (!doneEmitted) {
     emit({ type: WEB_LLM_DONE, providerId: request.providerId });
   }

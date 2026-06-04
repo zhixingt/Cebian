@@ -14,6 +14,8 @@ import {
   parseSseFrames,
   parseDelta,
   type SseEvent,
+  processChatStream,
+  WEB_SESSION_TIMEOUT_MS,
 } from '@/lib/ai-config/web-provider-relay';
 import type { WebProvider } from '@/lib/types';
 
@@ -359,6 +361,103 @@ describe('parseDelta (T8: ③+④ JSON path navigation)', () => {
   it('coerces non-string values to string (numbers, booleans)', () => {
     expect(parseDelta(JSON.stringify({ n: 42 }), 'n')).toBe('42');
     expect(parseDelta(JSON.stringify({ b: true }), 'b')).toBe('true');
+  });
+});
+
+/** Build a mock ReadableStream that emits the given UTF-8 chunks then closes. */
+function makeStream(chunks: string[]): ReadableStream<Uint8Array> {
+  const enc = new TextEncoder();
+  let i = 0;
+  return new ReadableStream({
+    pull(controller) {
+      if (i < chunks.length) {
+        controller.enqueue(enc.encode(chunks[i++]));
+      } else {
+        controller.close();
+      }
+    },
+  });
+}
+
+/** Build a mock ReadableStream that never closes (for timeout tests). */
+function makeHangingStream(): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start() { /* never close */ },
+    pull() { /* never resolve — hangs until aborted */ },
+  });
+}
+
+describe('processChatStream abort + timeout (T9: ③+④ cancellation)', () => {
+  it('exports WEB_SESSION_TIMEOUT_MS = 60_000', () => {
+    expect(WEB_SESSION_TIMEOUT_MS).toBe(60_000);
+  });
+
+  it('aborts when external AbortSignal is triggered mid-stream', async () => {
+    const stream = makeHangingStream();
+    const ac = new AbortController();
+    const emitted: any[] = [];
+    const p = processChatStream(
+      stream,
+      { providerId: 'glm', endpoint: 'x', bodyTemplate: '{}', streamFormat: 'sse', endSignal: '[DONE]', deltaPath: 'content' },
+      (m) => emitted.push(m),
+      { abortSignal: ac.signal },
+    );
+    // Give the stream loop a moment to start, then abort
+    await new Promise(r => setTimeout(r, 10));
+    ac.abort(new Error('user stopped'));
+    await p;
+    // Should emit WEB_LLM_ERROR with the abort reason
+    const error = emitted.find(m => m.type === 'WEB_LLM_ERROR');
+    expect(error).toBeDefined();
+    expect(error.error).toMatch(/user stopped|aborted/);
+  });
+
+  it('aborts immediately if signal is already aborted before start', async () => {
+    const stream = makeHangingStream();
+    const ac = new AbortController();
+    ac.abort(new Error('pre-aborted'));
+    const emitted: any[] = [];
+    await processChatStream(
+      stream,
+      { providerId: 'glm', endpoint: 'x', bodyTemplate: '{}', streamFormat: 'sse', endSignal: '[DONE]', deltaPath: 'content' },
+      (m) => emitted.push(m),
+      { abortSignal: ac.signal },
+    );
+    const error = emitted.find(m => m.type === 'WEB_LLM_ERROR');
+    expect(error).toBeDefined();
+    expect(error.error).toMatch(/pre-aborted/);
+  });
+
+  it('times out after custom timeoutMs (no end signal received)', async () => {
+    const stream = makeHangingStream();
+    const emitted: any[] = [];
+    await processChatStream(
+      stream,
+      { providerId: 'glm', endpoint: 'x', bodyTemplate: '{}', streamFormat: 'sse', endSignal: '[DONE]', deltaPath: 'content' },
+      (m) => emitted.push(m),
+      { timeoutMs: 50 },
+    );
+    // Should emit WEB_LLM_ERROR with timeout reason
+    const error = emitted.find(m => m.type === 'WEB_LLM_ERROR');
+    expect(error).toBeDefined();
+    expect(error.error).toMatch(/timeout/i);
+  });
+
+  it('processes a complete stream without abort/timeout (happy path)', async () => {
+    const stream = makeStream([
+      'data: {"choices":[{"delta":{"content":"hello"}}]}\n\n',
+      'data: [DONE]\n\n',
+    ]);
+    const emitted: any[] = [];
+    await processChatStream(
+      stream,
+      { providerId: 'glm', endpoint: 'x', bodyTemplate: '{}', streamFormat: 'sse', endSignal: '[DONE]', deltaPath: 'choices.0.delta.content' },
+      (m) => emitted.push(m),
+    );
+    expect(emitted).toEqual([
+      { type: 'WEB_LLM_CHUNK', providerId: 'glm', text: 'hello' },
+      { type: 'WEB_LLM_DONE', providerId: 'glm' },
+    ]);
   });
 });
 });
