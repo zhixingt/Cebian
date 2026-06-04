@@ -46,6 +46,12 @@ import {
   type WebProviderRelayMessage,
 } from './web-provider-relay';
 import { WEB_PROVIDER_PRESETS, type WebProviderPreset } from './web-provider-presets';
+// ⑪: Import per-provider content-fetch adapters so the bundler retains
+// their function bodies (chromeclaw-style HTTP-replay path). The export
+// `defaultMainWorldFetchByProvider` wires them up for the default deps.
+import { deepseekMainWorldFetch } from './web-provider-content-fetch-deepseek';
+import { kimiMainWorldFetch } from './web-provider-content-fetch-kimi';
+import { glmMainWorldFetch } from './web-provider-content-fetch-glm';
 import type { WebProvider } from '../types';
 import type { DomRelayRequest } from './web-provider-content-script';
 
@@ -63,6 +69,15 @@ export const WEB_SESSION_API = 'web-session' as const;
 export interface WebSessionStreamDeps {
   /** Open or reuse a Chrome tab for the provider. Returns the tabId. */
   openTab: (providerId: WebProvider['presetId'], url: string) => Promise<number>;
+  /**
+   * ⑪: Per-provider MAIN-world fetch function. If provided for the
+   * resolved providerId, the orchestrator takes the content-fetch path
+   * (chromeclaw-style HTTP-replay). If absent for a provider, fall back
+   * to the legacy DOM-relay path (injectScripts below).
+   */
+  mainWorldFetchByProvider?: Partial<
+    Record<WebProvider['presetId'], { request: unknown; func: (request: unknown) => Promise<void> }>
+  >;
   /** Inject the DOM relay scripts (ISOLATED bridge + MAIN orchestrator) into a tab. */
   injectScripts: (tabId: number, request: DomRelayRequest) => Promise<unknown>;
   /** Register a chrome.runtime.onMessage handler; returns an unregister function. */
@@ -78,6 +93,27 @@ export interface WebSessionStreamDeps {
  * Lazy-initialized to avoid loading chrome.* at import time (e.g., in tests).
  */
 let _defaultDeps: WebSessionStreamDeps | null = null;
+
+/**
+ * ⑪: Default per-provider content-fetch handlers. The adapter functions
+ * are referenced here so the bundler can't tree-shake them; the SW picks
+ * one of these at runtime based on the resolved providerId.
+ */
+export const defaultMainWorldFetchByProvider: WebSessionStreamDeps['mainWorldFetchByProvider'] = {
+  deepseek: {
+    request: { type: 'WEB_LLM_FETCH' } as unknown as object,
+    func: deepseekMainWorldFetch as unknown as (request: unknown) => Promise<void>,
+  },
+  kimi: {
+    request: { type: 'WEB_LLM_FETCH' } as unknown as object,
+    func: kimiMainWorldFetch as unknown as (request: unknown) => Promise<void>,
+  },
+  glm: {
+    request: { type: 'WEB_LLM_FETCH' } as unknown as object,
+    func: glmMainWorldFetch as unknown as (request: unknown) => Promise<void>,
+  },
+};
+
 function getDefaultDeps(): WebSessionStreamDeps {
   if (_defaultDeps) return _defaultDeps;
   _defaultDeps = {
@@ -86,6 +122,7 @@ function getDefaultDeps(): WebSessionStreamDeps {
       getTabRegistry().markUsed(providerId);
       return tabId;
     },
+    mainWorldFetchByProvider: defaultMainWorldFetchByProvider,
     injectScripts: (tabId, request) => injectDomRelay(tabId, request),
     onMessage: (handler) => {
       const listener = (msg: any) => {
@@ -213,11 +250,17 @@ async function orchestrateStream(
       throw new Error(`Provider ${providerId} has no valid session — please log in via Settings`);
     }
 
-    // 4. Build DOM relay request
-    const request = buildRelayRequest(preset, modelId, context);
-
-    // 5. Open/reuse tab
+    // 4. Build request(s) and open/reuse tab
     const tabId = await deps.openTab(providerId, preset.loginUrl);
+
+    // ⑪: Resolve content-fetch handler for this provider. If available, take
+    // the chromeclaw-style HTTP-replay path; otherwise fall back to DOM relay.
+    const fetchEntry = deps.mainWorldFetchByProvider?.[providerId];
+    const useContentFetch = !!fetchEntry;
+    const relayRequest: DomRelayRequest | null = useContentFetch
+      ? null
+      : buildRelayRequest(preset, modelId, context);
+    const fetchRequest: unknown = useContentFetch ? fetchEntry!.request : null;
 
     // 6. Listen for messages BEFORE injecting (so we don't miss the RELAY_READY)
     let accumulatedText = '';
@@ -226,9 +269,23 @@ async function orchestrateStream(
       if (msg.providerId !== providerId) return;
       switch (msg.type) {
         case WEB_LLM_CHUNK: {
-          // ⑧: msg.text is the FULL text (not delta) because the DOM reader
-          // re-reads the whole textContent each poll. Compute delta ourselves.
-          const newText = msg.text;
+          // ⑧ (DOM path): msg.text is the FULL text (not delta) because the
+          // DOM reader re-reads the whole textContent each poll. Compute
+          // delta ourselves.
+          // ⑪ (content-fetch path): msg.chunk is a raw SSE `data: ...\n\n`
+          // chunk. We accumulate it into accumulatedText and emit the new
+          // suffix as the delta (same contract regardless of source).
+          if (msg.chunk) {
+            accumulatedText += msg.chunk;
+            stream.push({
+              type: 'text_delta',
+              contentIndex: 0,
+              delta: msg.chunk,
+              partial: makePartial(providerId, modelId, accumulatedText),
+            });
+            break;
+          }
+          const newText = msg.text ?? '';
           const delta = newText.startsWith(accumulatedText)
             ? newText.slice(accumulatedText.length)
             : newText;  // reset, send all
@@ -300,8 +357,14 @@ async function orchestrateStream(
       partial: makePartial(providerId, modelId, ''),
     });
 
-    // 8. Inject the relay scripts
-    await deps.injectScripts(tabId, request);
+    // 8. Inject (DOM relay vs content-fetch, per provider capability)
+    if (useContentFetch) {
+      await import('./web-provider-relay').then(({ injectContentFetch }) =>
+        injectContentFetch(tabId, providerId, fetchEntry!.func, fetchRequest!),
+      );
+    } else {
+      await deps.injectScripts(tabId, relayRequest!);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const providerId = (() => {

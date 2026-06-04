@@ -1,9 +1,9 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 34 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨)
-Tests: 191/191 passing (was 64 at ② start; +127 new)
-Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓
+Total commits: 35 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line)
+Tests: 201/201 passing (was 64 at ② start; +137 new)
+Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓ • `pnpm check` clean
 
 ---
 
@@ -300,17 +300,104 @@ The full chain now works: pre-flight detects logged-out → SW receives `WEB_LLM
 
 ---
 
-## What remains (⑨.2 + ⑨.3)
+## ⑨ — Relogin detection (DONE) + ⑩+⑪ A-line (HTTP-replay)
 
-### ⑨.2 — Multi-turn conversation support (next)
+### ⑨ — Relogin detection
 
-The ⑦ storage foundation (`webProviderConversations` Dexie table) is already in place. What's missing is the relay-side wiring:
-- Per-provider: cache `parentMessageId` (DeepSeek) / `chat_id` (Kimi) / `conversation_id` (GLM) after each reply
-- On subsequent messages, read the cached value and include it in the request body
-- The DOM-injection approach gets this "for free" — the conversation is maintained by the provider's own UI (you can see the chat history in the tab). The only need is to detect when a "new conversation" was started (e.g., user clicked "+" to start a new chat) and reset the cache.
+**1 commit (ac99335).** Content script now performs a pre-flight check before
+each send: if the chat input element is missing, it short-circuits with
+`WEB_LLM_NEEDS_RELOGIN` (status 401) — the most reliable signal that the
+session expired and the provider redirected to a login wall.
 
-**Pragmatic MVP**: rely on the provider's own conversation UI. The ⑦ storage table is there for future enhancement (e.g., if the user closes the tab and we need to restore context in a new tab).
+| Step | File | Behavior |
+|---|---|---|
+| Pre-flight | `web-provider-content-script.ts:runDomRelayMainWorld` | Probe for input/textarea; missing → emit `WEB_LLM_NEEDS_RELOGIN` (no timeout wait) |
+| Tab-closed fallback | `web-provider-cookie-service.ts:captureFromTab` | If user closes the login tab early, salvage cookies from any matching tab already in cookie store |
+| Bug #1 (model resolution) | `entrypoints/background/agent-manager.ts:resolveModelObj` | Added `web:` branch — `getWebModel` for `web:providerId:modelId` model IDs |
+| Bug #2 (DeepSeek preset) | `web-provider-presets.ts:deepseek` | `sessionIndicators: ['sessionid','userToken']`, `useLocalStorageFallback: true` |
 
-### ⑨.3 — Final PR to upstream `maotoumao/Cebian`
+**4 + 4 + 4 new tests** across content-script, cookie-service, models, presets.
 
-Requires signing the project's CLA. The branch `feat/web-browser-session-provider` has 34 commits ahead of base, 191/191 tests passing, 9.6 MB build, i18n parity. Ready to PR once the CLA is signed.
+---
+
+### ⑩ — chromeclaw-style HTTP-replay pivot
+
+The ⑧ DOM-injection send chain kept timing out for the user's real
+browsers, even after 4 attempts (bug-fix #1, baseline gating, real send
+button click, turn-boundary). Playwright evidence at `localhost:9333`
+showed: synthetic `Enter` is ignored by DeepSeek's React textarea and
+Kimi's Lexical contenteditable, and the providers' UIs rely on first-party
+fetch with anti-bot challenges (DeepSeek PoW, Kimi Connect-Protocol, GLM
+sentinel) that we cannot solve from outside their ORIGIN.
+
+**Decision** (2026-06-04): switch from DOM-injection to **HTTP-replay
+inside the user's logged-in MAIN world**, following the chromeclaw
+architecture.
+
+**New layer** (`lib/ai-config/web-provider-content-fetch-*.ts`):
+
+| File | Adapter | What it does |
+|---|---|---|
+| `web-provider-content-fetch-main.ts` | Shared runtime | Pre-flight (input present?), template substitution, keep-alive ping, `connect+json` binary envelope, SSE chunk postMessage → SW |
+| `web-provider-content-fetch-deepseek.ts` | DeepSeek | `POST /api/v0/chat_session/create` → `chat/create_pow_challenge` → SHA-256 PoW (DeepSeekHashV1 surfaces as "needs WASM" error, by design) → `chat/completion` SSE |
+| `web-provider-content-fetch-kimi.ts` | Kimi | Connect-Protocol binary frame to `apiv2/kimi.gateway.chat.v1.ChatService/Chat`, 5-byte length prefix, response is binary framed |
+| `web-provider-content-fetch-glm.ts` | GLM | `POST chatglm.cn/api/chat/v1/stream` SSE (X-Sign HMAC pending) |
+
+**Bridge contract preserved**:
+- Same `WebProviderRelayMessage` events: `RELAY_READY` / `CHUNK` / `DONE` / `ERROR` / `NEEDS_RELOGIN`
+- Added `chunk?: string` field — raw SSE to accumulate in stream layer
+- DOM relay remains the **fallback** when no `mainWorldFetchByProvider[id]` is registered
+
+**Stream layer** (`web-provider-stream.ts`):
+- `WebSessionStreamDeps.mainWorldFetchByProvider` — `Map<providerId, MainWorldFetchFunction>`
+- `defaultMainWorldFetchByProvider` exported (3 adapters registered)
+- `orchestrateStream` branches: `injectContentFetch` if adapter present, else `injectRelayScripts` (DOM)
+
+**Inject path** (`web-provider-relay.ts`):
+- New `injectContentFetch(tabId, providerId, func, request)` — same
+  `chrome.scripting.executeScript` pattern as the DOM relay, but injects
+  the **content-fetch function body** (serialization-safe) and forwards
+  `WEB_LLM_CHUNK`/`DONE`/`ERROR` from `window.postMessage` to the SW.
+
+**Tests** (8 new, total 201/201):
+- `web-provider-content-fetch-main.test.ts` — pre-flight gate, template sub, postMessage envelope
+- `web-provider-cookie-service.test.ts` — tab-closed fallback (4 new)
+- `web-provider-content-script.test.ts` — serialization-safe inlined helpers, baseline gating
+- `web-provider-models.test.ts` — `resolveSelectedWebModel` for web-session (4 new)
+- `web-provider-presets.test.ts` — DeepSeek preset
+
+**Bundle verification** (post-build, 9.6 MB):
+- `background.js` contains `Oyt = {deepseek:{request:...,func:wyt}, kimi:{request:...,func:Tyt}, glm:{request:...,func:Eyt}}`
+- No tree-shaking of the 3 adapter symbols
+
+**Known limitations** (will be fixed in follow-up):
+1. **DeepSeekHashV1 PoW** — when the server returns this algorithm, the
+   adapter surfaces a clear "unsupported algorithm — reload page" error
+   rather than silently failing. The WASM solver is the next work item.
+2. **GLM X-Sign** — the GLM adapter currently uses bare SSE without the
+   HMAC `X-Sign` header. GLM-Intl tabs may still 401/403. Will add once
+   we capture the signature algorithm from a real request.
+3. **Real-extension E2E** — Playwright adapter-symbol extraction in
+   `pw-content-fetch-e2e.cjs` needs a fix to run the **built bundle's**
+   adapter functions in the user's tabs. The DOM-evidence tests prove
+   the runtime; only the SW→MAIN bridge needs real-world validation
+   once the user reloads the extension.
+
+---
+
+## What remains (post-A-line)
+
+### A — Real Chrome validation
+- User must **fully restart Chrome** (or remove+re-add the extension)
+  so the SW picks up the new bundle with `mainWorldFetchByProvider` wired in
+- Send one message each in Kimi / GLM / DeepSeek sidepanel
+- Capture screenshots of success/failure to decide next steps
+  (WASM for DeepSeekHashV1 / X-Sign for GLM / fall back to DOM)
+
+### B — Multi-turn conversation support (⑨.2, deferred)
+DOM-injection gives us "free" conversation continuity via the provider's
+own UI; the ⑦ storage foundation stays for future restoration scenarios.
+
+### C — Upstream PR (⑨.3, **deferred per user**)
+User explicitly opted NOT to submit PR to upstream `maotoumao/Cebian`.
+Branch state: 35 commits, 201/201 tests, 9.6 MB build, i18n parity.

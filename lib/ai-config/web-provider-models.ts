@@ -85,3 +85,41 @@ export function getAvailableWebModels(providers: WebProvider[]): WebProviderMode
     .filter(p => p.enabled && p.loginStatus === 'loggedIn')
     .map(p => resolveWebModel(p.presetId, p.modelId));
 }
+
+/**
+ * Resolve the currently selected active model when it points to the
+ * ModelSelector's Web group (`provider === 'web'`).
+ *
+ * Active model format from ModelSelector:
+ *   provider: 'web'
+ *   modelId:  'web:<presetId>:<modelId>'
+ */
+export function resolveSelectedWebModel(
+  activeModel: { provider: string; modelId: string } | null,
+  providers: WebProvider[],
+): WebProviderModel | null {
+  if (!activeModel || activeModel.provider !== 'web') return null;
+
+  const parsed = parseSelectedWebModelId(activeModel.modelId);
+  if (!parsed) return null;
+
+  const provider = providers.find(p => p.presetId === parsed.providerId);
+  if (!provider || !provider.enabled || provider.loginStatus !== 'loggedIn') {
+    return null;
+  }
+
+  return resolveWebModel(parsed.providerId, parsed.modelId);
+}
+
+function parseSelectedWebModelId(
+  id: string,
+): { providerId: WebProvider['presetId']; modelId: string } | null {
+  if (!id.startsWith('web:')) return null;
+  const rest = id.slice(4);
+  const colonIdx = rest.indexOf(':');
+  if (colonIdx <= 0 || colonIdx === rest.length - 1) return null;
+  return {
+    providerId: rest.slice(0, colonIdx) as WebProvider['presetId'],
+    modelId: rest.slice(colonIdx + 1),
+  };
+}

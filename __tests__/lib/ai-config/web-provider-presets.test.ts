@@ -31,14 +31,14 @@ describe('WEB_PROVIDER_PRESETS', () => {
     expect(ds.refreshUrl).toBeUndefined();
   });
 
-  it('Kimi uses localStorage fallback (chromeclaw confirms localStorage path)', () => {
+  it('Kimi and DeepSeek use localStorage fallback (provider token may be localStorage-backed)', () => {
     const kimi = WEB_PROVIDER_PRESETS.find(p => p.id === 'kimi')!;
     expect(kimi.useLocalStorageFallback).toBe(true);
-    // GLM and DeepSeek should NOT use localStorage fallback
+    // GLM should NOT use localStorage fallback
     const glm = WEB_PROVIDER_PRESETS.find(p => p.id === 'glm')!;
     const ds = WEB_PROVIDER_PRESETS.find(p => p.id === 'deepseek')!;
     expect(glm.useLocalStorageFallback).toBe(false);
-    expect(ds.useLocalStorageFallback).toBe(false);
+    expect(ds.useLocalStorageFallback).toBe(true);
   });
 
   it('T2: WebProviderDomStrategy interface has input + reader (TDD: compile-time check)', () => {

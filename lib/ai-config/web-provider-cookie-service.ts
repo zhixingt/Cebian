@@ -243,6 +243,12 @@ async function pollForSession(
     try {
       await chrome.tabs.get(tabId);
     } catch {
+      // Last-chance probe: users may close the tab right after login succeeds.
+      // For cookie-based providers (GLM/DeepSeek), we can still detect the
+      // session directly from cookie jar even if the tab is gone.
+      const cookieSession = await tryCaptureCookieSession(preset);
+      if (cookieSession) return cookieSession;
+
       onError('Login tab was closed before session was detected');
       return null;
     }
@@ -254,21 +260,8 @@ async function pollForSession(
     }
 
     try {
-      const cookies = await chrome.cookies.getAll({ domain: preset.cookieDomain });
-      const cookieMap: Record<string, string> = {};
-      for (const c of cookies) cookieMap[c.name] = c.value;
-      const matched = preset.sessionIndicators.filter((n: string) => cookieMap[n]);
-
-      if (matched.length > 0) {
-        const captured: Record<string, string> = {};
-        for (const n of preset.sessionIndicators) {
-          if (cookieMap[n]) captured[n] = cookieMap[n];
-        }
-        for (const n of COMMON_AUTH_COOKIES) {
-          if (cookieMap[n]) captured[n] = cookieMap[n];
-        }
-        return { cookies: captured, source: 'cookie' };
-      }
+      const cookieSession = await tryCaptureCookieSession(preset);
+      if (cookieSession) return cookieSession;
 
       if (preset.useLocalStorageFallback) {
         const lsTokens = await readLocalStorageFromTab(tabId, preset.sessionIndicators);
@@ -286,6 +279,26 @@ async function pollForSession(
   }
   onError(`Login timed out after ${LOGIN_TIMEOUT_MS / 1000}s`);
   return null;
+}
+
+async function tryCaptureCookieSession(
+  preset: ReturnType<typeof resolveEffectiveConfig>,
+): Promise<{ cookies: Record<string, string>; source: 'cookie' } | null> {
+  const cookies = await chrome.cookies.getAll({ domain: preset.cookieDomain });
+  const cookieMap: Record<string, string> = {};
+  for (const c of cookies) cookieMap[c.name] = c.value;
+
+  const matched = preset.sessionIndicators.filter((n: string) => cookieMap[n]);
+  if (matched.length === 0) return null;
+
+  const captured: Record<string, string> = {};
+  for (const n of preset.sessionIndicators) {
+    if (cookieMap[n]) captured[n] = cookieMap[n];
+  }
+  for (const n of COMMON_AUTH_COOKIES) {
+    if (cookieMap[n]) captured[n] = cookieMap[n];
+  }
+  return { cookies: captured, source: 'cookie' };
 }
 
 // ====== localStorage Fallback (MAIN world) ======

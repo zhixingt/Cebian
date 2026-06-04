@@ -150,6 +150,28 @@ describe('web-provider-cookie-service (login flow + A3 + A5 + A6 + A4)', () => {
       const glm = await getWebProviderRepository().get('glm');
       expect(glm?.loginAuditLog[0]?.result).toBe('tab-closed');
     }, 15000);
+
+    it('tab closed but cookies already present → succeeds via last-chance cookie probe', async () => {
+      await getWebProviderRepository().list();
+      // Simulate user closed tab quickly, but login cookie was already set.
+      (chrome.tabs.get as any) = vi.fn(() => Promise.reject(new Error('Tab not found')));
+      mockCookies = [
+        { name: 'sessionid', value: 'ds-session' },
+      ];
+
+      const sendResponse = vi.fn();
+      messageHandler({ type: 'WEB_PROVIDER_LOGIN', presetId: 'deepseek' }, {}, sendResponse);
+      await new Promise(r => setTimeout(r, 5500));
+
+      const response = sendResponse.mock.calls[0][0];
+      expect(response.success).toBe(true);
+      expect(response.status).toBe('loggedIn');
+      expect(response.capturedCookieNames).toContain('sessionid');
+
+      const deepseek = await getWebProviderRepository().get('deepseek');
+      expect(deepseek?.loginStatus).toBe('loggedIn');
+      expect(deepseek?.loginAuditLog[0]?.result).toBe('success');
+    }, 15000);
   });
 
   describe('WEB_PROVIDER_RECHECK', () => {

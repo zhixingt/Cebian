@@ -25,6 +25,8 @@ import {
 import { getMCPManager } from '@/lib/mcp/manager';
 import { getCopilotBaseUrl } from '@/lib/oauth';
 import { isCustomProvider, findCustomModel } from '@/lib/custom-models';
+import { getWebProviderRepository } from '@/lib/ai-config/web-provider-store';
+import { resolveSelectedWebModel } from '@/lib/ai-config/web-provider-models';
 import { t } from '@/lib/i18n';
 import { acquireKeepAlive, releaseKeepAlive } from './sw-keepalive';
 
@@ -189,6 +191,22 @@ class AgentManager {
       customProvidersStorage.getValue(),
     ]);
     if (!modelCfg) return null;
+
+    // Web (Browser Session) models are stored as:
+    //   provider = 'web'
+    //   modelId  = 'web:<presetId>:<modelId>'
+    // They are not part of pi-ai KnownProvider and must be resolved from
+    // Dexie WebProvider records.
+    if (modelCfg.provider === 'web') {
+      const providers = await getWebProviderRepository().list();
+      const webModel = resolveSelectedWebModel(modelCfg, providers);
+      if (!webModel) return null;
+      return {
+        model: webModel as unknown as Model<Api>,
+        provider: modelCfg.provider,
+        modelId: modelCfg.modelId,
+      };
+    }
 
     let model: Model<Api> | undefined;
 

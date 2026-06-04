@@ -4,6 +4,7 @@ import {
   getModelIdForProvider,
   resolveWebModel,
   getAvailableWebModels,
+  resolveSelectedWebModel,
   WEB_SESSION_API,
 } from '@/lib/ai-config/web-provider-models';
 import { getWebProviderRepository } from '@/lib/ai-config/web-provider-store';
@@ -127,5 +128,74 @@ describe('getAvailableWebModels (T5: filter logged-in providers)', () => {
     ];
     const models = getAvailableWebModels(providers);
     expect(models[0].id).toBe('web:glm:GLM-4.5');
+  });
+});
+
+describe('resolveSelectedWebModel (web activeModel resolution)', () => {
+  function makeProvider(overrides: Partial<WebProvider> = {}): WebProvider {
+    return {
+      presetId: 'glm',
+      enabled: true,
+      loginStatus: 'loggedIn',
+      modelId: 'GLM-4.6',
+      supportsToolCalls: true,
+      supportsReasoning: false,
+      lastCheckedAt: null,
+      encryptedCookieBundle: null,
+      userOverrides: null,
+      loginAuditLog: [],
+      createdAt: '2026-06-04T00:00:00Z',
+      updatedAt: '2026-06-04T00:00:00Z',
+      ...overrides,
+    } as WebProvider;
+  }
+
+  it('resolves selected web model when provider is enabled + loggedIn', () => {
+    const providers = [
+      makeProvider({ presetId: 'kimi', loginStatus: 'loggedIn', enabled: true }),
+    ];
+
+    const resolved = resolveSelectedWebModel(
+      { provider: 'web', modelId: 'web:kimi:kimi-k2-0905-preview' },
+      providers,
+    );
+
+    expect(resolved).not.toBeNull();
+    expect(resolved!.id).toBe('web:kimi:kimi-k2-0905-preview');
+    expect(resolved!.api).toBe(WEB_SESSION_API);
+  });
+
+  it('returns null for non-web activeModel provider', () => {
+    const providers = [makeProvider({ presetId: 'kimi' })];
+    const resolved = resolveSelectedWebModel(
+      { provider: 'anthropic', modelId: 'claude-3-7-sonnet' },
+      providers,
+    );
+    expect(resolved).toBeNull();
+  });
+
+  it('returns null for invalid web model id format', () => {
+    const providers = [makeProvider({ presetId: 'glm' })];
+    expect(resolveSelectedWebModel({ provider: 'web', modelId: 'glm-4.6' }, providers)).toBeNull();
+    expect(resolveSelectedWebModel({ provider: 'web', modelId: 'web:glm' }, providers)).toBeNull();
+  });
+
+  it('returns null when target provider is loggedOut or disabled', () => {
+    const providers = [
+      makeProvider({ presetId: 'deepseek', loginStatus: 'loggedOut' }),
+      makeProvider({ presetId: 'kimi', enabled: false, loginStatus: 'loggedIn' }),
+    ];
+
+    const deepseek = resolveSelectedWebModel(
+      { provider: 'web', modelId: 'web:deepseek:deepseek-chat' },
+      providers,
+    );
+    const kimi = resolveSelectedWebModel(
+      { provider: 'web', modelId: 'web:kimi:kimi-k2-0905-preview' },
+      providers,
+    );
+
+    expect(deepseek).toBeNull();
+    expect(kimi).toBeNull();
   });
 });

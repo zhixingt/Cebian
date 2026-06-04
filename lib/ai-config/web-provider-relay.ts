@@ -200,7 +200,14 @@ export const WEB_LLM_NEEDS_RELOGIN = 'WEB_LLM_NEEDS_RELOGIN' as const;
  */
 export type WebProviderRelayMessage =
   | { type: typeof WEB_LLM_RELAY_READY; providerId: WebProvider['presetId'] }
-  | { type: typeof WEB_LLM_CHUNK; providerId: WebProvider['presetId']; text: string; reasoning?: string }
+  | {
+      type: typeof WEB_LLM_CHUNK;
+      providerId: WebProvider['presetId'];
+      text?: string;
+      /** ⑪: raw SSE-style chunk for content-fetch adapters (Kimi/DeepSeek/GLM). */
+      chunk?: string;
+      reasoning?: string;
+    }
   | { type: typeof WEB_LLM_DONE; providerId: WebProvider['presetId']; stopReason?: string }
   | { type: typeof WEB_LLM_ERROR; providerId: WebProvider['presetId']; error: string }
   | { type: typeof WEB_LLM_NEEDS_RELOGIN; providerId: WebProvider['presetId']; status: 401 | 403; message: string };
@@ -239,6 +246,42 @@ export async function injectDomRelay(
     args: [request],
   });
 
+  return isolatedResult;
+}
+
+// ====================================================================
+// ⑪ injectContentFetch: SW → ISOLATED bridge → MAIN per-provider fetch
+// ====================================================================
+//
+// ⑪: chromeclaw-style HTTP-replay path. The MAIN-world function is the
+// per-provider adapter (DeepSeek / Kimi / GLM) that performs its own
+// auth + fetch + SSE stream. We reuse the SAME ISOLATED bridge as
+// `injectDomRelay` so the SW listener doesn't need to care which path
+// produced a given message — the message contract (WEB_LLM_RELAY_READY
+// / CHUNK / DONE / ERROR / NEEDS_RELOGIN) is identical.
+export type MainWorldFetchFunction = (request: unknown) => Promise<void>;
+
+export async function injectContentFetch(
+  tabId: number,
+  providerId: WebProvider['presetId'],
+  mainWorldFetch: MainWorldFetchFunction,
+  request: unknown,
+): Promise<unknown> {
+  // 1. ISOLATED bridge first (so it can attach a window.message listener
+  //    that forwards WEB_LLM_* events to chrome.runtime).
+  const isolatedResult = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: 'ISOLATED',
+    func: installIsolatedBridge,
+    args: [providerId],
+  });
+  // 2. MAIN world per-provider fetch.
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    world: 'MAIN',
+    func: mainWorldFetch,
+    args: [request],
+  });
   return isolatedResult;
 }
 
