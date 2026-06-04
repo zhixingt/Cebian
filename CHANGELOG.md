@@ -1,8 +1,8 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 30 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦)
-Tests: 193/193 passing (was 64 at ② start; +129 new)
+Total commits: 31 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧)
+Tests: 187/187 passing (was 64 at ② start; +123 new)
 Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓
 
 ---
@@ -268,10 +268,17 @@ d510c42 docs: add ③+④ Network Relay & Agent Integration design spec
 
 ## Next milestone
 
-When the user provides T1 data, the activation path is:
-1. User pastes cURLs from Kimi/GLM/DeepSeek DevTools
-2. I extract the web session endpoint + body shape from each cURL
-3. I patch `web-provider-presets.ts` `chatApi?` field for the 3 providers (single-file edit)
-4. T14 #1, #2, #8, #9 run as manual checks against the real extension
-5. (Optionally) start ⑦ conversation caching
-6. Final: PR to upstream `maotoumao/Cebian` (requires CLA)
+### ⑧.2 — Real Chrome verification (next)
+
+- Build the extension: `pnpm build`
+- Load the built `.output/chrome-mv3` in Chrome at `localhost:9333` (already open from ②)
+- Open the sidepanel, select a Web (Browser Session) model, send a message
+- Verify: tab opens/reuses, content script injects, message appears in the input, Enter pressed, AI's reply appears in the sidepanel
+- T14 #1 (DeepSeek), T14 #2 (Kimi), T14 #8 (GLM) — all 3 providers
+- Document any selector drift; if a strategy needs adjustment, the fix is a 1-line selector update + re-test
+
+### ⑨ — Long-term
+
+- ⑨.1: Relogin detection via DOM (page redirected to login wall → emit `WEB_LLM_NEEDS_RELOGIN`)
+- ⑨.2: Multi-turn conversation support (use the existing ⑦ storage foundation to cache `parentMessageId` / `chat_id` per provider)
+- ⑨.3: Final PR to upstream `maotoumao/Cebian` (requires CLA)
