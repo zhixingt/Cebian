@@ -76,7 +76,7 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     displayNameKey: 'webProviders.presets.glm.name',
     descriptionKey: 'webProviders.presets.glm.description',
     loginUrl: 'https://chatglm.cn',
-    defaultModelId: 'GLM-4.6',
+    defaultModelId: 'glm-4.6',
     defaultSupportsToolCalls: true,
     defaultSupportsReasoning: false,
     cookieDomain: 'chatglm.cn',
@@ -85,15 +85,19 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     useLocalStorageFallback: false,
     // GLM requires token exchange (chromeclaw confirms).
     refreshUrl: 'https://chatglm.cn/api/v1/auth/refresh',
-    // ⭐ ③+④ T3: PLACEHOLDER endpoint + body — T1 (DevTools research) will replace with real values.
-    // Assumes OpenAI-compatible SSE format. If GLM uses a different shape, T1 will adjust.
+    // ⭐ ③+④ T3 (2026-06-04 web-search update): all 3 providers use
+    // OpenAI-compatible wire format (confirmed via published API docs).
+    // The PUBLIC API is open.bigmodel.cn/api/paas/v4/chat/completions;
+    // the WEB SESSION endpoint may differ (different host, cookie auth
+    // instead of Bearer). T1 (user DevTools research) confirms/corrects
+    // the host. Format (delta path, SSE, end signal) is correct as-is.
     chatApi: {
-      endpoint: 'https://chatglm.cn/api/chat',
+      endpoint: 'https://chatglm.cn/api/paas/v4/chat/completions',
       method: 'POST',
       streamFormat: 'sse',
       deltaPath: 'choices.0.delta.content',
       stopReasonPath: 'choices.0.finish_reason',
-      bodyTemplate: '{"model":"GLM-4.6","messages":{{messages}},"stream":true}',
+      bodyTemplate: '{"model":"glm-4.6","messages":{{messages}},"stream":true}',
       endSignal: 'data: [DONE]',
       supportsImages: false,
     },
@@ -103,7 +107,7 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     displayNameKey: 'webProviders.presets.kimi.name',
     descriptionKey: 'webProviders.presets.kimi.description',
     loginUrl: 'https://kimi.com',
-    defaultModelId: 'kimi-k2-0905-preview',
+    defaultModelId: 'kimi-k2-0711-preview',
     defaultSupportsToolCalls: true,
     defaultSupportsReasoning: false,
     cookieDomain: 'kimi.moonshot.cn',
@@ -111,14 +115,18 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     sessionIndicators: ['kimi-auth'],
     useLocalStorageFallback: true,
     // No refresh exchange for Kimi
-    // ⭐ ③+④ T3: PLACEHOLDER — T1 (DevTools research) will replace with real Kimi endpoint.
+    // ⭐ T3 (2026-06-04 web-search update): PUBLIC API is
+    // api.moonshot.ai/v1/chat/completions (OpenAI-compatible).
+    // The WEB SESSION endpoint is on a different host (likely
+    // kimi.moonshot.cn) and uses cookie auth instead of Bearer.
+    // T1 (user DevTools) confirms the exact web session host.
     chatApi: {
-      endpoint: 'https://kimi.moonshot.cn/api/chat',
+      endpoint: 'https://kimi.moonshot.cn/v1/chat/completions',
       method: 'POST',
       streamFormat: 'sse',
       deltaPath: 'choices.0.delta.content',
       stopReasonPath: 'choices.0.finish_reason',
-      bodyTemplate: '{"model":"kimi-k2-0905-preview","messages":{{messages}},"stream":true}',
+      bodyTemplate: '{"model":"kimi-k2-0711-preview","messages":{{messages}},"stream":true}',
       endSignal: 'data: [DONE]',
       supportsImages: false,
     },
@@ -135,14 +143,18 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     // Django-style sessionid guess; user can override via A2
     sessionIndicators: ['sessionid'],
     useLocalStorageFallback: false,
-    // ⭐ ③+④ T3: PLACEHOLDER — T1 (DevTools research) will replace with real DeepSeek endpoint.
+    // ⭐ T3 (2026-06-04 web-search update): DeepSeek's PUBLIC API is
+    // api.deepseek.com/chat/completions (OpenAI-compatible, supports
+    // thinking mode + tools). The WEB SESSION likely uses the SAME
+    // endpoint shape (with cookie auth) but on chat.deepseek.com.
+    // T1 (user DevTools) confirms the exact host.
     chatApi: {
-      endpoint: 'https://chat.deepseek.com/api/v0/chat/completions',
+      endpoint: 'https://chat.deepseek.com/chat/completions',
       method: 'POST',
       streamFormat: 'sse',
       deltaPath: 'choices.0.delta.content',
       stopReasonPath: 'choices.0.finish_reason',
-      bodyTemplate: '{"model":"deepseek-chat","messages":{{messages}},"stream":true,"stream_options":{"include_usage":true}}',
+      bodyTemplate: '{"model":"deepseek-chat","messages":{{messages}},"stream":true}',
       endSignal: 'data: [DONE]',
       supportsImages: false,
     },

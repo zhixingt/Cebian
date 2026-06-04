@@ -11,8 +11,8 @@ import type { WebProvider } from '@/lib/types';
 
 describe('getModelIdForProvider (T5: ③+④ model lookup)', () => {
   it('returns the preset defaultModelId for each built-in provider', () => {
-    expect(getModelIdForProvider('kimi')).toBe('kimi-k2-0905-preview');
-    expect(getModelIdForProvider('glm')).toBe('GLM-4.6');
+    expect(getModelIdForProvider('kimi')).toBe('kimi-k2-0711-preview');
+    expect(getModelIdForProvider('glm')).toBe('glm-4.6');
     expect(getModelIdForProvider('deepseek')).toBe('deepseek-chat');
   });
 
@@ -37,17 +37,17 @@ describe('resolveWebModel (T5: pi-ai Model<web-session> shape)', () => {
   });
 
   it('returns a Model for GLM with reasoning=false (per preset)', () => {
-    const model = resolveWebModel('glm', 'GLM-4.6');
+    const model = resolveWebModel('glm', 'glm-4.6');
     expect(model.reasoning).toBe(false);
     expect(model.api).toBe(WEB_SESSION_API);
-    expect(model.baseUrl).toBe('https://chatglm.cn/api/chat');
+    expect(model.baseUrl).toBe('https://chatglm.cn/api/paas/v4/chat/completions');
   });
 
   it('returns a Model for DeepSeek with reasoning=true (per preset)', () => {
     const model = resolveWebModel('deepseek', 'deepseek-chat');
     expect(model.reasoning).toBe(true);
     expect(model.api).toBe(WEB_SESSION_API);
-    expect(model.baseUrl).toBe('https://chat.deepseek.com/api/v0/chat/completions');
+    expect(model.baseUrl).toBe('https://chat.deepseek.com/chat/completions');
   });
 
   it('throws on unknown providerId', () => {
