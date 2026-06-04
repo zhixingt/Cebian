@@ -106,9 +106,37 @@ export async function runDomRelayMainWorld(request: DomRelayRequest): Promise<vo
   };
 
   try {
+    // 0. ⑨: pre-flight "needs relogin" check.
+    //    The most reliable signal that the user's session expired is that the
+    //    chat input element is no longer present — the provider redirected to
+    //    a login wall or the page is showing an error. Emit a relogin signal
+    //    (not a generic error) so the sidepanel can prompt the user.
+    if (!document.querySelector(request.domStrategy.input.selector)) {
+      postToBridge({
+        type: 'WEB_LLM_NEEDS_RELOGIN',
+        providerId: request.providerId,
+        status: 401,
+        message: `Provider ${request.providerId} is no longer logged in (chat input not found on ${location.href}). Please re-login via Settings → Web Providers.`,
+      });
+      return;
+    }
+
     // 1. Set the message
     const setResult = _setInput(document, request.domStrategy.input, request.message);
     if (!setResult.ok) {
+      // ⑨: "set failed" usually means the input element disappeared between
+      // our pre-flight check and the set call. Treat as needs-relogin too —
+      // the page likely redirected to a login wall mid-call.
+      const isInputMissing = !document.querySelector(request.domStrategy.input.selector);
+      if (isInputMissing) {
+        postToBridge({
+          type: 'WEB_LLM_NEEDS_RELOGIN',
+          providerId: request.providerId,
+          status: 401,
+          message: `Provider ${request.providerId} is no longer logged in (chat input disappeared mid-call). Please re-login via Settings → Web Providers.`,
+        });
+        return;
+      }
       postToBridge({ type: 'WEB_LLM_ERROR', providerId: request.providerId, error: 'set: ' + setResult.error });
       return;
     }

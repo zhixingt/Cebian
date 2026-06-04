@@ -1,8 +1,8 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 31 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧)
-Tests: 187/187 passing (was 64 at ② start; +123 new)
+Total commits: 34 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨)
+Tests: 191/191 passing (was 64 at ② start; +127 new)
 Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓
 
 ---
@@ -268,17 +268,49 @@ d510c42 docs: add ③+④ Network Relay & Agent Integration design spec
 
 ## Next milestone
 
-### ⑧.2 — Real Chrome verification (next)
+### ⑧.2 — Real Chrome verification (DONE in ⑧ + selector-fix commits)
 
-- Build the extension: `pnpm build`
-- Load the built `.output/chrome-mv3` in Chrome at `localhost:9333` (already open from ②)
-- Open the sidepanel, select a Web (Browser Session) model, send a message
-- Verify: tab opens/reuses, content script injects, message appears in the input, Enter pressed, AI's reply appears in the sidepanel
-- T14 #1 (DeepSeek), T14 #2 (Kimi), T14 #8 (GLM) — all 3 providers
-- Document any selector drift; if a strategy needs adjustment, the fix is a 1-line selector update + re-test
+- Build: `pnpm build` → 9.6 MB clean ✓
+- Load: Chrome at `localhost:9333` (already open from ②)
+- E2E via CDP at localhost:9333: all 3 providers returned valid AI replies
+  - Kimi: "你好！我是Kimi，由月之暗面（Moonshot AI）开发..." (70 chars)
+  - DeepSeek: 25 chars (first chunk of reasoning mode)
+  - GLM: "你好，我是清言，由智谱AI基于GLM-5.1模型开发..." (463 chars)
+- Selector drift found and fixed (commit `35091e1`):
+  - GLM input: `textarea[data-testid="chat-input"]` → `textarea` (no data-testid)
+  - GLM/Kimi/DeepSeek reader: `.markdown-body` → `[class*="markdown"]:last-of-type` (verified per-provider)
+- T14 #1, #2, #8: ✅ verified via CDP (automated)
 
-### ⑨ — Long-term
+### ⑨ — Relogin detection (DONE in ⑨ commit)
 
-- ⑨.1: Relogin detection via DOM (page redirected to login wall → emit `WEB_LLM_NEEDS_RELOGIN`)
-- ⑨.2: Multi-turn conversation support (use the existing ⑦ storage foundation to cache `parentMessageId` / `chat_id` per provider)
-- ⑨.3: Final PR to upstream `maotoumao/Cebian` (requires CLA)
+- ⑨.1 ✅: Content script's pre-flight check emits `WEB_LLM_NEEDS_RELOGIN` (status 401) when the chat input element is missing — the most reliable signal that the user's session expired and the provider redirected to a login wall.
+- ⑨.2: Multi-turn conversation support (use the existing ⑦ storage foundation to cache `parentMessageId` / `chat_id` per provider) — NOT YET
+- ⑨.3: Final PR to upstream `maotoumao/Cebian` (requires CLA) — NOT YET
+
+### ⑨ E2E verification (real GLM tab, 2026-06-04)
+
+- Step 1: Pre-flight check on logged-in GLM tab → `textarea` found (parent: `input-box-inner`) ✓
+- Step 2: Install `window.postMessage` spy + remove the textarea from DOM (simulates session expiry)
+- Step 3: Post-removal pre-flight → `textarea` NOT found ✓
+- Step 4: Content script's pre-flight signal fires → emits `WEB_LLM_NEEDS_RELOGIN` with status 401, message includes the URL ✓
+- Step 5: Spy captured the message → ✅ PASS
+- Cleanup: Reloaded GLM tab to restore state
+
+The full chain now works: pre-flight detects logged-out → SW receives `WEB_LLM_NEEDS_RELOGIN` → invalidates bundle cache → broadcasts to sidepanel → shows toast + opens Settings (verified in `web-provider-relogin-flow.test.ts` ⑤.2+⑤.4 integration test, 4 tests).
+
+---
+
+## What remains (⑨.2 + ⑨.3)
+
+### ⑨.2 — Multi-turn conversation support (next)
+
+The ⑦ storage foundation (`webProviderConversations` Dexie table) is already in place. What's missing is the relay-side wiring:
+- Per-provider: cache `parentMessageId` (DeepSeek) / `chat_id` (Kimi) / `conversation_id` (GLM) after each reply
+- On subsequent messages, read the cached value and include it in the request body
+- The DOM-injection approach gets this "for free" — the conversation is maintained by the provider's own UI (you can see the chat history in the tab). The only need is to detect when a "new conversation" was started (e.g., user clicked "+" to start a new chat) and reset the cache.
+
+**Pragmatic MVP**: rely on the provider's own conversation UI. The ⑦ storage table is there for future enhancement (e.g., if the user closes the tab and we need to restore context in a new tab).
+
+### ⑨.3 — Final PR to upstream `maotoumao/Cebian`
+
+Requires signing the project's CLA. The branch `feat/web-browser-session-provider` has 34 commits ahead of base, 191/191 tests passing, 9.6 MB build, i18n parity. Ready to PR once the CLA is signed.
