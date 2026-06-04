@@ -1,24 +1,26 @@
+import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useWebProviders } from '@/hooks/useWebProviders';
-import { useWebProviderWebLogin } from '@/hooks/useWebProviderWebLogin';
+import { useWebProviderWebLogin, type LastCaptureInfo } from '@/hooks/useWebProviderWebLogin';
 import {
   WEB_PROVIDER_PRESETS,
   resolveEffectiveConfig,
 } from '@/lib/ai-config/web-provider-presets';
-import type { WebProviderUserOverrides } from '@/lib/types';
+import type { WebProvider, WebProviderUserOverrides } from '@/lib/types';
 import { t } from '@/lib/i18n';
 import { WebProviderCard } from '../provider/WebProviderCard';
 import { EmptyWebProvidersState } from '../provider/EmptyWebProvidersState';
 
 /**
  * Container that wires the two hooks to a list of WebProviderCard.
- * No local state of its own; the two hooks own all behavior.
+ * No local state of its own (except A1 capture cache), the two hooks own all behavior.
  *
  * ② updates:
  *   - useWebProviderSimulatedLogin replaced with useWebProviderWebLogin
  *   - Pass Login button + A1 transparency + A2 Advanced + A4 audit to card
  *   - setUserOverrides wired through useWebProviders (A2)
+ *   - Per-provider captureInfo cache (A1: persists past checkingId=null)
  */
 export function WebProvidersSubSection() {
   const { providers, update, isLoading, error } = useWebProviders();
@@ -27,7 +29,6 @@ export function WebProvidersSubSection() {
     recheck,
     checkingId,
     loginLoading,
-    lastCaptureInfo,
   } = useWebProviderWebLogin({
     onSuccess: (id) => update.setLoginStatus(id, 'loggedIn'),
     onFailure: (id, err) => {
@@ -36,7 +37,31 @@ export function WebProvidersSubSection() {
         description: err,
       });
     },
+    // A1: per-provider cache of the most recent successful capture.
+    onCapture: (id, info) => {
+      setCaptureByProvider(prev => ({ ...prev, [id]: info }));
+    },
   });
+
+  // A1: per-provider cache of the most recent successful capture.
+  // Persists past the checkingId window so users can verify what was captured
+  // even after the tab auto-closes. Keyed by presetId.
+  const [captureByProvider, setCaptureByProvider] = useState<
+    Partial<Record<WebProvider['presetId'], LastCaptureInfo>>
+  >({});
+
+  const onLogin = useCallback(
+    (id: WebProvider['presetId']) => {
+      // Optimistically clear the old capture for this provider before starting
+      // a new login; the new capture will replace it on success.
+      setCaptureByProvider(prev => ({ ...prev, [id]: undefined }));
+      void login(id);
+    },
+    [login],
+  );
+
+  // Re-check should NOT clear capture — it just verifies the stored bundle.
+  // Capture info shown is the most recent successful login.
 
   if (error) {
     return (
@@ -82,13 +107,9 @@ export function WebProvidersSubSection() {
                 update.setCapability(provider.presetId, cap, v)
               }
               onRecheck={() => recheck(provider.presetId)}
-              onLogin={() => login(provider.presetId)}
+              onLogin={() => onLogin(provider.presetId)}
               isLoginLoading={loginLoading && checkingId === provider.presetId}
-              lastCaptureInfo={
-                lastCaptureInfo && checkingId === provider.presetId
-                  ? lastCaptureInfo
-                  : null
-              }
+              lastCaptureInfo={captureByProvider[provider.presetId] ?? null}
               effectiveConfig={resolveEffectiveConfig(provider, preset)}
               onUserOverrideChange={(
                 field: keyof WebProviderUserOverrides,

@@ -12,6 +12,13 @@ export interface WebLoginConfig {
   onSuccess: (id: WebProvider['presetId']) => void;
   /** Called on any failure (timeout, tab closed, cookies insufficient, etc.). */
   onFailure: (id: WebProvider['presetId'], error: string) => void;
+  /**
+   * ⭐ A1: called when a successful capture happens, with the per-provider
+   *        capture info. Persists past the login window so the UI can show
+   *        "Captured N cookies" even after the tab auto-closes.
+   *        Optional — only needed if the consumer wants persistent A1 display.
+   */
+  onCapture?: (id: WebProvider['presetId'], info: LastCaptureInfo) => void;
 }
 
 export interface WebLoginResult {
@@ -23,7 +30,7 @@ export interface WebLoginResult {
   checkingId: WebProvider['presetId'] | null;
   /** True while a login is in progress (for spinner on the Login button). */
   loginLoading: boolean;
-  /** ⭐ A1: most recent capture metadata, null if never logged in. Display in UI. */
+  /** ⭐ A1: most recent capture metadata (across all providers). Cleared on next login. */
   lastCaptureInfo: LastCaptureInfo | null;
 }
 
@@ -73,16 +80,19 @@ export function useWebProviderWebLogin(config: WebLoginConfig): WebLoginResult {
         });
         if (response?.success) {
           // A1: capture metadata for UI transparency (only on login success)
+          let captured: LastCaptureInfo | null = null;
           if (
             isLogin &&
             response.capturedCookieNames &&
             response.capturedTokenSources
           ) {
-            setLastCaptureInfo({
+            captured = {
               cookieNames: response.capturedCookieNames,
               tokenSources: response.capturedTokenSources,
               capturedAt: new Date().toISOString(),
-            });
+            };
+            setLastCaptureInfo(captured);
+            config.onCapture?.(id, captured);
           }
           config.onSuccess(id);
         } else {
