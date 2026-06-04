@@ -10,6 +10,8 @@ import { isInjectablePage } from '@/lib/tab-helpers';
 import { vfs } from '@/lib/vfs';
 import { registerCookieService } from '@/lib/ai-config/web-provider-cookie-service';
 import { registerWebProviderStream } from '@/lib/ai-config/web-provider-stream';
+import { registerWebProviderReloginHandler, type WebProviderNeedsReloginMessage } from './web-provider-relogin';
+import { invalidateBundle } from '@/lib/ai-config/web-provider-bundle';
 
 /**
  * Grace period after the last subscribed port disconnects before the agent
@@ -34,6 +36,19 @@ export default defineBackground(() => {
   // T11: register the 'web-session' pi-ai provider so Model<'web-session'>
   // dispatched by the agent lands in our stream function (tab-based fetch).
   registerWebProviderStream();
+  // ⑤.2: register the WEB_LLM_NEEDS_RELOGIN handler (401/403 from fetcher
+  // → invalidate bundle cache + broadcast to sidepanel to re-open Settings)
+  registerWebProviderReloginHandler({
+    broadcast: (msg: WebProviderNeedsReloginMessage) => {
+      // Reuse the per-port safePost path (handles disconnected ports).
+      // Cast: WebProviderNeedsReloginMessage is the new variant; we add
+      // it to ServerMessage below.
+      for (const [port] of ports) {
+        safePost(port, msg as any);
+      }
+    },
+    invalidateBundle,
+  });
 
   // Dev-only: seed a custom provider from .env.local if configured.
   // No-op in production builds and when WXT_DEV_API_KEY is empty.
