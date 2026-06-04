@@ -36,7 +36,19 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
   }
 
   // ── Step 2: read bearer from cookie jar (chrome.cookies API not
-  // available in MAIN world — we just trust credentials: 'include'). ──
+  // available in MAIN world — read document.cookie for the kimi-auth
+  // cookie). chromeclaw's buildRequest does the same: it pulls the
+  // `kimi-auth` cookie value and forwards it as `Authorization: Bearer …`,
+  // because the Kimi chat endpoint requires the bearer header, not just a
+  // first-party cookie. ──
+  let kimiAuth = '';
+  try {
+    const m = document.cookie.match(/(?:^|;\s*)kimi-auth=([^;]*)/);
+    if (m) kimiAuth = decodeURIComponent(m[1]);
+  } catch {
+    /* ignore */
+  }
+
   // Confirm we are on kimi.com; otherwise bail with a clear error.
   if (!origin.includes('kimi.com')) {
     window.postMessage(
@@ -80,6 +92,7 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
       'X-Language': 'zh-CN',
       'X-Msh-Platform': 'web',
       Accept: 'application/connect+json',
+      ...(kimiAuth ? { Authorization: `Bearer ${kimiAuth}` } : {}),
     },
     body: kimiBody,
     credentials: 'include',

@@ -1,9 +1,9 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 35 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line)
+Total commits: 36 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix)
 Tests: 201/201 passing (was 64 at ② start; +137 new)
-Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓ • `pnpm check` clean
+Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓ • `pnpm check` clean • E2E infrastructure in `scripts/e2e-content-fetch.cjs`
 
 ---
 
@@ -371,33 +371,84 @@ architecture.
 - No tree-shaking of the 3 adapter symbols
 
 **Known limitations** (will be fixed in follow-up):
-1. **DeepSeekHashV1 PoW** — when the server returns this algorithm, the
-   adapter surfaces a clear "unsupported algorithm — reload page" error
-   rather than silently failing. The WASM solver is the next work item.
-2. **GLM X-Sign** — the GLM adapter currently uses bare SSE without the
-   HMAC `X-Sign` header. GLM-Intl tabs may still 401/403. Will add once
-   we capture the signature algorithm from a real request.
-3. **Real-extension E2E** — Playwright adapter-symbol extraction in
-   `pw-content-fetch-e2e.cjs` needs a fix to run the **built bundle's**
-   adapter functions in the user's tabs. The DOM-evidence tests prove
-   the runtime; only the SW→MAIN bridge needs real-world validation
-   once the user reloads the extension.
+1. **DeepSeekHashV1 PoW** — confirmed by E2E: server returns this
+   algorithm. Adapter surfaces a clear "unsupported algorithm — reload
+   page" error. WASM solver is the next work item.
+2. **GLM X-Sign + endpoint** — confirmed by E2E: `/api/chat/v1/stream`
+   returns 405. Real endpoint is `/chatglm/backend-api/assistant/stream`
+   (chromeclaw), with `assistant_id: '65940acff94777010aa6b796'`,
+   `chat_type: 'user_chat'`, `meta_data` envelope, plus 10+ X-*
+   headers including **MD5 X-Sign** with secret
+   `8a1317a7468aa3ad86e997d08f3f31cb` and timestamp with checksum
+   digit. SSE response shape is `parts[].content[].text` (cumulative
+   delta — must dedupe). Full rewrite needed.
+3. **Kimi server returns 200 with empty body** — confirmed by E2E:
+   request accepted (200 OK + `application/connect+json` content-type)
+   but body is empty. Authorization header is added when `kimi-auth`
+   cookie is present (the user has none in MAIN world — `kimi-auth` is
+   not in their cookie jar; only tracking cookies are). Server is not
+   streaming — this is a server-side issue, not an adapter bug.
+4. **Real-extension E2E** — DONE in this commit: `scripts/e2e-content-fetch.cjs`
+   connects to the user's Chrome at 9333, extracts adapter source from
+   the **built bundle** (not source files), and runs the real adapter
+   inside the user's logged-in tabs. The infrastructure is in place;
+   only the GLM and DeepSeek adapter bodies need work to make 3/3 pass.
+
+---
+
+### ⑪.6 — Real-extension E2E infrastructure (this commit)
+
+**`scripts/e2e-content-fetch.cjs`** (11.9 KB) — Playwright E2E that
+verifies the A-line adapters run inside the user's actual Chrome at
+`localhost:9333` and stream SSE chunks back. Key features:
+
+| Feature | Why |
+|---|---|
+| Bundle extraction | Reads `background.js`, finds each adapter by minified symbol (`wyt`/`Tyt`/`Eyt`) via balanced-brace walk, injects the **exact function the SW injects** — not source |
+| runId-tagged listener | Prevents event pollution across re-runs of the same page |
+| `window.fetch` wrapper | Captures the actual URL/method/headers/body the adapter sends |
+| `Response` capture | Logs the real status code + content-type the server returns |
+| Cookie probe | Reports which auth cookies are present in `document.cookie` before each call |
+
+**E2E v3 run results** (2026-06-04, against user's real Chrome):
+
+| Provider | Cookies present | Request → Response | Chunks | Verdict |
+|---|---|---|---|---|
+| Kimi | tracking only (no `kimi-auth`) | POST `kimi.gateway.chat.v1.ChatService/Chat` → 200 `application/connect+json` | 0 | 200 OK but empty body — server-side, not adapter |
+| GLM | `chatglm_token` + `chatglm_refresh_token` ✓ | POST `/api/chat/v1/stream` → 405 nginx error | 0 | Wrong endpoint — needs X-Sign rewrite |
+| DeepSeek | `smidV2` (auth) | POST `chat_session/create` → 200; POST `create_pow_challenge` → 200 | 0 | `DeepSeekHashV1` PoW — needs WASM solver |
+
+**Kimi fix landed** (in this commit): `web-provider-content-fetch-kimi.ts`
+now extracts `kimi-auth` from `document.cookie` and adds
+`Authorization: Bearer ${kimi-auth}` (chromeclaw parity). Empty-body
+result is **not** caused by missing auth header — server returned 200 +
+empty body even with the right shape.
 
 ---
 
 ## What remains (post-A-line)
 
-### A — Real Chrome validation
-- User must **fully restart Chrome** (or remove+re-add the extension)
-  so the SW picks up the new bundle with `mainWorldFetchByProvider` wired in
-- Send one message each in Kimi / GLM / DeepSeek sidepanel
-- Capture screenshots of success/failure to decide next steps
-  (WASM for DeepSeekHashV1 / X-Sign for GLM / fall back to DOM)
+### D — GLM X-Sign rewrite (concrete next work item)
+Real endpoint + body + headers + MD5 X-Sign + cumulative-delta SSE
+parser. ~130 LoC change. The chromeclaw reference is in
+`chromeclaw-research/.../providers/{glm-shared,glm-signing}.ts`.
 
-### B — Multi-turn conversation support (⑨.2, deferred)
+### E — DeepSeekHashV1 WASM solver (concrete next work item)
+Bundle the DeepSeekHashV1 WASM (separate from the SHA-256 JS solver
+already in `web-provider-content-fetch-deepseek.ts`).
+
+### F — Real Chrome validation by user
+User must **fully restart Chrome** (or remove+re-add the extension)
+so the SW picks up the new bundle with `mainWorldFetchByProvider` wired in
++ the Kimi Authorization fix. Send one message each in sidepanel
+(Kimi / GLM / DeepSeek) and capture screenshots. With the
+above D + E work landed, all 3 should pass.
+
+### G — Multi-turn conversation support (⑨.2, deferred)
 DOM-injection gives us "free" conversation continuity via the provider's
 own UI; the ⑦ storage foundation stays for future restoration scenarios.
 
-### C — Upstream PR (⑨.3, **deferred per user**)
+### H — Upstream PR (⑨.3, **deferred per user**)
 User explicitly opted NOT to submit PR to upstream `maotoumao/Cebian`.
-Branch state: 35 commits, 201/201 tests, 9.6 MB build, i18n parity.
+Branch state: 36 commits, 201/201 tests, 9.6 MB build, i18n parity,
+E2E infrastructure in.
