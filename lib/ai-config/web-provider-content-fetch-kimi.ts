@@ -161,9 +161,11 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
   // shared runtime is composed at injection time by the SW instead).
   let buffer = new Uint8Array(0);
   let first = true;
+  let bytesRead = 0;  // ⑪.7: track total bytes read; 0 = empty body
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
+    bytesRead += value.byteLength;
     const merged = new Uint8Array(buffer.byteLength + value.byteLength);
     merged.set(buffer);
     merged.set(value, buffer.byteLength);
@@ -199,17 +201,23 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
       if (buffer.byteLength < frameLen) break;
 
       if (flags & 0x02) {
-        // Trailer frame: try to extract error
+        // Trailer frame: try to extract error. Kimi's actual trailer
+        // format is `{"error":{"code":"...","message":"..."}}` (nested),
+        // not the top-level `{code, message}` shape that chromeclaw used.
+        // Check both.
         const trailerPayload = buffer.slice(5, frameLen);
         try {
           const trailerStr = new TextDecoder().decode(trailerPayload);
           const trailer = JSON.parse(trailerStr) as Record<string, unknown>;
-          if (trailer.code || trailer.message) {
+          const nestedError = trailer.error as Record<string, unknown> | undefined;
+          const errCode = (trailer.code as string | undefined) ?? nestedError?.code as string | undefined;
+          const errMsg = (trailer.message as string | undefined) ?? nestedError?.message as string | undefined;
+          if (errCode || errMsg) {
             window.postMessage(
               {
                 type: 'WEB_LLM_ERROR',
                 requestId,
-                error: `Kimi trailer: ${trailer.message ?? trailer.code ?? 'unknown'}`,
+                error: `Kimi trailer: ${errMsg ?? errCode ?? 'unknown'}${errCode ? ` (code=${errCode})` : ''}`,
               },
               origin,
             );
@@ -246,6 +254,26 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
         /* ignore partial frames */
       }
     }
+  }
+  // ⑪.7: If the server returned 200 OK but the body was completely empty,
+  // don't silently emit DONE with 0 chunks — the user would see a chat
+  // panel with no response and no error, which is undebuggable. Surface
+  // a clear error pointing at the most likely server-side causes so the
+  // user (or the next devtools session) can investigate.
+  if (bytesRead === 0) {
+    window.postMessage(
+      {
+        type: 'WEB_LLM_ERROR',
+        requestId,
+        error: `Kimi returned 200 OK but the response body was empty. ` +
+               `This usually means: (1) the server is rate-limiting the session, ` +
+               `(2) the connect-json envelope format has changed, or ` +
+               `(3) the endpoint has drifted. ` +
+               `Retry after reloading the Kimi tab, or capture a working request from DevTools to compare.`,
+      },
+      origin,
+    );
+    return;
   }
   window.postMessage({ type: 'WEB_LLM_DONE', requestId }, origin);
 };

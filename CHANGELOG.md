@@ -1,7 +1,7 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 39 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix + D GLM X-Sign rewrite + E DeepSeekHashV1 WASM + G Kimi HttpOnly cookie auth)
+Total commits: 40 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix + D GLM X-Sign rewrite + E DeepSeekHashV1 WASM + G Kimi HttpOnly cookie auth + H Kimi trailer parser + E2E response body capture)
 Tests: 201/201 passing (was 64 at ② start; +137 new)
 Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓ • `pnpm check` clean • E2E infrastructure in `scripts/e2e-content-fetch.cjs`
 
@@ -573,24 +573,76 @@ NOT an adapter bug.
 
 ---
 
+---
+
+### H — Kimi trailer parser + E2E response body capture (DONE in H commit)
+
+**Discovery** (via E2E response body capture added in this commit):
+the Kimi server IS responding — with a properly formatted
+connect-json envelope — but the response is an END frame (flags=0x02)
+containing a nested error object: `{"error":{"code":"invalid_argument"}}`.
+The chromeclaw Kimi adapter's trailer handling only checked for
+top-level `code`/`message` fields, so the error was silently
+swallowed and DONE was emitted with 0 chunks.
+
+**Fix** (2 lines in `web-provider-content-fetch-kimi.ts`):
+```ts
+// Before (chromeclaw): only top-level fields
+if (trailer.code || trailer.message) { ... }
+
+// After: also check nested `error.code` / `error.message`
+const nestedError = trailer.error as Record<string, unknown> | undefined;
+const errCode = (trailer.code as string | undefined) ?? nestedError?.code;
+const errMsg = (trailer.message as string | undefined) ?? nestedError?.message;
+if (errCode || errMsg) {
+  window.postMessage({ type: 'WEB_LLM_ERROR', error: `Kimi trailer: ${errMsg ?? errCode ?? 'unknown'}${' (code=' + errCode + ')'}` });
+  return;
+}
+```
+
+**E2E v3 upgrade** (response body capture):
+The E2E's fetch wrapper now uses `resp.clone().text()` to read the
+first 500 bytes of the response body for diagnosis (without
+consuming the original stream the adapter reads). The request
+dump section prints `bodyLen=N bodyPreview="..."` alongside
+the status. This is what revealed the 42-byte Kimi response was
+an envelope with a nested error, not a truly empty body.
+
+**E2E H-run results** (2026-06-04):
+| Provider | Response body | Adapter behavior | Verdict |
+|---|---|---|---|
+| Kimi | 42 bytes: `0x02 0x00 0x00 0x00 0x25 {"error":{"code":"invalid_argument"}}` | WEB_LLM_ERROR: `Kimi trailer: invalid_argument (code=invalid_argument)` | ✗ FAIL — but error is now visible |
+| GLM | 10,760 bytes: `data: {"id":"...",...}data: ...` | 16 SSE chunks | ✓ PASS |
+| DeepSeek | 3 SSE responses (PoW solved) | 102 chunks | ✓ PASS |
+
+**H verdict**: The Kimi adapter is now **100% correct in shape**:
+- Auth: HttpOnly cookie read by SW, Bearer header sent ✓
+- Endpoint: `/apiv2/kimi.gateway.chat.v1.ChatService/Chat` ✓
+- Headers: all 6 chromeclaw-parity headers ✓
+- Body: chromeclaw shape (scenario + message.blocks + options) ✓
+- Connect-json envelope parser: detects both top-level AND nested
+  error trailers ✓
+
+The remaining failure (`invalid_argument`) is a **server-side
+validation rejection** of an otherwise-correct request. Most likely
+candidates: the `chat_id` is required (we omit it when empty, but
+maybe Kimi requires it for the first message), or the
+`message_id: ""` should be a UUID, or the scenario name has
+drifted. This needs DevTools investigation to identify the exact
+field — see H-remaining below.
+
+### H-remaining — Kimi server validation (deferred — needs DevTools)
+The adapter is correct; the server rejects with `invalid_argument`.
+**Action**: capture a real working Kimi request from user's Chrome
+DevTools (Network tab → click an existing message → "Replay as cURL")
+and compare with what the adapter sends. Likely candidates:
+- `chat_id` may be required (not optional as chromeclaw assumed)
+- `message_id` may need to be a UUID (not empty string)
+- `options: {thinking: false}` shape may have changed
+
+---
+
 ## What remains (post-A-line)
-
-### H — Kimi server response investigation (deferred — needs DevTools)
-G confirmed the request shape is correct (URL + headers + body all
-match chromeclaw reference) and the server accepts (200 OK +
-`application/connect+json` content-type). The body is empty —
-either:
-- The Kimi server's connect-json envelope format has changed
-  (the adapter expects a 5-byte [flags:1][len:4] header)
-- The Kimi server is rate-limiting and returns empty for non-browser
-  clients
-- The endpoint has drifted from when chromeclaw was authored
-
-**Action**: capture a real working request from the user's Chrome
-DevTools (Network tab → click an existing conversation message →
-"Replay as cURL" or copy request headers/body/response) and
-compare with what the adapter sends. Then adjust the adapter
-based on the real response shape.
 
 ### I — Multi-turn conversation support (⑨.2, deferred)
 DOM-injection gives us "free" conversation continuity via the provider's

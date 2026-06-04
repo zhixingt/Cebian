@@ -117,9 +117,22 @@ async function runProviderE2E(page, providerId, adapterSource) {
         window.__cebRequests = window.__cebRequests || [];
         window.__cebRequests.push(reqInfo);
         return origFetch.apply(this, args).then((resp) => {
-          const respInfo = { runId: rid, status: resp.status, statusText: resp.statusText, url: reqInfo.url, contentType: resp.headers.get('content-type') || '', ts: Date.now() };
+          const respInfo = { runId: rid, status: resp.status, statusText: resp.statusText, url: reqInfo.url, contentType: resp.headers.get('content-type') || '', bodyPreview: undefined, ts: Date.now() };
           window.__cebResponses = window.__cebResponses || [];
           window.__cebResponses.push(respInfo);
+          // ⑪.7: Clone the response and read the first 500 bytes for diagnosis.
+          // The adapter still gets the original `resp` (so its reader works).
+          // .clone() reads the body without consuming the original stream.
+          if (resp.body && typeof resp.clone === 'function') {
+            resp.clone().text().then((text) => {
+              const len = text.length;
+              respInfo.bodyLength = len;
+              respInfo.bodyPreview = len > 500 ? text.slice(0, 500) + `... [+${len - 500} chars]` : text;
+              // Replace the pushed entry so the read-back at end-of-test sees the body
+              const idx = window.__cebResponses.findIndex((r) => r === respInfo);
+              if (idx >= 0) window.__cebResponses[idx] = { ...respInfo };
+            }).catch(() => { /* ignore */ });
+          }
           return resp;
         });
       };
@@ -288,7 +301,14 @@ async function runProviderE2E(page, providerId, adapterSource) {
       console.log(`  [req ${i}] ${q.method} ${q.url}`);
       if (q.headers) console.log(`         headers: ${JSON.stringify(q.headers).slice(0, 280)}`);
       if (q.bodyPreview) console.log(`         body: ${JSON.stringify(q.bodyPreview).slice(0, 200)}`);
-      if (resp) console.log(`         → ${resp.status} ${resp.statusText} (${resp.contentType})`);
+      if (resp) {
+        let bodyInfo = '';
+        if (typeof resp.bodyLength === 'number') {
+          bodyInfo = `  bodyLen=${resp.bodyLength}`;
+          if (resp.bodyPreview) bodyInfo += `  bodyPreview=${JSON.stringify(resp.bodyPreview).slice(0, 400)}`;
+        }
+        console.log(`         → ${resp.status} ${resp.statusText} (${resp.contentType})${bodyInfo}`);
+      }
     }
   }
 
