@@ -5,6 +5,12 @@ import {
   getTabRegistry,
   _resetTabRegistryForTesting,
   _getTabEntryForTesting,
+  injectRelayScripts,
+  WEB_LLM_RELAY_READY,
+  WEB_LLM_CHUNK,
+  WEB_LLM_DONE,
+  WEB_LLM_ERROR,
+  type WebProviderRelayMessage,
 } from '@/lib/ai-config/web-provider-relay';
 import type { WebProvider } from '@/lib/types';
 
@@ -138,15 +144,135 @@ describe('TabRegistry (T6: ③+④ tab reuse + 5min auto-close)', () => {
       expect(chrome.tabs.remove).toHaveBeenCalledWith(1000);
     });
 
-    it('markUsed within idle window prevents auto-close', async () => {
-      _resetTabRegistryForTesting({ idleCloseMs: 100 });
-      const reg = getTabRegistry();
-      await reg.openOrReuseTab('glm' as WebProvider['presetId'], 'https://chatglm.cn');
-      // Use it again before timeout
-      setTimeout(() => reg.markUsed('glm' as WebProvider['presetId']), 50);
-      // Wait past original timeout
-      await new Promise(r => setTimeout(r, 150));
-      expect(reg.getTab('glm' as WebProvider['presetId'])).toBe(1000);
+  it('markUsed within idle window prevents auto-close', async () => {
+    _resetTabRegistryForTesting({ idleCloseMs: 100 });
+    const reg = getTabRegistry();
+    await reg.openOrReuseTab('glm' as WebProvider['presetId'], 'https://chatglm.cn');
+    // Use it again before timeout
+    setTimeout(() => reg.markUsed('glm' as WebProvider['presetId']), 50);
+    // Wait past original timeout
+    await new Promise(r => setTimeout(r, 150));
+    expect(reg.getTab('glm' as WebProvider['presetId'])).toBe(1000);
+  });
+});
+
+describe('injectRelayScripts (T7: ③+④ ISOLATED then MAIN injection + message contract)', () => {
+  beforeEach(() => {
+    // Ensure chrome.scripting exists (T6 beforeEach only sets chrome.tabs + chrome.runtime)
+    if (!(chrome as any).scripting) {
+      (chrome as any).scripting = { executeScript: vi.fn() };
+    }
+    (chrome.scripting.executeScript as any) = vi.fn((_opts: any) => {
+      // Mock the bridge registration: ISOLATED injection returns immediately
+      return Promise.resolve([{ result: { ok: true } }]);
     });
   });
+
+  it('injects ISOLATED world first, then MAIN world (order matters for bridge availability)', async () => {
+    const callOrder: string[] = [];
+    (chrome.scripting.executeScript as any) = vi.fn((opts: any) => {
+      callOrder.push(opts.world);
+      return Promise.resolve([{ result: { ok: true } }]);
+    });
+    await injectRelayScripts(42, {
+      providerId: 'glm',
+      endpoint: 'https://chatglm.cn/api/chat',
+      bodyTemplate: '{}',
+      streamFormat: 'sse',
+      endSignal: 'data: [DONE]',
+      deltaPath: 'choices.0.delta.content',
+      stopReasonPath: 'choices.0.finish_reason',
+    });
+    expect(callOrder).toEqual(['ISOLATED', 'MAIN']);
+  });
+
+  it('ISOLATED injection has correct target + world', async () => {
+    const calls: any[] = [];
+    (chrome.scripting.executeScript as any) = vi.fn((opts: any) => {
+      calls.push(opts);
+      return Promise.resolve([{ result: { ok: true } }]);
+    });
+    await injectRelayScripts(42, {
+      providerId: 'glm',
+      endpoint: 'https://chatglm.cn/api/chat',
+      bodyTemplate: '{}',
+      streamFormat: 'sse',
+      endSignal: 'data: [DONE]',
+      deltaPath: 'choices.0.delta.content',
+      stopReasonPath: 'choices.0.finish_reason',
+    });
+    const isolated = calls.find(c => c.world === 'ISOLATED');
+    expect(isolated).toBeDefined();
+    expect(isolated.target).toEqual({ tabId: 42 });
+    expect(typeof isolated.func).toBe('function');
+  });
+
+  it('MAIN injection receives the chat request as args (providerId, endpoint, bodyTemplate, etc.)', async () => {
+    const calls: any[] = [];
+    (chrome.scripting.executeScript as any) = vi.fn((opts: any) => {
+      calls.push(opts);
+      return Promise.resolve([{ result: { ok: true } }]);
+    });
+    await injectRelayScripts(42, {
+      providerId: 'kimi',
+      endpoint: 'https://kimi.moonshot.cn/api/chat',
+      bodyTemplate: '{"messages":[]}',
+      streamFormat: 'sse',
+      endSignal: 'data: [DONE]',
+      deltaPath: 'choices.0.delta.content',
+      stopReasonPath: 'choices.0.finish_reason',
+    });
+    const main = calls.find(c => c.world === 'MAIN');
+    expect(main).toBeDefined();
+    expect(main.target).toEqual({ tabId: 42 });
+    // The args array is passed to the MAIN-world function
+    expect(main.args).toEqual([expect.objectContaining({
+      providerId: 'kimi',
+      endpoint: 'https://kimi.moonshot.cn/api/chat',
+      bodyTemplate: '{"messages":[]}',
+      streamFormat: 'sse',
+      endSignal: 'data: [DONE]',
+      deltaPath: 'choices.0.delta.content',
+      stopReasonPath: 'choices.0.finish_reason',
+    })]);
+  });
+
+  it('throws if MAIN injection fails (e.g., page not ready, CSP blocks)', async () => {
+    let call = 0;
+    (chrome.scripting.executeScript as any) = vi.fn((_opts: any) => {
+      call++;
+      if (call === 1) return Promise.resolve([{ result: { ok: true } }]);  // ISOLATED ok
+      return Promise.reject(new Error('Cannot access chrome:// page'));   // MAIN fails
+    });
+    await expect(injectRelayScripts(42, {
+      providerId: 'glm',
+      endpoint: 'https://chatglm.cn/api/chat',
+      bodyTemplate: '{}',
+      streamFormat: 'sse',
+      endSignal: 'data: [DONE]',
+      deltaPath: 'choices.0.delta.content',
+      stopReasonPath: 'choices.0.finish_reason',
+    })).rejects.toThrow('Cannot access chrome:// page');
+  });
+});
+
+describe('message type constants (T7: contract for MAIN → ISOLATED → SW)', () => {
+  it('exports 4 message type constants with expected string values', () => {
+    expect(WEB_LLM_RELAY_READY).toBe('WEB_LLM_RELAY_READY');
+    expect(WEB_LLM_CHUNK).toBe('WEB_LLM_CHUNK');
+    expect(WEB_LLM_DONE).toBe('WEB_LLM_DONE');
+    expect(WEB_LLM_ERROR).toBe('WEB_LLM_ERROR');
+  });
+
+  it('WebProviderRelayMessage union includes all 4 message shapes', () => {
+    const ready: WebProviderRelayMessage = { type: 'WEB_LLM_RELAY_READY', providerId: 'glm' };
+    const chunk: WebProviderRelayMessage = { type: 'WEB_LLM_CHUNK', providerId: 'glm', text: 'hi' };
+    const done: WebProviderRelayMessage = { type: 'WEB_LLM_DONE', providerId: 'glm', stopReason: 'stop' };
+    const error: WebProviderRelayMessage = { type: 'WEB_LLM_ERROR', providerId: 'glm', error: 'oops' };
+    expect(ready.type).toBe('WEB_LLM_RELAY_READY');
+    expect(chunk.type).toBe('WEB_LLM_CHUNK');
+    expect(done.type).toBe('WEB_LLM_DONE');
+    expect(error.type).toBe('WEB_LLM_ERROR');
+  });
+});
 });

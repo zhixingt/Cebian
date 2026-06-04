@@ -189,3 +189,135 @@ export function _setLastUsedAtForTesting(
   const entry = (registry as unknown as { tabs: Map<WebProvider['presetId'], TabEntry> }).tabs.get(providerId);
   if (entry) entry.lastUsedAt = ms;
 }
+
+// ====================================================================
+// T7: Script injection + message contract
+// ====================================================================
+
+/**
+ * Message types for the MAIN → ISOLATED → SW pipeline.
+ * String constants are exported so the injected scripts (which are stringified)
+ * and the SW listener (typed TS) share the same source of truth.
+ */
+export const WEB_LLM_RELAY_READY = 'WEB_LLM_RELAY_READY' as const;
+export const WEB_LLM_CHUNK = 'WEB_LLM_CHUNK' as const;
+export const WEB_LLM_DONE = 'WEB_LLM_DONE' as const;
+export const WEB_LLM_ERROR = 'WEB_LLM_ERROR' as const;
+
+/**
+ * Discriminated union of all messages the injected content scripts can send
+ * to the SW via chrome.runtime.sendMessage. SW listener narrows on .type.
+ */
+export type WebProviderRelayMessage =
+  | { type: typeof WEB_LLM_RELAY_READY; providerId: WebProvider['presetId'] }
+  | { type: typeof WEB_LLM_CHUNK; providerId: WebProvider['presetId']; text: string; reasoning?: string }
+  | { type: typeof WEB_LLM_DONE; providerId: WebProvider['presetId']; stopReason?: string }
+  | { type: typeof WEB_LLM_ERROR; providerId: WebProvider['presetId']; error: string };
+
+/**
+ * Chat request payload passed from the SW to the MAIN-world fetcher.
+ * The MAIN script serializes this for the provider's chat endpoint.
+ */
+export interface WebProviderChatRequest {
+  providerId: WebProvider['presetId'];
+  endpoint: string;
+  bodyTemplate: string;
+  streamFormat: 'sse' | 'jsonl';
+  endSignal: string;
+  deltaPath: string;
+  reasoningPath?: string;
+  stopReasonPath?: string;
+  extraHeaders?: Record<string, string>;
+}
+
+/**
+ * Inject the relay scripts (ISOLATED bridge + MAIN fetcher) into a tab.
+ *
+ * Order matters: ISOLATED must run first so it can register the
+ * `window.postMessage` listener before MAIN starts emitting.
+ *
+ * @param tabId - the Chrome tab to inject into
+ * @param request - the chat request to send to the MAIN-world fetcher
+ * @returns the ISOLATED injection result (used to confirm bridge is up)
+ */
+export async function injectRelayScripts(
+  tabId: number,
+  request: WebProviderChatRequest,
+): Promise<unknown> {
+  // 1. ISOLATED world: install the bridge that forwards window.postMessage
+  //    from the page context (MAIN) to the SW via chrome.runtime.sendMessage.
+  const isolatedResult = await chrome.scripting.executeScript({
+    target: { tabId },
+    world: 'ISOLATED',
+    func: installIsolatedBridge,
+    args: [request.providerId],
+  });
+
+  // 2. MAIN world: install the page-context fetcher that does the actual
+  //    chat request (with first-party cookies) and postMessages results
+  //    back to the ISOLATED bridge.
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    world: 'MAIN',
+    func: runMainFetcher,
+    args: [request],
+  });
+
+  return isolatedResult;
+}
+
+/**
+ * ISOLATED-world bridge. Registered once per chat session per tab.
+ * Listens for window.postMessage from the page context and forwards
+ * to the SW via chrome.runtime.sendMessage.
+ *
+ * Stringified and executed via chrome.scripting.executeScript; must be
+ * self-contained (no closure references to outer scope).
+ */
+function installIsolatedBridge(providerId: string): void {
+  // Idempotent: don't double-register on re-injection
+  const w = window as unknown as { __cebWebProviderBridge?: { providerId: string } };
+  if (w.__cebWebProviderBridge?.providerId === providerId) return;
+
+  window.addEventListener('message', (event: MessageEvent) => {
+    const data = event.data;
+    if (!data || typeof data !== 'object') return;
+    if (data.source !== 'ceb-web-provider-main') return;
+    if (data.providerId !== providerId) return;
+    // Forward to SW
+    chrome.runtime.sendMessage(data.payload).catch((err) => {
+      console.warn('[ceb-web-provider-bridge] sendMessage failed:', err);
+    });
+  });
+
+  w.__cebWebProviderBridge = { providerId };
+
+  // Tell SW the bridge is up
+  chrome.runtime.sendMessage({
+    type: 'WEB_LLM_RELAY_READY',
+    providerId,
+  }).catch(() => { /* SW may not be ready; harmless */ });
+}
+
+/**
+ * MAIN-world fetcher. Runs the actual chat request with first-party cookies.
+ * Streams chunks back to the ISOLATED bridge via window.postMessage.
+ *
+ * Stringified and executed via chrome.scripting.executeScript; must be
+ * self-contained (no closure references to outer scope).
+ *
+ * T8 will add the SSE parser; for T7 we just demonstrate the message contract.
+ */
+async function runMainFetcher(request: WebProviderChatRequest): Promise<void> {
+  // T7 placeholder: the actual SSE streaming is implemented in T8.
+  // For now, post a single error so the SW knows the bridge works.
+  window.postMessage({
+    source: 'ceb-web-provider-main',
+    providerId: request.providerId,
+    payload: {
+      type: 'WEB_LLM_ERROR',
+      providerId: request.providerId,
+      error: 'T7 placeholder: SSE fetcher not yet implemented (T8)',
+    },
+  }, '*');
+}
