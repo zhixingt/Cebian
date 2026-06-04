@@ -557,6 +557,8 @@ webProviders:
     # ⭐ ②: new strings
     login: "Login"
     loggingIn: "Logging in…"
+    # ⑤.3: clears stored cookies + sets loginStatus=loggedOut
+    logout: "Logout"
   status:
     loggedIn: "Logged in"
     loggedOut: "Not logged in"
@@ -567,6 +569,9 @@ webProviders:
   messages:
     loadFailed: "Failed to load web providers. Please reopen the settings page."
     recheckFailed: "Login check failed. Please make sure you're signed in to the website."
+    # ⑤.3: Logout button feedback
+    logoutSuccess: "Logged out. Stored cookies have been cleared."
+    logoutFailed: "Logout failed. Please try again."
     # ⭐ ②: new error messages
     loginFailed: "Login failed. Please try again."
     loginTimedOut: "Login timed out after 5 minutes. Please try again."

@@ -7,6 +7,8 @@ import {
   WEB_PROVIDER_PRESETS,
   resolveEffectiveConfig,
 } from '@/lib/ai-config/web-provider-presets';
+import { getWebProviderRepository } from '@/lib/ai-config/web-provider-store';
+import { invalidateBundle } from '@/lib/ai-config/web-provider-bundle';
 import type { WebProvider, WebProviderUserOverrides } from '@/lib/types';
 import { t } from '@/lib/i18n';
 import { WebProviderCard } from '../provider/WebProviderCard';
@@ -60,6 +62,29 @@ export function WebProvidersSubSection() {
     [login],
   );
 
+  // ⑤.3: clear stored cookies + set loggedOut + invalidate bundle cache.
+  // Direct repo call (not via the hook) because the hook only exposes the
+  // common setters; clearEncryptedCookieBundle is a ⑤ addition. Invalidate
+  // the bundle cache so the next chat attempt re-reads from DB and sees
+  // loginStatus=loggedOut (not the stale decrypted cookies).
+  const onLogout = useCallback(
+    async (id: WebProvider['presetId']) => {
+      try {
+        const repo = getWebProviderRepository();
+        await repo.clearEncryptedCookieBundle(id);
+        await update.setLoginStatus(id, 'loggedOut');
+        invalidateBundle(id);
+        // Clear the A1 capture display for this provider.
+        setCaptureByProvider(prev => ({ ...prev, [id]: undefined }));
+        toast.success(t('webProviders.messages.logoutSuccess'));
+      } catch (err) {
+        console.warn('[web-providers] logout failed:', err);
+        toast.error(t('webProviders.messages.logoutFailed'));
+      }
+    },
+    [update],
+  );
+
   // Re-check should NOT clear capture — it just verifies the stored bundle.
   // Capture info shown is the most recent successful login.
 
@@ -108,6 +133,7 @@ export function WebProvidersSubSection() {
               }
               onRecheck={() => recheck(provider.presetId)}
               onLogin={() => onLogin(provider.presetId)}
+              onLogout={() => { void onLogout(provider.presetId); }}
               isLoginLoading={loginLoading && checkingId === provider.presetId}
               lastCaptureInfo={captureByProvider[provider.presetId] ?? null}
               effectiveConfig={resolveEffectiveConfig(provider, preset)}

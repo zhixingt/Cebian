@@ -546,6 +546,8 @@ webProviders:
     # ⭐ ②
     login: "登入"
     loggingIn: "登入中…"
+    # ⑤.3: 清除已儲存的 cookie 並將狀態設為未登入
+    logout: "登出"
   status:
     loggedIn: "已登入"
     loggedOut: "未登入"
@@ -556,6 +558,9 @@ webProviders:
   messages:
     loadFailed: "載入網頁版供應商失敗，請重新開啟設定頁。"
     recheckFailed: "登入檢查失敗，請確認你已在該網站登入。"
+    # ⑤.3: 登出按鈕回饋
+    logoutSuccess: "已登出。已儲存的 Cookie 已被清除。"
+    logoutFailed: "登出失敗。請重試。"
     # ⭐ ②
     loginFailed: "登入失敗，請重試。"
     loginTimedOut: "登入逾時（5 分鐘），請重試。"

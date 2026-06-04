@@ -547,6 +547,8 @@ webProviders:
     # ⭐ ②
     login: "登录"
     loggingIn: "登录中…"
+    # ⑤.3: 清除已保存的 cookie 并将状态设为未登录
+    logout: "退出登录"
   status:
     loggedIn: "已登录"
     loggedOut: "未登录"
@@ -557,6 +559,9 @@ webProviders:
   messages:
     loadFailed: "加载网页版提供商失败，请重新打开设置页。"
     recheckFailed: "登录检查失败，请确认你已在该网站登录。"
+    # ⑤.3: 退出登录按钮反馈
+    logoutSuccess: "已退出登录。已保存的 Cookie 已被清除。"
+    logoutFailed: "退出登录失败。请重试。"
     # ⭐ ②
     loginFailed: "登录失败，请重试。"
     loginTimedOut: "登录超时（5 分钟），请重试。"

@@ -104,4 +104,74 @@ describe('WebProviderCard', () => {
     fireEvent.click(button);
     expect(onRecheck).toHaveBeenCalled();
   });
+
+  // ⭐ ⑤.3: Logout button tests
+  it('shows Logout button when loginStatus=loggedIn', () => {
+    const loggedIn = { ...fakeProvider, loginStatus: 'loggedIn' as const };
+    render(
+      <WebProviderCard
+        provider={loggedIn}
+        preset={fakePreset}
+        isChecking={false}
+        onEnabledChange={vi.fn()}
+        onModelIdChange={vi.fn()}
+        onCapabilityChange={vi.fn()}
+        onRecheck={vi.fn()}
+        onLogout={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('logout-button')).toBeInTheDocument();
+  });
+
+  it('does NOT show Logout button when loginStatus=loggedOut', () => {
+    const loggedOut = { ...fakeProvider, loginStatus: 'loggedOut' as const };
+    render(
+      <WebProviderCard
+        provider={loggedOut}
+        preset={fakePreset}
+        isChecking={false}
+        onEnabledChange={vi.fn()}
+        onModelIdChange={vi.fn()}
+        onCapabilityChange={vi.fn()}
+        onRecheck={vi.fn()}
+        onLogout={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('logout-button')).not.toBeInTheDocument();
+  });
+
+  it('does NOT show Logout button when loginStatus=unknown', () => {
+    render(
+      <WebProviderCard
+        provider={fakeProvider}  // loginStatus='unknown'
+        preset={fakePreset}
+        isChecking={false}
+        onEnabledChange={vi.fn()}
+        onModelIdChange={vi.fn()}
+        onCapabilityChange={vi.fn()}
+        onRecheck={vi.fn()}
+        onLogout={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('logout-button')).not.toBeInTheDocument();
+  });
+
+  it('clicking Logout calls onLogout (parent clears bundle + sets loggedOut)', () => {
+    const onLogout = vi.fn();
+    const loggedIn = { ...fakeProvider, loginStatus: 'loggedIn' as const };
+    render(
+      <WebProviderCard
+        provider={loggedIn}
+        preset={fakePreset}
+        isChecking={false}
+        onEnabledChange={vi.fn()}
+        onModelIdChange={vi.fn()}
+        onCapabilityChange={vi.fn()}
+        onRecheck={vi.fn()}
+        onLogout={onLogout}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('logout-button'));
+    expect(onLogout).toHaveBeenCalledTimes(1);
+  });
 });

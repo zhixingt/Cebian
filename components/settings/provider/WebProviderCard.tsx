@@ -22,6 +22,9 @@ export interface WebProviderCardProps {
   /** ⭐ ②: Login callback for the new "Login" button (opens tab + polls). */
   onLogin?: () => void;
 
+  /** ⭐ ⑤.3: Logout callback — parent should clear the bundle + set loggedOut. */
+  onLogout?: () => void;
+
   /** ⭐ ②: whether the login flow is currently running. */
   isLoginLoading?: boolean;
 
@@ -53,6 +56,7 @@ export function WebProviderCard({
   onCapabilityChange,
   onRecheck,
   onLogin,
+  onLogout,
   isLoginLoading = false,
   lastCaptureInfo = null,
   effectiveConfig: providedEffectiveConfig,
@@ -152,6 +156,16 @@ export function WebProviderCard({
             data-testid="login-button"
           >
             {isLoginLoading ? 'Logging in…' : 'Login'}
+          </Button>
+        )}
+        {provider.loginStatus === 'loggedIn' && onLogout && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={onLogout}
+            data-testid="logout-button"
+          >
+            {t('webProviders.fields.logout')}
           </Button>
         )}
         <Button
