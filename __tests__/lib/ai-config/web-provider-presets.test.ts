@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { WEB_PROVIDER_PRESETS, resolveEffectiveConfig } from '@/lib/ai-config/web-provider-presets';
+import type { WebProviderChatApi } from '@/lib/ai-config/web-provider-presets';
 import type { WebProvider } from '@/lib/types';
 
 describe('WEB_PROVIDER_PRESETS', () => {
@@ -38,6 +39,36 @@ describe('WEB_PROVIDER_PRESETS', () => {
     const ds = WEB_PROVIDER_PRESETS.find(p => p.id === 'deepseek')!;
     expect(glm.useLocalStorageFallback).toBe(false);
     expect(ds.useLocalStorageFallback).toBe(false);
+  });
+
+  it('T2: WebProviderChatApi interface has the 9 required fields (TDD: compile-time check)', () => {
+    // Compile-time: if interface is missing or has wrong shape, this line fails TS.
+    const sample: WebProviderChatApi = {
+      endpoint: 'https://example.com/api/chat',
+      method: 'POST',
+      streamFormat: 'sse',
+      deltaPath: 'choices.0.delta.content',
+      stopReasonPath: 'choices.0.finish_reason',
+      bodyTemplate: '{}',
+      extraHeaders: { 'X-Test': '1' },
+      endSignal: 'data: [DONE]',
+      supportsImages: false,
+    };
+    expect(sample.endpoint).toBeTruthy();
+    expect(sample.method).toBe('POST');
+    expect(sample.streamFormat).toBe('sse');
+    expect(sample.endSignal).toBe('data: [DONE]');
+    expect(sample.supportsImages).toBe(false);
+  });
+
+  it('T2: presets have optional chatApi? field (undefined until T3 populates)', () => {
+    for (const p of WEB_PROVIDER_PRESETS) {
+      // chatApi? is optional; T3 will populate, T2 only adds the type.
+      // After T2 lands, accessing .chatApi should not be a TS error.
+      const api: WebProviderChatApi | undefined = p.chatApi;
+      // Currently all 3 should be undefined (T3 not done yet).
+      expect(api).toBeUndefined();
+    }
   });
 });
 

@@ -1,6 +1,35 @@
 import type { WebProvider, WebProviderUserOverrides } from '../types';
 
 /**
+ * ③+④: per-preset chat API descriptor. Tells the relay how to talk to the
+ * provider's web session. Optional in T2; T3 will populate for the 3 built-in
+ * providers. If undefined, the provider is cookie-captured but cannot be used
+ * for chat (set chatApi = null via A2 to skip; not exposed in MVP).
+ */
+export interface WebProviderChatApi {
+  /** Provider域的 chat endpoint（绝对 URL） */
+  endpoint: string;
+  /** HTTP method */
+  method: 'POST' | 'GET';
+  /** 流格式 */
+  streamFormat: 'sse' | 'jsonl';
+  /** 提取 delta text 的 JSON 路径（点号分隔，e.g. 'choices.0.delta.content'） */
+  deltaPath: string;
+  /** 提取 reasoning text 的 JSON 路径（可选） */
+  reasoningPath?: string;
+  /** 提取 stop reason 的 JSON 路径（可选） */
+  stopReasonPath?: string;
+  /** 请求 body 模板（{{messages}} {{system}} 占位；多轮 conversationId 缓存是 ⑦ 范围，本里程碑固定传全量历史） */
+  bodyTemplate: string;
+  /** 额外请求头（cookie 由 MAIN-world fetch 自动带，这里只填 x-*） */
+  extraHeaders?: Record<string, string>;
+  /** 流结束信号（'data: [DONE]' 或自定义） */
+  endSignal: string;
+  /** 是否支持 images（决定 Model.image: false 标记）。MVP 全部为 false */
+  supportsImages: false;
+}
+
+/**
  * Built-in web AI provider presets.
  * Adding a new preset = append an entry here + add 3 i18n keys.
  * User-defined presets are a future feature; not supported in MVP.
@@ -36,6 +65,9 @@ export interface WebProviderPreset {
 
   /** ⭐ ②: optional URL to exchange refresh_token for access_token (GLM only) */
   refreshUrl?: string;
+
+  /** ⭐ ③+④: per-preset chat API descriptor (optional in T2; T3 populates) */
+  chatApi?: WebProviderChatApi;
 }
 
 export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
