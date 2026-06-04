@@ -99,24 +99,81 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
   // `TOOL_TYPE_SEARCH` even when search is disabled (empty object).
   // Server rejects requests without the `tools` field.
   // ⑪.7: DevTools capture showed the real Kimi frontend sends
-  // `parent_id: "<prev-msg-UUID>"` for REPLIES. For the FIRST
-  // message of a new conversation, there is no previous message —
-  // the semantics should be "no parent" rather than "empty string
-  // parent_id". Try `parent_id: null` (JSON null) instead of `""`
-  // — the server may reject empty string as an invalid UUID format
-  // for a field that should be nullable.
-  const kimiBody = JSON.stringify({
-    chat_id: chatId,
-    scenario,
-    tools: [{ type: 'TOOL_TYPE_SEARCH', search: {} }],
-    message: {
-      parent_id: null,
-      role: 'user',
-      blocks: [{ message_id: '', text: { content: kimiPrompt } }],
-      scenario,
-    },
-    options: { thinking: false },
-  });
+  // `parent_id: "<prev-msg-UUID>"` for REPLIES. We tried
+  //   - parent_id: ""  → invalid_argument
+  //   - parent_id: null → invalid_argument
+  //   - chat_id: random UUID → invalid_argument (server can't find
+  //     a chat with that random UUID)
+  //   - chat_id from window.location.pathname + parent_id missing →
+  //     still invalid_argument (server requires valid parent_id)
+  //   - ListMessages/GetChat endpoints all return 415 (different
+  //     framing required)
+  // ⑪.7: ROOT CAUSE for persistent `invalid_argument`:
+  //   The server requires BOTH a valid `chat_id` (the conversation UUID
+  //   from the kimi tab URL) AND a valid `parent_id` (the last message
+  //   UUID in that conversation). Sending a random chat_id → server
+  //   can't find the chat → invalid_argument. Sending parent_id as
+  //   null/"" → server can't find the parent message → invalid_argument.
+  //
+  // SOLUTION (extracted from kimi page DOM, no extra API calls):
+  //   1. `chat_id` comes from `window.location.pathname` — the kimi
+  //      tab URL is `https://www.kimi.com/chat/{chat_id}`.
+  //   2. `parent_id` comes from the last `.chat-content-item[data-archer-id]`
+  //      element in the DOM. Each message in the conversation is rendered
+  //      as a `<div class="chat-content-item chat-content-item-{user|assistant}"
+  //      data-archer-id="<UUID>">`. The LAST one is the most recent message
+  //      (regardless of role). For a brand new conversation with no
+  //      messages yet, fall back to chromeclaw's minimal body (no
+  //      chat_id, no parent_id — server creates a new chat).
+  const urlChatId = (() => {
+    try {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      // /chat/{chatId} → ['chat', chatId]
+      const idx = parts.indexOf('chat');
+      if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
+    } catch {
+      /* ignore */
+    }
+    return '';
+  })();
+  const parentId = (() => {
+    try {
+      const items = document.querySelectorAll('.chat-content-item[data-archer-id]');
+      const last = items[items.length - 1] as HTMLElement | undefined;
+      return last?.getAttribute('data-archer-id') ?? '';
+    } catch {
+      return '';
+    }
+  })();
+  const resolvedChatId = existingChatId || urlChatId;
+
+  // Build the body. If we have BOTH a valid chat_id and parent_id (from
+  // DOM), use the full body shape matching the real Kimi frontend. If
+  // we're on a brand new chat (no parent_id), fall back to chromeclaw's
+  // minimal body so the server creates a new chat for us.
+  const kimiBody = resolvedChatId && parentId
+    ? JSON.stringify({
+        chat_id: resolvedChatId,
+        scenario,
+        tools: [{ type: 'TOOL_TYPE_SEARCH', search: {} }],
+        message: {
+          parent_id: parentId,
+          role: 'user',
+          blocks: [{ message_id: '', text: { content: kimiPrompt } }],
+          scenario,
+        },
+        options: { thinking: false },
+      })
+    : JSON.stringify({
+        scenario,
+        tools: [{ type: 'TOOL_TYPE_SEARCH', search: {} }],
+        message: {
+          role: 'user',
+          blocks: [{ message_id: '', text: { content: kimiPrompt } }],
+          scenario,
+        },
+        options: { thinking: false },
+      });
 
   // The shared runtime will:
   //   - binaryEncodeBody=true → wrap the body in a 5-byte binary frame

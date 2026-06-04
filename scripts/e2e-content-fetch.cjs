@@ -72,13 +72,37 @@ function extractAdapterSource(bundle, symbol) {
 }
 
 async function runProviderE2E(page, providerId, adapterSource) {
-  const result = { provider: providerId, url: page.url(), events: [], requests: [], responses: [], summary: null };
+  const result = { provider: providerId, url: page.url(), events: [], requests: [], responses: [], summary: null, cdpRequests: [] };
   const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
   try {
     await page.waitForLoadState('domcontentloaded', { timeout: 10_000 }).catch(() => {});
     await page.waitForTimeout(2_000);
 
+    // ⑪.7: CDP-based full request capture (includes browser-automatic
+    // headers like Referer, Origin, User-Agent, Sec-Fetch-* that the
+    // fetch wrapper above can't see because init.headers only contains
+    // what the adapter explicitly sets).
+    let cdpSession = null;
+    try {
+      cdpSession = await page.context().newCDPSession(page);
+      await cdpSession.send('Network.enable');
+      cdpSession.on('Network.requestWillBeSent', (params) => {
+        const url = params.request.url;
+        if (url.includes('kimi.gateway.chat.v1.ChatService/Chat') ||
+            url.includes('chatglm') || url.includes('deepseek')) {
+          result.cdpRequests.push({
+            runId,
+            url,
+            method: params.request.method,
+            headers: params.request.headers,  // FULL headers (browser-automatic included)
+            postData: params.request.postData,
+          });
+        }
+      });
+    } catch (e) {
+      result.cdpError = e.message;
+    }
     // Install CLEAN observer with runId tagging
     await page.evaluate((rid) => {
       // Wipe any previous run state
@@ -309,6 +333,29 @@ async function runProviderE2E(page, providerId, adapterSource) {
         }
         console.log(`         → ${resp.status} ${resp.statusText} (${resp.contentType})${bodyInfo}`);
       }
+    }
+  }
+
+  // ⑪.7: CDP-captured FULL request dump (includes browser-automatic
+  // headers like Referer, Origin, User-Agent, Sec-Fetch-*, Cookie).
+  // The fetch wrapper above only sees init.headers (what the adapter
+  // explicitly sets). CDP Network.requestWillBeSent sees the full
+  // request as the browser sends it.
+  console.log('\n[e2e] === CDP FULL REQUEST DUMP (browser-automatic headers included) ===');
+  for (const providerId of ['kimi', 'glm', 'deepseek']) {
+    const r = results[providerId];
+    if (!r || !r.cdpRequests || r.cdpRequests.length === 0) {
+      console.log(`\n[${providerId}] (no CDP requests captured${r?.cdpError ? `, error=${r.cdpError}` : ''})`);
+      continue;
+    }
+    for (let i = 0; i < r.cdpRequests.length; i++) {
+      const c = r.cdpRequests[i];
+      console.log(`\n[${providerId} cdp-req ${i}] ${c.method} ${c.url.slice(0, 120)}`);
+      console.log(`  ALL HEADERS (${Object.keys(c.headers || {}).length}):`);
+      for (const [k, v] of Object.entries(c.headers || {})) {
+        console.log(`    ${k}: ${v}`);
+      }
+      console.log(`  Body (${c.postData?.length || 0}B): ${(c.postData || '').slice(0, 400)}`);
     }
   }
 

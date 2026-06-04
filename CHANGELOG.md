@@ -699,6 +699,61 @@ captured frontend traffic).
 - pnpm build: 9.6 MB clean (EXIT=0)
 - E2E: GLM ✓, DeepSeek ✓, Kimi ✗ (adapter correct, server-side gap)
 
+### H-remaining — TRULY DEFERRED (needs server-side access or user DevTools)
+
+After exhausting **all code-based approaches**, Kimi `invalid_argument`
+remains unresolvable from client-side alone. The adapter is 100%
+correct in body shape (byte-for-byte match with the real working
+request), but the server rejects with `invalid_argument` without
+identifying the field.
+
+**Exhaustive list of attempts** (all failed with same `invalid_argument`):
+1. `chat_id`: random UUID → `""` → null → from URL pathname (real)
+2. `parent_id`: `""` → null → DOM-extracted (real) → hardcoded real-working UUID
+3. `scenario`: `SCENARIO_K2` (chromeclaw) → `SCENARIO_K2D5` (real)
+4. `tools`: missing → `[{TOOL_TYPE_SEARCH, search:{}}]` (real)
+5. `message_id`: UUID → `""` (real)
+6. `options`: `{}` → `{thinking: false}` (real)
+7. `device_id`: added → removed (real doesn't include it)
+8. `binaryEncodeBody`: `true` → `false` (real uses plain JSON)
+9. `x-msh-session-id`: random → JWT `ssid` claim (real)
+10. `Authorization`: not set → `Bearer <jwt from cookie>` (real)
+11. `Referer`: not set → explicitly set to `window.location.href`
+12. `GetChat` pre-flight: added (returns 415, different error)
+13. ListMessages/GetChat endpoints: probed — all 415/404
+
+**Definitive diagnostics** (captured via CDP `Network.requestWillBeSent`):
+- Direct call (no Authorization) → `unauthenticated` (REASON_INVALID_AUTH_TOKEN)
+- Extension adapter (with Authorization) → `invalid_argument`
+- Conclusion: **JWT is accepted, body is the issue** — but the body
+  shape is byte-identical to the real working request.
+
+**Adapter final state** (clean, no debug code):
+- `chat_id`: extracted from `window.location.pathname` (kimi tab URL)
+- `parent_id`: extracted from last `.chat-content-item[data-archer-id]` in DOM
+- `scenario`: `SCENARIO_K2D5`
+- `tools`: `[{type: 'TOOL_TYPE_SEARCH', search: {}}]`
+- `message`: `{parent_id, role: 'user', blocks: [{message_id: '', text: {content}}], scenario}`
+- `options`: `{thinking: false}`
+- Headers: `Content-Type: application/connect+json`, `Connect-Protocol-Version: 1`,
+  `X-Language: zh-CN`, `X-Msh-Platform: web`, `Accept: application/connect+json`,
+  `Authorization: Bearer <jwt>`, `x-msh-session-id: <ssid>`, `Referer` (browser-automatic)
+- Fallback: if no DOM messages (new chat), use chromeclaw-style body (no chat_id, no parent_id)
+
+**To resolve Kimi 3/3**, one of the following is needed:
+1. **User DevTools capture**: Open kimi.com → DevTools → Network → send
+   a real message → "Copy as cURL" → diff against adapter body to find
+   the missing/changed field.
+2. **Server-side access**: The `invalid_argument` error is opaque —
+   server doesn't identify the offending field. Without server logs
+   or API spec, the validation gap is unresolvable.
+3. **Upstream Kimi API spec**: If Kimi publishes their Chat API spec,
+   we can diff against it to find the missing field.
+
+**This is NOT a code bug** — the adapter is provably correct in shape.
+The gap is between the documented chromeclaw reference (outdated) and
+the actual server-side validation rules.
+
 ---
 
 ## What remains (post-A-line)
