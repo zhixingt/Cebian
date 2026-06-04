@@ -376,20 +376,20 @@ export function startReader(
 export const GLM_DOM_STRATEGY: WebProviderDomStrategy = {
   input: {
     // GLM uses a controlled <textarea> at the bottom of the chat panel.
-    // Selector: data-testid is more stable than className. GLM uses
-    // `inputbar` for the textarea wrapper.
-    selector: 'textarea[data-testid="chat-input"]',
+    // Verified 2026-06-04: single <textarea> with class `scroll-display-none`,
+    // parent `.input-box-inner`. No data-testid; just match the textarea.
+    selector: 'textarea',
     setMethod: 'textarea-setter',
     sendMethod: 'enter',
-    settleDelayMs: 150,
+    settleDelayMs: 200,
     scrollIntoView: true,
   },
   reader: {
-    // The last assistant message is wrapped in a div with class
-    // `.message-content` and `.assistant-message-content`.
-    // We select only the LAST one via :last-of-type to avoid matching the user's
-    // echoed message or earlier messages.
-    assistantMessageSelector: '.message-content.assistant-message-content:last-of-type, .assistant-message-content:last-of-type',
+    // GLM renders assistant messages with class `.markdown-body` (GitHub-flavored
+    // markdown renderer). Last-of-type to get the most recent reply.
+    // Verified 2026-06-04: page probe found 2 `.markdown-body` elements; the
+    // last is the AI's latest reply.
+    assistantMessageSelector: '.markdown-body:last-of-type',
     // GLM shows a "stop generating" button while streaming; when it disappears
     // the message is done. Selector: button with text or class.
     thinkingIndicatorSelector: 'button.stop-generate, [data-testid="stop-generate"]',
@@ -411,9 +411,11 @@ export const KIMI_DOM_STRATEGY: WebProviderDomStrategy = {
     scrollIntoView: true,
   },
   reader: {
-    // Kimi renders assistant messages as divs with class containing "assistant".
-    // Last-of-type ensures we get the most recent.
-    assistantMessageSelector: '[class*="assistant"]:not([class*="user"]):last-of-type .markdown-body, .chat-content .assistant-message:last-of-type .markdown-body',
+    // Kimi renders assistant messages with class containing "markdown".
+    // Verified 2026-06-04: 4 `[class*="markdown"]` elements; the last contains
+    // the AI's reply text. Avoid `markdown-body` (not used) and exact
+    // `chat-content-item-assistant` (matches multiple ancestors).
+    assistantMessageSelector: '[class*="markdown"]:last-of-type',
     // Kimi shows a typing indicator (3 dots) while generating.
     thinkingIndicatorSelector: '[class*="typing"], [class*="loading"]',
     pollIntervalMs: 100,
@@ -434,10 +436,10 @@ export const DEEPSEEK_DOM_STRATEGY: WebProviderDomStrategy = {
     scrollIntoView: true,
   },
   reader: {
-    // DeepSeek renders messages in a chat-message-list.
-    // Assistant messages have class .ds-markdown or similar.
-    // Use the data-role attribute if available, fallback to class.
-    assistantMessageSelector: '[data-message-role="assistant"]:last-of-type .ds-markdown, .assistant-message:last-of-type, [class*="assistant"]:not([class*="user"]):last-of-type',
+    // DeepSeek renders assistant messages with class containing "markdown".
+    // Verified 2026-06-04: 2 `[class*="markdown"]` elements; the last is the
+    // AI's latest reply.
+    assistantMessageSelector: '[class*="markdown"]:last-of-type',
     // DeepSeek shows a stop button while generating (label "停止生成" or "Stop").
     thinkingIndicatorSelector: 'button[class*="stop"], [data-testid="stop-generating"]',
     pollIntervalMs: 100,

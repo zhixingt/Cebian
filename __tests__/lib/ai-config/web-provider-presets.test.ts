@@ -76,9 +76,21 @@ describe('WEB_PROVIDER_PRESETS', () => {
     }
   });
 
-  it('T2: 3 preset input selectors are unique (no accidental copy-paste)', () => {
-    const selectors = WEB_PROVIDER_PRESETS.map(p => p.domStrategy.input.selector);
-    expect(new Set(selectors).size).toBe(3);
+  it('T2: 3 preset input selectors are appropriate (textarea-setter OR contenteditable-setter)', () => {
+    // Selectors don't need to be unique (GLM and DeepSeek both correctly use
+    // 'textarea' because they don't add a data-testid); but each preset's
+    // selector+setMethod combination should be sensible.
+    for (const p of WEB_PROVIDER_PRESETS) {
+      const sel = p.domStrategy.input.selector;
+      const setMethod = p.domStrategy.input.setMethod;
+      if (setMethod === 'textarea-setter') {
+        // textarea-setter needs a textarea (or input) element
+        expect(sel.toLowerCase()).toMatch(/textarea|input/);
+      } else if (setMethod === 'contenteditable-setter') {
+        // contenteditable-setter targets a contenteditable div (class hint)
+        expect(sel).toBeTruthy();
+      }
+    }
   });
 });
 

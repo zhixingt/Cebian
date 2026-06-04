@@ -369,8 +369,8 @@ describe('DOM_STRATEGIES (verified via T1 DevTools, 2026-06-04)', () => {
     expect(DOM_STRATEGIES.deepseek).toBeDefined();
   });
 
-  it('GLM uses textarea-setter + enter (verified via textarea[data-testid="chat-input"])', () => {
-    expect(GLM_DOM_STRATEGY.input.selector).toBe('textarea[data-testid="chat-input"]');
+  it('GLM uses textarea-setter + enter (verified via plain <textarea> selector)', () => {
+    expect(GLM_DOM_STRATEGY.input.selector).toBe('textarea');
     expect(GLM_DOM_STRATEGY.input.setMethod).toBe('textarea-setter');
     expect(GLM_DOM_STRATEGY.input.sendMethod).toBe('enter');
   });
