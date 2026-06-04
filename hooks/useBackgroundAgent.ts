@@ -46,6 +46,10 @@ export interface AgentPortCallbacks {
   onSessionLoaded?: (session: SessionRecord | null) => void;
   onSessionList?: (sessions: SessionMeta[]) => void;
   onSessionDeleted?: (sessionId: string) => void;
+  /** ⑤.4.followup: open Settings view (e.g. navigate to /settings).
+   *  Used by the web_provider_needs_relogin flow to take the user to the
+   *  re-login surface after a 401/403 from a web provider. */
+  onOpenSettings?: () => void;
 }
 
 // ─── Hook ───
@@ -232,13 +236,12 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
           break;
 
         case 'web_provider_needs_relogin':
-          // ⑤.4: surface the 401/403 from a web provider. Show a toast;
-          // the user can click Settings themselves to re-login.
-          // (The pure handler handleWebProviderNeedsRelogin is unit-tested
-          // separately; here we just call it with toast deps. The
-          // openSettings dep is omitted at this layer because
-          // useBackgroundAgent doesn't have access to the sidepanel's
-          // view state — a follow-up can plumb a callback through.)
+          // ⑤.4 + ⑤.4.followup: surface the 401/403 from a web provider.
+          // 1) Show a destructive toast (user immediately sees the cause)
+          // 2) Call onOpenSettings (navigate to /settings where the user
+          //    can re-login). The providerId is intentionally not threaded
+          //    into the callback yet — once we plumb a "scroll to provider"
+          //    affordance in the settings page, we can extend this signature.
           handleWebProviderNeedsRelogin(msg, {
             showToast: ({ variant, title, description }) => {
               // Map shadcn/ui-style variants to sonner's API.
@@ -249,7 +252,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
                 toast(title, { description });
               }
             },
-            openSettings: () => { /* TODO: plumb view state from sidepanel */ },
+            openSettings: () => callbacks.onOpenSettings?.(),
           });
           break;
       }
