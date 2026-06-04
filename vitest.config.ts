@@ -10,6 +10,10 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, './'),
+      // WXT aliases — not available in vitest. Stub them so modules that
+      // transitively import i18n (via lib/i18n → #i18n) can be loaded.
+      '#i18n': resolve(__dirname, './vitest-stubs/i18n.ts'),
+      '#imports': resolve(__dirname, './vitest-stubs/imports.ts'),
     },
   },
 });
