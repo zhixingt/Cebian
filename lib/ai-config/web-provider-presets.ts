@@ -85,6 +85,18 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     useLocalStorageFallback: false,
     // GLM requires token exchange (chromeclaw confirms).
     refreshUrl: 'https://chatglm.cn/api/v1/auth/refresh',
+    // ⭐ ③+④ T3: PLACEHOLDER endpoint + body — T1 (DevTools research) will replace with real values.
+    // Assumes OpenAI-compatible SSE format. If GLM uses a different shape, T1 will adjust.
+    chatApi: {
+      endpoint: 'https://chatglm.cn/api/chat',
+      method: 'POST',
+      streamFormat: 'sse',
+      deltaPath: 'choices.0.delta.content',
+      stopReasonPath: 'choices.0.finish_reason',
+      bodyTemplate: '{"model":"GLM-4.6","messages":{{messages}},"stream":true}',
+      endSignal: 'data: [DONE]',
+      supportsImages: false,
+    },
   },
   {
     id: 'kimi',
@@ -99,6 +111,17 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     sessionIndicators: ['kimi-auth'],
     useLocalStorageFallback: true,
     // No refresh exchange for Kimi
+    // ⭐ ③+④ T3: PLACEHOLDER — T1 (DevTools research) will replace with real Kimi endpoint.
+    chatApi: {
+      endpoint: 'https://kimi.moonshot.cn/api/chat',
+      method: 'POST',
+      streamFormat: 'sse',
+      deltaPath: 'choices.0.delta.content',
+      stopReasonPath: 'choices.0.finish_reason',
+      bodyTemplate: '{"model":"kimi-k2-0905-preview","messages":{{messages}},"stream":true}',
+      endSignal: 'data: [DONE]',
+      supportsImages: false,
+    },
   },
   {
     id: 'deepseek',
@@ -112,6 +135,17 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     // Django-style sessionid guess; user can override via A2
     sessionIndicators: ['sessionid'],
     useLocalStorageFallback: false,
+    // ⭐ ③+④ T3: PLACEHOLDER — T1 (DevTools research) will replace with real DeepSeek endpoint.
+    chatApi: {
+      endpoint: 'https://chat.deepseek.com/api/v0/chat/completions',
+      method: 'POST',
+      streamFormat: 'sse',
+      deltaPath: 'choices.0.delta.content',
+      stopReasonPath: 'choices.0.finish_reason',
+      bodyTemplate: '{"model":"deepseek-chat","messages":{{messages}},"stream":true,"stream_options":{"include_usage":true}}',
+      endSignal: 'data: [DONE]',
+      supportsImages: false,
+    },
   },
 ] as const;
 

@@ -66,8 +66,34 @@ describe('WEB_PROVIDER_PRESETS', () => {
       // chatApi? is optional; T3 will populate, T2 only adds the type.
       // After T2 lands, accessing .chatApi should not be a TS error.
       const api: WebProviderChatApi | undefined = p.chatApi;
-      // Currently all 3 should be undefined (T3 not done yet).
-      expect(api).toBeUndefined();
+      // T3: all 3 should now be populated (was undefined pre-T3).
+      expect(api).toBeDefined();
+    }
+  });
+
+  it('T3: all 3 presets have chatApi with required fields populated (placeholder values; T1 will refine)', () => {
+    for (const p of WEB_PROVIDER_PRESETS) {
+      const api = p.chatApi;
+      expect(api, `${p.id} should have chatApi defined`).toBeDefined();
+      // Required fields
+      expect(api!.endpoint).toMatch(/^https:\/\/[a-z0-9.-]+/);
+      expect(['POST', 'GET']).toContain(api!.method);
+      expect(['sse', 'jsonl']).toContain(api!.streamFormat);
+      expect(api!.deltaPath.length).toBeGreaterThan(0);
+      expect(api!.bodyTemplate.length).toBeGreaterThan(0);
+      expect(api!.endSignal.length).toBeGreaterThan(0);
+      expect(api!.supportsImages).toBe(false);
+    }
+  });
+
+  it('T3: 3 preset endpoints are unique (no accidental copy-paste)', () => {
+    const endpoints = WEB_PROVIDER_PRESETS.map(p => p.chatApi!.endpoint);
+    expect(new Set(endpoints).size).toBe(3);
+  });
+
+  it('T3: bodyTemplate includes {{messages}} placeholder (T8 injectMessages will substitute)', () => {
+    for (const p of WEB_PROVIDER_PRESETS) {
+      expect(p.chatApi!.bodyTemplate).toContain('{{messages}}');
     }
   });
 });
