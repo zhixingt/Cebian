@@ -11,6 +11,8 @@ import { t } from '@/lib/i18n';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
 import { mcpAppResourceChannel } from '@/lib/mcp/sidepanel-channel';
 import { myInstanceId } from '@/lib/instance-id';
+import { toast } from 'sonner';
+import { handleWebProviderNeedsRelogin } from '@/hooks/handle-web-provider-needs-relogin';
 
 // ─── State ───
 
@@ -227,6 +229,28 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
 
         case 'mcp_resource_result':
           mcpAppResourceChannel.handleResult(msg);
+          break;
+
+        case 'web_provider_needs_relogin':
+          // ⑤.4: surface the 401/403 from a web provider. Show a toast;
+          // the user can click Settings themselves to re-login.
+          // (The pure handler handleWebProviderNeedsRelogin is unit-tested
+          // separately; here we just call it with toast deps. The
+          // openSettings dep is omitted at this layer because
+          // useBackgroundAgent doesn't have access to the sidepanel's
+          // view state — a follow-up can plumb a callback through.)
+          handleWebProviderNeedsRelogin(msg, {
+            showToast: ({ variant, title, description }) => {
+              // Map shadcn/ui-style variants to sonner's API.
+              // 'destructive' → toast.error; 'default' → toast (regular).
+              if (variant === 'destructive') {
+                toast.error(title, { description });
+              } else {
+                toast(title, { description });
+              }
+            },
+            openSettings: () => { /* TODO: plumb view state from sidepanel */ },
+          });
           break;
       }
     };
