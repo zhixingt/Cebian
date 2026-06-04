@@ -1,7 +1,7 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 37 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix + D GLM X-Sign rewrite)
+Total commits: 38 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix + D GLM X-Sign rewrite + E DeepSeekHashV1 WASM)
 Tests: 201/201 passing (was 64 at ② start; +137 new)
 Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓ • `pnpm check` clean • E2E infrastructure in `scripts/e2e-content-fetch.cjs`
 
@@ -371,16 +371,16 @@ architecture.
 - No tree-shaking of the 3 adapter symbols
 
 **Known limitations** (will be fixed in follow-up):
-1. **DeepSeekHashV1 PoW** — confirmed by E2E: server returns this
-   algorithm. Adapter surfaces a clear "unsupported algorithm — reload
-   page" error. WASM solver is the next work item.
+1. **Kimi server returns 200 with empty body** — confirmed by E2E
+   (D + E runs): request accepted (200 OK + `application/connect+json`
+   content-type) but body is empty. Authorization header is added
+   when `kimi-auth` cookie is present (the user has none in MAIN
+   world — `kimi-auth` is not in their cookie jar; only tracking
+   cookies are). Server is not streaming — this is a server-side
+   issue, not an adapter bug. Needs investigation in a separate
+   session.
 2. **GLM X-Sign + endpoint** — **DONE in D commit** (see below).
-3. **Kimi server returns 200 with empty body** — confirmed by E2E:
-   request accepted (200 OK + `application/connect+json` content-type)
-   but body is empty. Authorization header is added when `kimi-auth`
-   cookie is present (the user has none in MAIN world — `kimi-auth` is
-   not in their cookie jar; only tracking cookies are). Server is not
-   streaming — this is a server-side issue, not an adapter bug.
+3. **DeepSeekHashV1 PoW** — **DONE in E commit** (see below).
 4. **Real-extension E2E** — DONE in ⑪.6 commit: `scripts/e2e-content-fetch.cjs`
    connects to the user's Chrome at 9333, extracts adapter source from
    the **built bundle** (not source files), and runs the real adapter
@@ -453,27 +453,85 @@ The full response streamed token-by-token:
 
 ---
 
+### E — DeepSeekHashV1 WASM solver (DONE in E commit)
+
+`web-provider-content-fetch-deepseek.ts` now bundles the DeepSeekHashV1
+PoW WASM as a 26 KB binary embedded as a base64 string inlined into
+the function body. The WASM is a SHA3-based hash function that
+DeepSeek's own frontend uses to solve its PoW challenges. Ported
+from chromeclaw's `content-fetch-deepseek.ts::solveDeepSeekHashV1`.
+
+| Detail | Value |
+|---|---|
+| WASM size (decoded) | 26,612 bytes |
+| WASM base64 (inlined) | 35,484 chars |
+| Exported function | `wasm_solve(retptr, ptrC, lenC, ptrP, lenP, difficulty)` |
+| Return shape | `{ status: i32, answer: f64 }` at retptr (16 bytes) |
+| Memory mgmt | wbindgen-style: `__wbindgen_export_0` (alloc), `__wbindgen_add_to_stack_pointer` (stack), `memory` (linear) |
+| Algorithm | SHA3-based, with a specific prefix `${salt}_${expire_at}_` prepended to the challenge before hashing |
+
+**WASM allocation pattern** (critical for detached-ArrayBuffer bug):
+```ts
+// Allocate BOTH buffers first, THEN write data
+const challengeBuf = new TextEncoder().encode(challengeStr);
+const prefixBuf = new TextEncoder().encode(prefix);
+const ptrC = alloc(challengeBuf.length, 1);
+const ptrP = alloc(prefixBuf.length, 1);
+const lenC = encodeString(challengeStr, ptrC);  // may trigger memory.grow()
+const lenP = encodeString(prefix, ptrP);
+```
+Comment from chromeclaw: "if `alloc()` triggers `memory.grow()`, data
+written to a pointer from a previous alloc would be lost — so we
+allocate everything first, then write."
+
+**E2E verification** (run 2026-06-04, against user's real Chrome):
+
+| Provider | Request flow | Chunks | Verdict |
+|---|---|---|---|
+| DeepSeek | POST `chat_session/create` → 200; POST `create_pow_challenge` → 200; POST `chat/completion` → 200 | **63** | ✓ **PASS** |
+
+First 6 chunks of the streaming response:
+1. `{"type":"deepseek:chat_session_id","chat_session_id":"b2424599-..."}`
+2. `{"request_message_id":1,"response_message_id":2,"model_type":"default"}`
+3. `{"updated_at":1780583072.6533048}`
+4. `{"v":{"response":{"message_id":2,...,"thinking_enabled":true,...,"status":"WIP",...}}}`
+5. `{"p":"response/fragments/-1/content","o":"APPEND","v":"，"}`
+6. `{"v":"用户"}`
+
+The full PoW → completion → SSE stream flow works end-to-end. The
+adapter solves the DeepSeekHashV1 challenge via the embedded WASM
+(answer returned in ~1s) and streams the model's response back
+through the bridge.
+
+---
+
 ## What remains (post-A-line)
 
-### E — DeepSeekHashV1 WASM solver (concrete next work item)
-Bundle the DeepSeekHashV1 WASM (separate from the SHA-256 JS solver
-already in `web-provider-content-fetch-deepseek.ts`). E2E confirms
-DeepSeek reaches the PoW step and the server returns
-`algorithm: 'DeepSeekHashV1'` (so the adapter path is correct, only
-the solver is missing).
-
-### F — Real Chrome validation by user
+### F — Real Chrome validation by user (only Kimi remains)
 User must **fully restart Chrome** (or remove+re-add the extension)
 so the SW picks up the new bundle with `mainWorldFetchByProvider` wired in
-+ the Kimi Authorization fix + the GLM X-Sign rewrite. Send one
-message each in sidepanel (Kimi / GLM / DeepSeek) and capture
-screenshots. With D done and E done, all 3 should pass.
++ the Kimi Authorization fix + the GLM X-Sign rewrite + the
+DeepSeekHashV1 WASM solver. Send one message each in sidepanel
+(Kimi / GLM / DeepSeek) and capture screenshots. With D + E done,
+GLM and DeepSeek should pass; Kimi is a separate investigation
+(server returns 200 with empty body, not an adapter bug).
 
-### G — Multi-turn conversation support (⑨.2, deferred)
+### G — Kimi empty-body investigation (deferred)
+Server-side issue — request accepted (200 OK + `application/connect+json`)
+but body is empty. Possible causes:
+- `kimi-auth` cookie not in MAIN world (HttpOnly or absent)
+- Kimi server requires a different auth mechanism
+- Endpoint or body shape has drifted from when chromeclaw was authored
+
+Needs separate session to capture a real request from the user's
+Chrome DevTools and compare with what our adapter sends.
+
+### H — Multi-turn conversation support (⑨.2, deferred)
 DOM-injection gives us "free" conversation continuity via the provider's
 own UI; the ⑦ storage foundation stays for future restoration scenarios.
 
-### H — Upstream PR (⑨.3, **deferred per user**)
+### I — Upstream PR (⑨.3, **deferred per user**)
 User explicitly opted NOT to submit PR to upstream `maotoumao/Cebian`.
-Branch state: 37 commits, 201/201 tests, 9.6 MB build, i18n parity,
-E2E infrastructure in (auto-detect + re-wrapping fixed).
+Branch state: 38 commits, 201/201 tests, 9.6 MB build, i18n parity,
+E2E infrastructure in, 2/3 providers verified by real-extension E2E
+(GLM ✓, DeepSeek ✓, Kimi ✗ server-side).
