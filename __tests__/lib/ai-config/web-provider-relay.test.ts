@@ -11,6 +11,9 @@ import {
   WEB_LLM_DONE,
   WEB_LLM_ERROR,
   type WebProviderRelayMessage,
+  parseSseFrames,
+  parseDelta,
+  type SseEvent,
 } from '@/lib/ai-config/web-provider-relay';
 import type { WebProvider } from '@/lib/types';
 
@@ -273,6 +276,89 @@ describe('message type constants (T7: contract for MAIN → ISOLATED → SW)', (
     expect(chunk.type).toBe('WEB_LLM_CHUNK');
     expect(done.type).toBe('WEB_LLM_DONE');
     expect(error.type).toBe('WEB_LLM_ERROR');
+  });
+});
+
+describe('parseSseFrames (T8: ③+④ SSE parser)', () => {
+  it('parses a single complete event from a full chunk', () => {
+    const chunk = 'data: {"choices":[{"delta":{"content":"hello"}}]}\n\n';
+    const { events, rest } = parseSseFrames('', chunk);
+    expect(events).toEqual([{ data: '{"choices":[{"delta":{"content":"hello"}}]}' }]);
+    expect(rest).toBe('');
+  });
+
+  it('buffers partial events across chunks (frame split mid-line)', () => {
+    // Chunk 1: half of an event
+    const r1 = parseSseFrames('', 'data: {"choices":[{"delta":{"con');
+    expect(r1.events).toEqual([]);
+    expect(r1.rest).toBe('data: {"choices":[{"delta":{"con');
+    // Chunk 2: rest of the event + a complete second event
+    const r2 = parseSseFrames(r1.rest, 'tent":"hi"}}]}\n\ndata: [DONE]\n\n');
+    expect(r2.events).toEqual([
+      { data: '{"choices":[{"delta":{"content":"hi"}}]}' },
+      { data: '[DONE]' },
+    ]);
+    expect(r2.rest).toBe('');
+  });
+
+  it('treats blank line as event separator', () => {
+    const chunk = 'data: a\n\ndata: b\n\n';
+    const { events } = parseSseFrames('', chunk);
+    expect(events).toEqual([{ data: 'a' }, { data: 'b' }]);
+  });
+
+  it('parses event: line as event type', () => {
+    const chunk = 'event: message\ndata: hello\n\n';
+    const { events } = parseSseFrames('', chunk);
+    expect(events).toEqual([{ event: 'message', data: 'hello' }]);
+  });
+
+  it('ignores comment lines (starting with :)', () => {
+    const chunk = ': this is a comment\ndata: hello\n\n';
+    const { events } = parseSseFrames('', chunk);
+    expect(events).toEqual([{ data: 'hello' }]);
+  });
+
+  it('returns empty events for chunk with no complete frames', () => {
+    const { events, rest } = parseSseFrames('', 'data: partial');
+    expect(events).toEqual([]);
+    expect(rest).toBe('data: partial');
+  });
+
+  it('handles multi-line data (concatenated with \\n)', () => {
+    const chunk = 'data: line1\ndata: line2\n\n';
+    const { events } = parseSseFrames('', chunk);
+    expect(events).toEqual([{ data: 'line1\nline2' }]);
+  });
+});
+
+describe('parseDelta (T8: ③+④ JSON path navigation)', () => {
+  it('extracts text from simple dot-notation path', () => {
+    const json = JSON.stringify({ content: 'hello' });
+    expect(parseDelta(json, 'content')).toBe('hello');
+  });
+
+  it('extracts text from nested path with array index', () => {
+    const json = JSON.stringify({ choices: [{ delta: { content: 'hi' } }] });
+    expect(parseDelta(json, 'choices.0.delta.content')).toBe('hi');
+  });
+
+  it('returns empty string for missing path', () => {
+    const json = JSON.stringify({ choices: [{ delta: {} }] });
+    expect(parseDelta(json, 'choices.0.delta.content')).toBe('');
+  });
+
+  it('returns empty string for null/undefined intermediate', () => {
+    expect(parseDelta(JSON.stringify({ a: null }), 'a.b.c')).toBe('');
+  });
+
+  it('returns empty string for invalid JSON', () => {
+    expect(parseDelta('not json', 'content')).toBe('');
+  });
+
+  it('coerces non-string values to string (numbers, booleans)', () => {
+    expect(parseDelta(JSON.stringify({ n: 42 }), 'n')).toBe('42');
+    expect(parseDelta(JSON.stringify({ b: true }), 'b')).toBe('true');
   });
 });
 });

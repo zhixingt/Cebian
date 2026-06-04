@@ -221,6 +221,8 @@ export type WebProviderRelayMessage =
 export interface WebProviderChatRequest {
   providerId: WebProvider['presetId'];
   endpoint: string;
+  /** Optional HTTP method (defaults to POST) */
+  method?: 'POST' | 'GET';
   bodyTemplate: string;
   streamFormat: 'sse' | 'jsonl';
   endSignal: string;
@@ -306,18 +308,256 @@ function installIsolatedBridge(providerId: string): void {
  * Stringified and executed via chrome.scripting.executeScript; must be
  * self-contained (no closure references to outer scope).
  *
- * T8 will add the SSE parser; for T7 we just demonstrate the message contract.
+ * T8 implementation: real fetch + SSE parsing + delta extraction.
  */
 async function runMainFetcher(request: WebProviderChatRequest): Promise<void> {
-  // T7 placeholder: the actual SSE streaming is implemented in T8.
-  // For now, post a single error so the SW knows the bridge works.
-  window.postMessage({
-    source: 'ceb-web-provider-main',
-    providerId: request.providerId,
-    payload: {
-      type: 'WEB_LLM_ERROR',
+  try {
+    const response = await fetch(request.endpoint, {
+      method: request.method ?? 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(request.extraHeaders ?? {}),
+      },
+      body: request.bodyTemplate,
+      credentials: 'include',  // first-party cookies
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} ${response.statusText}`);
+    }
+    if (!response.body) {
+      throw new Error('Response has no body');
+    }
+
+    await processChatStream(response.body, request, (payload) => {
+      window.postMessage({
+        source: 'ceb-web-provider-main',
+        providerId: request.providerId,
+        payload,
+      }, '*');
+    });
+  } catch (err) {
+    window.postMessage({
+      source: 'ceb-web-provider-main',
       providerId: request.providerId,
-      error: 'T7 placeholder: SSE fetcher not yet implemented (T8)',
-    },
-  }, '*');
+      payload: {
+        type: WEB_LLM_ERROR,
+        providerId: request.providerId,
+        error: err instanceof Error ? err.message : String(err),
+      },
+    }, '*');
+  }
+}
+
+/**
+ * Process a streaming response body, parsing SSE frames and emitting relay messages.
+ *
+ * Pure-ish: takes a ReadableStream, a chat request config, and an emit callback.
+ * The MAIN-world fetcher wraps this with window.postMessage; tests can pass a mock
+ * stream + a spy emit.
+ */
+export async function processChatStream(
+  body: ReadableStream<Uint8Array>,
+  request: WebProviderChatRequest,
+  emit: (msg: WebProviderRelayMessage) => void,
+): Promise<void> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
+  let doneEmitted = false;
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      const { events, rest } = parseSseFrames(buffer, chunk);
+      buffer = rest;
+
+      for (const event of events) {
+        // End signal check (e.g., 'data: [DONE]\n\n')
+        if (event.data.trim() === request.endSignal) {
+          emit({ type: WEB_LLM_DONE, providerId: request.providerId });
+          doneEmitted = true;
+          continue;
+        }
+        // Try to extract delta
+        const text = parseDelta(event.data, request.deltaPath);
+        if (text) {
+          const reasoning = request.reasoningPath
+            ? parseDelta(event.data, request.reasoningPath)
+            : undefined;
+          emit({
+            type: WEB_LLM_CHUNK,
+            providerId: request.providerId,
+            text,
+            ...(reasoning ? { reasoning } : {}),
+          });
+        }
+        // Check for stop reason (optional)
+        if (request.stopReasonPath) {
+          const stopReason = parseDelta(event.data, request.stopReasonPath);
+          if (stopReason) {
+            emit({
+              type: WEB_LLM_DONE,
+              providerId: request.providerId,
+              stopReason,
+            });
+            doneEmitted = true;
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  // Always emit DONE at end of stream (some providers don't send [DONE])
+  if (!doneEmitted) {
+    emit({ type: WEB_LLM_DONE, providerId: request.providerId });
+  }
+}
+
+// ====================================================================
+// T8: Pure SSE parser + delta extractor (testable in isolation)
+// ====================================================================
+
+/** A single SSE event extracted from a stream chunk. */
+export interface SseEvent {
+  /** Optional event type from `event: foo` line */
+  event?: string;
+  /** Data payload from one or more `data: ...` lines (joined with \n) */
+  data: string;
+  /** Optional id from `id: ...` line */
+  id?: string;
+}
+
+/**
+ * Parse SSE frames from a streaming chunk.
+ *
+ * Buffers partial frames across calls: a frame split across two chunks
+ * (e.g., 'data: {"a":' then '1}\n\n') is reassembled before being returned.
+ *
+ * Format reminder (https://html.spec.whatwg.org/multipage/server-sent-events.html):
+ *   - Lines starting with `:` are comments (ignored)
+ *   - `field: value` sets a field; `field` alone is `field: true`
+ *   - Blank line dispatches the event
+ *   - Multi-line `data:` is joined with \n
+ *
+ * @param buffer - incomplete tail from previous call (or '' for first call)
+ * @param chunk  - new text from the stream
+ * @returns parsed events + remaining buffer (incomplete tail for next call)
+ */
+export function parseSseFrames(buffer: string, chunk: string): { events: SseEvent[]; rest: string } {
+  const combined = buffer + chunk;
+  // Normalize line endings
+  const normalized = combined.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // Split into "lines" but keep blank lines as event separators
+  const lines = normalized.split('\n');
+
+  const events: SseEvent[] = [];
+  let currentEvent: string | undefined;
+  let currentId: string | undefined;
+  let dataLines: string[] = [];
+  let hasField = false;
+  /** Index in `lines` of the last blank line that dispatched an event.
+   *  Everything after this index is "rest" (incomplete tail for next call). */
+  let lastBlankLineIdx = -1;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line === '') {
+      // Blank line = event separator
+      if (hasField) {
+        const event: SseEvent = { data: dataLines.join('\n') };
+        if (currentEvent !== undefined) event.event = currentEvent;
+        if (currentId !== undefined) event.id = currentId;
+        events.push(event);
+        currentEvent = undefined;
+        currentId = undefined;
+        dataLines = [];
+        hasField = false;
+      }
+      lastBlankLineIdx = i;
+      continue;
+    }
+    if (line.startsWith(':')) {
+      // Comment — ignore
+      continue;
+    }
+    const colonIdx = line.indexOf(':');
+    let field: string;
+    let value: string;
+    if (colonIdx === -1) {
+      field = line;
+      value = '';
+    } else {
+      field = line.slice(0, colonIdx);
+      // Per spec, strip a single leading space after the colon
+      value = colonIdx + 1 < line.length && line[colonIdx + 1] === ' '
+        ? line.slice(colonIdx + 2)
+        : line.slice(colonIdx + 1);
+    }
+    if (field === 'data') {
+      dataLines.push(value);
+      hasField = true;
+    } else if (field === 'event') {
+      currentEvent = value;
+      hasField = true;
+    } else if (field === 'id') {
+      currentId = value;
+      hasField = true;
+    }
+    // Other fields (retry, etc.) are ignored
+  }
+
+  // "rest" = text from after the last dispatched blank line to the end
+  // This handles 3 cases:
+  //   1. No blank line yet → all text is rest
+  //   2. Blank line at the end → rest is '' (everything was dispatched)
+  //   3. Blank line in the middle → rest is the tail after it
+  let rest = '';
+  if (lastBlankLineIdx < lines.length - 1) {
+    // There are lines after the last blank line — these are the incomplete tail
+    rest = lines.slice(lastBlankLineIdx + 1).join('\n');
+  }
+
+  return { events, rest };
+}
+
+/**
+ * Extract a string value from a JSON payload using dot-notation path.
+ *
+ * Path syntax: 'choices.0.delta.content' navigates
+ *   parsed.choices[0].delta.content
+ *
+ * Array indices are numeric; other segments are property names.
+ *
+ * @returns the value coerced to string, or '' for missing/invalid paths
+ */
+export function parseDelta(json: string, path: string): string {
+  if (!json || !path) return '';
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return '';
+  }
+  const segments = path.split('.');
+  let cur: unknown = parsed;
+  for (const seg of segments) {
+    if (cur === null || cur === undefined) return '';
+    // Array index?
+    if (/^\d+$/.test(seg)) {
+      const idx = parseInt(seg, 10);
+      if (!Array.isArray(cur) || idx >= cur.length) return '';
+      cur = cur[idx];
+    } else {
+      if (typeof cur !== 'object') return '';
+      cur = (cur as Record<string, unknown>)[seg];
+    }
+  }
+  if (cur === null || cur === undefined) return '';
+  if (typeof cur === 'string') return cur;
+  return String(cur);
 }
