@@ -36,7 +36,7 @@ import {
   type SimpleStreamOptions,
 } from '@earendil-works/pi-ai';
 import { resolveBundle as defaultResolveBundle } from './web-provider-bundle';
-import { getTabRegistry, injectDomRelay } from './web-provider-relay';
+import { getTabRegistry, injectDomRelay, getAuthHeadersForProvider } from './web-provider-relay';
 import {
   WEB_LLM_CHUNK,
   WEB_LLM_DONE,
@@ -52,6 +52,7 @@ import { WEB_PROVIDER_PRESETS, type WebProviderPreset } from './web-provider-pre
 import { deepseekMainWorldFetch } from './web-provider-content-fetch-deepseek';
 import { kimiMainWorldFetch } from './web-provider-content-fetch-kimi';
 import { glmMainWorldFetch } from './web-provider-content-fetch-glm';
+import type { ContentFetchRequest } from './web-provider-content-fetch-main';
 import type { WebProvider } from '../types';
 import type { DomRelayRequest } from './web-provider-content-script';
 
@@ -78,6 +79,13 @@ export interface WebSessionStreamDeps {
   mainWorldFetchByProvider?: Partial<
     Record<WebProvider['presetId'], { request: unknown; func: (request: unknown) => Promise<void> }>
   >;
+  /**
+   * ⑪.7: Read HttpOnly cookies the SW can see (via `chrome.cookies.getAll`)
+   * and return an Authorization header value (e.g. `'Bearer <jwt>'`) or
+   * `null` if no auth cookie is available. Used to pass HttpOnly tokens
+   * (Kimi's `kimi-auth`) to the MAIN-world adapter as `request.authHeader`.
+   */
+  getAuthHeaders: (providerId: WebProvider['presetId']) => Promise<string | null>;
   /** Inject the DOM relay scripts (ISOLATED bridge + MAIN orchestrator) into a tab. */
   injectScripts: (tabId: number, request: DomRelayRequest) => Promise<unknown>;
   /** Register a chrome.runtime.onMessage handler; returns an unregister function. */
@@ -123,6 +131,7 @@ function getDefaultDeps(): WebSessionStreamDeps {
       return tabId;
     },
     mainWorldFetchByProvider: defaultMainWorldFetchByProvider,
+    getAuthHeaders: (providerId) => getAuthHeadersForProvider(providerId),
     injectScripts: (tabId, request) => injectDomRelay(tabId, request),
     onMessage: (handler) => {
       const listener = (msg: any) => {
@@ -260,7 +269,15 @@ async function orchestrateStream(
     const relayRequest: DomRelayRequest | null = useContentFetch
       ? null
       : buildRelayRequest(preset, modelId, context);
-    const fetchRequest: unknown = useContentFetch ? fetchEntry!.request : null;
+    // ⑪.7: Build the full ContentFetchRequest (not the stub in fetchEntry.request).
+    // The stub has no init.body or authHeader — the adapter would throw on
+    // `init.body` and the HttpOnly `kimi-auth` cookie would be invisible
+    // to the MAIN world. We extract the user message from context, fetch
+    // the auth header via SW's chrome.cookies.getAll, and pass a complete
+    // request the adapter can actually use.
+    const fetchRequest: ContentFetchRequest | null = useContentFetch
+      ? await buildContentFetchRequest(preset, modelId, context, deps)
+      : null;
 
     // 6. Listen for messages BEFORE injecting (so we don't miss the RELAY_READY)
     let accumulatedText = '';
@@ -424,6 +441,58 @@ function buildRelayRequest(
     modelId,
     message: messageText,
     domStrategy: preset.domStrategy,
+  };
+}
+
+/**
+ * ⑪.7: Build the ContentFetchRequest for a given context. Unlike
+ * `buildRelayRequest` (which only needs the user message — the DOM
+ * does the auth), the content-fetch adapter runs in MAIN world and
+ * needs:
+ *   1. The user prompt in `init.body` (so the adapter can extract it)
+ *   2. The auth header from SW-side `chrome.cookies.getAll` (for
+ *      HttpOnly cookies the MAIN world can't see)
+ *
+ * The stub `fetchEntry.request` from the dispatch table has neither
+ * — the adapter would throw on `init.body` and the HttpOnly
+ * `kimi-auth` would be invisible. This function builds a complete
+ * request the adapter can actually consume.
+ */
+async function buildContentFetchRequest(
+  preset: WebProviderPreset,
+  _modelId: string,
+  context: Context,
+  deps: WebSessionStreamDeps,
+): Promise<ContentFetchRequest> {
+  // Extract the last user message (same logic as buildRelayRequest)
+  const lastUserMsg = [...context.messages].reverse().find((m) => m.role === 'user');
+  let messageText = '';
+  if (lastUserMsg) {
+    if (typeof lastUserMsg.content === 'string') {
+      messageText = lastUserMsg.content;
+    } else {
+      messageText = lastUserMsg.content
+        .filter((c: any) => c.type === 'text')
+        .map((c: any) => c.text)
+        .join('\n');
+    }
+  }
+
+  // ⑪.7: Read HttpOnly cookies from the SW (HttpOnly cookies are
+  // invisible to MAIN world `document.cookie`). Returns 'Bearer <token>'
+  // or null. Adapters that need the token as a Bearer header (Kimi)
+  // read it from `request.authHeader`; adapters that read from
+  // localStorage or non-HttpOnly cookies (DeepSeek, GLM) ignore it.
+  const authHeader = await deps.getAuthHeaders(preset.id);
+
+  return {
+    type: 'WEB_LLM_FETCH',
+    requestId: crypto.randomUUID(),
+    init: {
+      method: 'POST',
+      body: JSON.stringify({ prompt: messageText, chatId: '' }),
+    },
+    ...(authHeader ? { authHeader } : {}),
   };
 }
 

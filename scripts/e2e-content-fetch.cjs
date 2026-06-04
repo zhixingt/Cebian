@@ -137,12 +137,36 @@ async function runProviderE2E(page, providerId, adapterSource) {
     });
     result.cookies = cookies;
 
+    // ⑪.7: Probe ALL cookies (including HttpOnly) via Playwright's
+    // context.cookies() API — the SW uses the same chrome.cookies.getAll
+    // to read HttpOnly cookies like Kimi's `kimi-auth`. document.cookie
+    // (above) can't see HttpOnly, so we need this second probe to
+    // simulate the SW's view.
+    const allCookies = await page.context().cookies(...(function () {
+      if (providerId === 'kimi') return ['https://www.kimi.com'];
+      if (providerId === 'glm') return ['https://chatglm.cn'];
+      if (providerId === 'deepseek') return ['https://chat.deepseek.com'];
+      return [];
+    })());
+    result.allCookies = allCookies.map(c => ({ name: c.name, httpOnly: c.httpOnly, len: c.value.length }));
+
+    // For Kimi, extract `kimi-auth` from the full cookie list and add
+    // it as `authHeader` on the stub request — simulating what the SW
+    // will do at runtime via chrome.cookies.getAll.
+    let authHeader = null;
+    if (providerId === 'kimi') {
+      const kimiAuth = allCookies.find(c => c.name === 'kimi-auth')?.value;
+      if (kimiAuth) authHeader = `Bearer ${kimiAuth}`;
+      result.authHeader = authHeader ? 'present' : 'absent';
+    }
+
     // Build stub request
     const stub = {
       type: 'WEB_LLM_FETCH',
       requestId: runId,
       url: '',
       init: { method: 'POST', body: JSON.stringify({ prompt: '你好', chatId: '' }) },
+      ...(authHeader ? { authHeader } : {}),
     };
 
     // Call adapter

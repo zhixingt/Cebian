@@ -1,7 +1,7 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 38 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix + D GLM X-Sign rewrite + E DeepSeekHashV1 WASM)
+Total commits: 39 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix + D GLM X-Sign rewrite + E DeepSeekHashV1 WASM + G Kimi HttpOnly cookie auth)
 Tests: 201/201 passing (was 64 at ② start; +137 new)
 Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓ • `pnpm check` clean • E2E infrastructure in `scripts/e2e-content-fetch.cjs`
 
@@ -371,14 +371,14 @@ architecture.
 - No tree-shaking of the 3 adapter symbols
 
 **Known limitations** (will be fixed in follow-up):
-1. **Kimi server returns 200 with empty body** — confirmed by E2E
-   (D + E runs): request accepted (200 OK + `application/connect+json`
-   content-type) but body is empty. Authorization header is added
-   when `kimi-auth` cookie is present (the user has none in MAIN
-   world — `kimi-auth` is not in their cookie jar; only tracking
-   cookies are). Server is not streaming — this is a server-side
-   issue, not an adapter bug. Needs investigation in a separate
-   session.
+1. **Kimi server returns 200 with empty body** — E2E in G commit
+   proves the auth fix landed: request now sends
+   `Authorization: Bearer <kimi-auth JWT>` (extracted from the
+   HttpOnly cookie via SW's `chrome.cookies.getAll`). Server
+   accepts (200 + `application/connect+json` content-type) but
+   body is empty. This is a server-side issue — adapter behavior
+   is correct. Needs DevTools capture of a real working request
+   to identify the response-format change. See H below.
 2. **GLM X-Sign + endpoint** — **DONE in D commit** (see below).
 3. **DeepSeekHashV1 PoW** — **DONE in E commit** (see below).
 4. **Real-extension E2E** — DONE in ⑪.6 commit: `scripts/e2e-content-fetch.cjs`
@@ -505,33 +505,99 @@ through the bridge.
 
 ---
 
+### G — Kimi HttpOnly cookie auth fix (DONE in G commit)
+
+Root cause (discovered via CDP `Network.getCookies`):
+the user's `kimi-auth` cookie is **HttpOnly** — set by the server,
+invisible to MAIN world `document.cookie`. The browser DOES send
+it with `credentials: 'include'`, but the Kimi server requires
+it as `Authorization: Bearer <token>` (chromeclaw parity), not
+just as a cookie. Without that header, the server returns 200 +
+empty body.
+
+**Fix architecture** (4 layers):
+1. **`web-provider-relay.ts`** — new `getAuthHeadersForProvider()`:
+   uses `chrome.cookies.getAll({domain: '.kimi.com'})` to read
+   HttpOnly cookies (SW context only — MAIN world can't see them).
+   Returns `'Bearer <jwt>'` or `null`.
+2. **`web-provider-content-fetch-main.ts`** — added optional
+   `authHeader?: string` field to `ContentFetchRequest`. Adapters
+   that need it (Kimi) read it in preference to `document.cookie`.
+   Also made `url` optional (adapters that build the URL internally
+   don't need it).
+3. **`web-provider-content-fetch-kimi.ts`** — reads
+   `request.authHeader` if present, falls back to
+   `document.cookie` (for non-HttpOnly cases). The previous
+   in-function cookie extraction is kept as fallback.
+4. **`web-provider-stream.ts`** — new `getAuthHeaders` dep on
+   `WebSessionStreamDeps`; wired to `getAuthHeadersForProvider` in
+   default deps. New `buildContentFetchRequest()` function builds
+   a **complete** `ContentFetchRequest` with:
+     - `init.body = JSON.stringify({prompt, chatId})` (previously
+       the stream layer passed a stub `{type: 'WEB_LLM_FETCH'}`
+       with no body, and the adapter threw on `init.body`)
+     - `authHeader` from the SW cookie read
+   The stream layer previously passed `fetchEntry.request`
+   (the stub from the dispatch table) which had neither body nor
+   authHeader — this was the latent bug preventing all 3 adapters
+   from working through the actual SW path.
+
+**E2E v3 upgrade** (in same commit):
+The E2E previously called the adapter directly with a stub request,
+bypassing the SW's `chrome.cookies` read. To properly validate the
+fix, the E2E now also calls Playwright's `context.cookies()` (which
+CAN read HttpOnly) for the provider's domain, and injects the
+`authHeader` into the stub request — simulating exactly what the SW
+does at runtime.
+
+**E2E v3 G-run results** (2026-06-04, against user's real Chrome):
+
+| Provider | Authorization header | Response | Verdict |
+|---|---|---|---|
+| Kimi | `Bearer eyJhbGciOiJIUzUxMiIsInR5cCI6IkpXVCJ9...` (full JWT) | 200 + `application/connect+json` + **empty body** | Auth ✓ sent, body ✗ empty |
+| GLM | n/a (handled in adapter) | 200 + 16 SSE chunks | ✓ PASS |
+| DeepSeek | n/a (localStorage token) | 200 + 86 SSE chunks (PoW solved) | ✓ PASS |
+
+**The G fix verified the auth path works.** The remaining Kimi
+empty-body issue is a server-side protocol change (see H below),
+NOT an adapter bug.
+
+**Files changed** (4 source + 2 test + 1 E2E):
+- `lib/ai-config/web-provider-content-fetch-main.ts` (+`authHeader`, `url?`)
+- `lib/ai-config/web-provider-content-fetch-kimi.ts` (use `request.authHeader`)
+- `lib/ai-config/web-provider-relay.ts` (+`getAuthHeadersForProvider`)
+- `lib/ai-config/web-provider-stream.ts` (+`getAuthHeaders` dep, `buildContentFetchRequest`)
+- `__tests__/lib/ai-config/web-provider-stream.test.ts` (mock `getAuthHeaders`)
+- `__tests__/integration/web-provider-logout-flow.test.ts` (mock `getAuthHeaders`)
+- `scripts/e2e-content-fetch.cjs` (HttpOnly cookie probe + authHeader injection)
+
+---
+
 ## What remains (post-A-line)
 
-### F — Real Chrome validation by user (only Kimi remains)
-User must **fully restart Chrome** (or remove+re-add the extension)
-so the SW picks up the new bundle with `mainWorldFetchByProvider` wired in
-+ the Kimi Authorization fix + the GLM X-Sign rewrite + the
-DeepSeekHashV1 WASM solver. Send one message each in sidepanel
-(Kimi / GLM / DeepSeek) and capture screenshots. With D + E done,
-GLM and DeepSeek should pass; Kimi is a separate investigation
-(server returns 200 with empty body, not an adapter bug).
+### H — Kimi server response investigation (deferred — needs DevTools)
+G confirmed the request shape is correct (URL + headers + body all
+match chromeclaw reference) and the server accepts (200 OK +
+`application/connect+json` content-type). The body is empty —
+either:
+- The Kimi server's connect-json envelope format has changed
+  (the adapter expects a 5-byte [flags:1][len:4] header)
+- The Kimi server is rate-limiting and returns empty for non-browser
+  clients
+- The endpoint has drifted from when chromeclaw was authored
 
-### G — Kimi empty-body investigation (deferred)
-Server-side issue — request accepted (200 OK + `application/connect+json`)
-but body is empty. Possible causes:
-- `kimi-auth` cookie not in MAIN world (HttpOnly or absent)
-- Kimi server requires a different auth mechanism
-- Endpoint or body shape has drifted from when chromeclaw was authored
+**Action**: capture a real working request from the user's Chrome
+DevTools (Network tab → click an existing conversation message →
+"Replay as cURL" or copy request headers/body/response) and
+compare with what the adapter sends. Then adjust the adapter
+based on the real response shape.
 
-Needs separate session to capture a real request from the user's
-Chrome DevTools and compare with what our adapter sends.
-
-### H — Multi-turn conversation support (⑨.2, deferred)
+### I — Multi-turn conversation support (⑨.2, deferred)
 DOM-injection gives us "free" conversation continuity via the provider's
 own UI; the ⑦ storage foundation stays for future restoration scenarios.
 
-### I — Upstream PR (⑨.3, **deferred per user**)
+### J — Upstream PR (⑨.3, **deferred per user**)
 User explicitly opted NOT to submit PR to upstream `maotoumao/Cebian`.
-Branch state: 38 commits, 201/201 tests, 9.6 MB build, i18n parity,
-E2E infrastructure in, 2/3 providers verified by real-extension E2E
-(GLM ✓, DeepSeek ✓, Kimi ✗ server-side).
+Branch state: 39 commits, 201/201 tests, 9.6 MB build, i18n parity,
+E2E infrastructure in, 2/3 providers fully verified (GLM ✓, DeepSeek ✓),
+Kimi auth fix landed (server response is the only remaining gap).

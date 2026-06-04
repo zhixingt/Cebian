@@ -116,6 +116,9 @@ describe('T14 #7: Logout flow → next chat shows "please log in" error (no wast
         // (Decrypt path elided for this test)
         return { sessionid: 'decrypted' };
       },
+      // ⑪.7: SW-side HttpOnly cookie read (not exercised in this test
+      // because resolveBundle returns null before the auth-headers step)
+      getAuthHeaders: vi.fn(() => Promise.resolve(null)),
       presets: WEB_PROVIDER_PRESETS,
     });
 

@@ -35,18 +35,25 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
     /* defaults */
   }
 
-  // ── Step 2: read bearer from cookie jar (chrome.cookies API not
-  // available in MAIN world — read document.cookie for the kimi-auth
-  // cookie). chromeclaw's buildRequest does the same: it pulls the
-  // `kimi-auth` cookie value and forwards it as `Authorization: Bearer …`,
-  // because the Kimi chat endpoint requires the bearer header, not just a
+  // ── Step 2: read bearer from cookie jar. The `kimi-auth` cookie is
+  // HttpOnly, so `document.cookie` in MAIN world returns nothing useful.
+  // The SW reads it via `chrome.cookies.getAll` (which CAN read HttpOnly)
+  // and passes the value as `request.authHeader = 'Bearer <token>'`.
+  // chromeclaw's buildRequest does the same: it pulls the `kimi-auth`
+  // cookie value and forwards it as `Authorization: Bearer …`, because
+  // the Kimi chat endpoint requires the bearer header, not just a
   // first-party cookie. ──
   let kimiAuth = '';
-  try {
-    const m = document.cookie.match(/(?:^|;\s*)kimi-auth=([^;]*)/);
-    if (m) kimiAuth = decodeURIComponent(m[1]);
-  } catch {
-    /* ignore */
+  if (request.authHeader && request.authHeader.startsWith('Bearer ')) {
+    kimiAuth = request.authHeader.slice('Bearer '.length).trim();
+  } else {
+    // Fallback: try document.cookie (works if the cookie is non-HttpOnly)
+    try {
+      const m = document.cookie.match(/(?:^|;\s*)kimi-auth=([^;]*)/);
+      if (m) kimiAuth = decodeURIComponent(m[1]);
+    } catch {
+      /* ignore */
+    }
   }
 
   // Confirm we are on kimi.com; otherwise bail with a clear error.
@@ -98,13 +105,17 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
     credentials: 'include',
   };
 
-  // Replace the init in the request (so the runtime picks up our body)
-  const kimiRequest: ContentFetchRequest = {
+  // Replace the init in the request (so the runtime picks up our body).
+  // Note: NO `: ContentFetchRequest` type annotation — `url` is optional
+  // in that interface, and annotating would widen `kimiRequest.url` to
+  // `string | undefined`. We want the literal type with `url: string`
+  // so the subsequent `fetch(kimiRequest.url, ...)` is type-safe.
+  const kimiRequest = {
     ...request,
     url: `${origin}/apiv2/kimi.gateway.chat.v1.ChatService/Chat`,
     init: kimiInit,
-    binaryProtocol: 'connect-json',
-    binaryEncodeBody: true,
+    binaryProtocol: 'connect-json' as const,
+    binaryEncodeBody: true as const,
   };
 
   // We hand off to the shared runtime. It will post WEB_LLM_CHUNK / DONE / ERROR.

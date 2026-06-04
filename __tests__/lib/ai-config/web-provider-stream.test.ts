@@ -49,6 +49,10 @@ beforeEach(() => {
       return unregister;
     }),
     resolveBundle: vi.fn(() => Promise.resolve({ sessionid: 'abc' })),
+    // ⑪.7: Mock the SW-side HttpOnly cookie read. Default null (no
+    // auth header) is correct for tests that don't exercise the
+    // auth-header path; specific tests can override.
+    getAuthHeaders: vi.fn(() => Promise.resolve(null)),
     presets: WEB_PROVIDER_PRESETS,
   };
 });

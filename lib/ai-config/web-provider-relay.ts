@@ -23,6 +23,31 @@ const TAB_IDLE_CLOSE_MS = 5 * 60 * 1000;  // 5 minutes
 /** Default timeout for a single chat stream (no end signal = stall = abort). */
 export const WEB_SESSION_TIMEOUT_MS = 60_000;
 
+/**
+ * ⑪.7: Read HttpOnly cookies for a provider that the MAIN world can't see
+ * via `document.cookie`. Used to pass an Authorization header to adapters
+ * that need the token as a Bearer header (chromeclaw parity for Kimi).
+ *
+ * Currently only Kimi needs this — its `kimi-auth` cookie is HttpOnly,
+ * so `document.cookie` in MAIN world returns nothing useful. The SW has
+ * `chrome.cookies` API which CAN read HttpOnly.
+ *
+ * Returns `'Bearer <token>'` (the full Authorization header value) or
+ * `null` if no auth cookie is found for the provider.
+ */
+export async function getAuthHeadersForProvider(
+  providerId: WebProvider['presetId'],
+): Promise<string | null> {
+  if (providerId !== 'kimi') return null;
+  try {
+    const cookies = await chrome.cookies.getAll({ domain: '.kimi.com' });
+    const kimiAuth = cookies.find((c) => c.name === 'kimi-auth')?.value;
+    return kimiAuth ? `Bearer ${kimiAuth}` : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface TabRegistryConfig {
   /** Override the idle close timeout. Production: 5min. Tests: small values. */
   idleCloseMs: number;

@@ -46,8 +46,9 @@ export interface ContentFetchRequest {
   /**
    * The fully-built `url` and `init` for the provider's main chat endpoint.
    * Providers fill this in from their own auth + body construction.
+   * Optional — adapters that build the URL internally (Kimi/GLM/DeepSeek) ignore it.
    */
-  url: string;
+  url?: string;
   init: RequestInit;
   /**
    * Optional pre-flight request (e.g. Qwen's `create chat session`).
@@ -87,6 +88,15 @@ export interface ContentFetchRequest {
    * got a 403 and the page should be reloaded.
    */
   retryAttempt?: number;
+  /**
+   * ⑪.7: SW-provided Authorization header for cookies the MAIN world
+   * can't see via `document.cookie` (HttpOnly cookies like Kimi's
+   * `kimi-auth`). The SW reads them via `chrome.cookies.getAll` (which
+   * CAN read HttpOnly) and passes the value here. Adapters that need
+   * auth use this in preference to extracting from `document.cookie`.
+   * Format: `'Bearer <token>'` (the adapter strips the prefix).
+   */
+  authHeader?: string;
 }
 
 /**
@@ -107,6 +117,22 @@ export const webProviderContentFetchMain = async (request: ContentFetchRequest):
     binaryEncodeBody,
   } = request;
   let { url, init } = request;
+  // The shared runtime always needs a URL. Adapters that build the URL
+  // internally (Kimi/GLM/DeepSeek) don't use this runtime — they have
+  // their own self-contained implementations. If a caller hands us a
+  // request without a url, fail loudly rather than silently making
+  // a fetch() to `undefined`.
+  if (!url) {
+    window.postMessage(
+      {
+        type: 'WEB_LLM_ERROR',
+        requestId,
+        error: 'webProviderContentFetchMain requires `url` in the request; adapters that build the URL internally should not delegate here.',
+      },
+      window.location.origin,
+    );
+    return;
+  }
   const origin = window.location.origin;
 
   // ── Keep-alive (anti "inactive tab" detection, esp. ChatGPT). ──
