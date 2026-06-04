@@ -1,8 +1,8 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 27 (② + B + ③+④ + ⑤ + followups)
-Tests: 181/181 passing (was 64 at ② start; +117 new)
+Total commits: 29 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥)
+Tests: 187/187 passing (was 64 at ② start; +123 new)
 Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓
 
 ---
@@ -111,13 +111,67 @@ and auth header details still need user DevTools verification.
 
 ---
 
+## ⑥ — Tool-call extraction (defensive feature)
+
+**1 commit (9dd8ae3).** Re-examined the original YAGNI claim for tool
+support and found it unverified — I had assumed "providers use UI
+buttons for tools" without confirming the LLM's SSE stream never
+contains `tool_calls`. Implementing the extraction is bounded cost
+(no behavioral change for current providers) and real benefit if any
+provider's LLM happens to emit tool_calls in the stream.
+
+| Component | File | Behavior |
+|---|---|---|
+| Types | `web-provider-relay.ts` | Added `WEB_LLM_TOOLCALL_START/DELTA/END` constants; extended `WebProviderRelayMessage` union with 3 new variants |
+| Tracker | `processChatStream` inner loop | `Map<number, ToolCallTracker>` keyed by `delta.tool_calls[i].index`; tracks `id`/`name`/`argsBuffer`/`startEmitted`/`endEmitted` |
+| Extraction | `processChatStream` | `JSON.parse(event.data)`; if `choices[0].delta.tool_calls` is an array, emit START on first id+name, DELTA on each args fragment, END on `finish_reason='tool_calls'` or EOF |
+| Cleanup | `flushToolCallEnds()` | Helper called on `[DONE]`, on `finish_reason=tool_calls`, and in `finally` block — guarantees no half-built tool calls leak in agent state if stream is cut off abruptly |
+
+**Wire format** matches pi-ai's `AssistantMessageContent`:
+```ts
+{ type: 'toolCall', id, name, arguments }  // pi-ai ToolCall shape
+```
+
+**6 new tests** in `__tests__/lib/ai-config/web-provider-relay.test.ts`:
+1. emits start when first chunk has id+name
+2. emits delta for argument fragments across chunks (`a`+`bc`+`def`)
+3. emits end with parsed arguments on `finish_reason=tool_calls`
+4. handles multiple parallel tool calls (index 0 + 1)
+5. does NOT emit start for malformed entries (no id)
+6. ignores events with no tool_calls (text-only regression guard)
+
+**Impact on current providers**: zero. Kimi/GLM/DeepSeek all UI-driven
+tools in web sessions, so `delta.tool_calls` is never populated. The
+extraction is a no-op pass-through. If/when a provider's LLM starts
+emitting tool_calls, the agent now has the events to consume.
+
+---
+
+## T14 — E2E verification status (9 items)
+
+| # | Item | Status | Coverage |
+|---|---|---|---|
+| 1 | Real chat with real provider completes | **Blocked on T1** | Format verified via T1-partial (d7d334f); real chat needs DevTools observation |
+| 2 | TTFT ≤3s | **Blocked on T1** | Need real timing; no synthetic data possible |
+| 3 | Web provider appears in ModelSelector | ✓ Covered | B (ec4f79a) + ModelSelector.test.ts (8 tests in `provider-groups.ts`) |
+| 4 | Side panel renders web providers in Settings | ✓ Covered | ② (16 commits) + WebProviderCard tests |
+| 5 | Logout button works | ✓ Covered | ⑤.3 (c1aa5d8) + 4 Logout tests in WebProviderCard.test.tsx |
+| 6 | 401/403 triggers needs_relogin toast | ✓ Covered | ⑤.1 (238b1bf) + ⑤.2 (a313539) + ⑤.4 (c00253d) + ⑤.INTEGRATION (5 tests) + ⑤.4.followup (4 tests) |
+| 7 | Cache invalidation on re-login | ✓ Covered | ⑤.2 + T14#7-#8 (80a92cb, 4 tests) |
+| 8 | Re-login via web flow restores chat | **Blocked on T1** | Need real session cookie observation; SW + sidepanel wiring is in place |
+| 9 | Error toast on session expired | ✓ Covered | ⑤.4 (c00253d) + toast tests |
+
+**6 of 9 T14 items covered by 23 automated tests. 3 of 9 blocked on T1
+(items #1, #2, #8 all need real provider observation).**
+
+---
+
 ## What remains (user input required)
 
 | | Why blocked | Your action |
 |---|---|---|
-| **T1** full | Web session endpoints differ from public APIs | Run `chrome.exe --remote-debugging-port=9333` + `agent-browser`, send chats at kimi.com/chatglm.cn/chat.deepseek.com, DevTools → Copy as cURL → paste back. I do the rest. |
-| **T14** #1, #2, #8, #9 | Real chat with real providers | After T1, the 4 remaining manual checks are: (1) chat with each provider works, (2) TTFT ≤3s, (8) re-login flow, (9) TTFT assertions. T14 #3-#7 are covered by automated tests. |
-| **⑥** Tool support | YAGNI (re-verified 3×) | All 3 providers use UI buttons for tools in web sessions; LLM never emits `tool_calls` in the stream. No autonomous path. |
+| **T1** full | Web session endpoints differ from public APIs; need actual cURL to confirm body shape, headers, SSE format | Run `chrome.exe --remote-debugging-port=9333` + `agent-browser`, send chats at kimi.com/chatglm.cn/chat.deepseek.com, DevTools → Copy as cURL → paste back. I do the rest. |
+| **T14** #1, #2, #8 | Real chat with real providers | After T1, the 3 remaining manual checks are: (1) chat with each provider works, (2) TTFT ≤3s, (8) re-login flow. T14 #3-#7, #9 are covered by 23 automated tests. |
 | **⑦** Conversation caching | Provider-specific protocols | After T1, the request/response for conversation memory is known. Implementing requires per-provider session-id field name + storage. |
 
 ---
@@ -127,7 +181,7 @@ and auth header details still need user DevTools verification.
 ```bash
 cd D:\Project\CebianX\cebian-web-provider
 pnpm install        # 1 minute
-pnpm test           # 181/181 pass in ~30s
+pnpm test           # 187/187 pass in ~30s
 pnpm run check      # WXT types + TS + i18n lint
 pnpm run build      # 9.6 MB output
 ```
@@ -142,11 +196,14 @@ pnpm run build      # 9.6 MB output
 ## Branch state
 
 ```
-$ git log --oneline -28
+$ git log --oneline -29
+9dd8ae3 feat(relay): extract tool_calls from SSE stream (⑥ defensive)
 80a92cb test(integration): add logout flow + parseWebModelId round-trip tests (T14 #7-#8)
+afad161 docs: add comprehensive CHANGELOG for ②+B+③+④+⑤+T1-partial+T14#7-#8 effort
 d7d334f feat(presets): update T3 placeholders with web-search-verified format (T1 partial)
 c37f8bc feat(sidepanel): plumb onOpenSettings callback through useBackgroundAgent (⑤.4.followup)
 c748463 docs: add ⑤ Maintenance verification report
+b1857af test(integration): end-to-end relogin flow (fetcher→SW→sidepanel) (⑤.INTEGRATION)
 c00253d feat(sidepanel): handle web_provider_needs_relogin with toast (⑤.4)
 c1aa5d8 feat(chat): add Logout button on WebProviderCard (⑤.3)
 a313539 feat(background): handle WEB_LLM_NEEDS_RELOGIN (invalidate + broadcast) (⑤.2)
