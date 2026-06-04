@@ -11,13 +11,39 @@ const fs = require('node:fs');
 
 const CDP_URL = 'http://127.0.0.1:9333';
 const BUNDLE_PATH = 'D:/Project/CebianX/cebian-web-provider/.output/chrome-mv3/background.js';
-const ADAPTER_SYMBOLS = { deepseek: 'wyt', kimi: 'Tyt', glm: 'Eyt' };
 const PROVIDER_LOGIN_URLS = {
   deepseek: 'https://chat.deepseek.com/',
   kimi: 'https://www.kimi.com/',
   glm: 'https://chatglm.cn/',
 };
 const TIMEOUT_MS = 25_000;
+
+/**
+ * Auto-detect adapter function symbols from the mainWorldFetchByProvider
+ * dispatch table. The table has the shape:
+ *   <sym>={deepseek:{request:{type:`WEB_LLM_FETCH`},func:wyt},kimi:{...func:Tyt},glm:{...func:Ryt}}
+ * Find each provider's func symbol independently (avoids needing to match
+ * nested braces in a single regex).
+ */
+function detectAdapterSymbols(bundle) {
+  // The dispatch table is the unique location of the pattern
+  //   <provider>:{request:{type:`WEB_LLM_FETCH`},func:<symbol>}
+  // (the backtick string `WEB_LLM_FETCH` and the literal `request:` key
+  // are specific to mainWorldFetchByProvider — no other code uses them).
+  const find = (providerName) => {
+    const re = new RegExp(
+      `\\b${providerName}:\\s*\\{\\s*request:\\s*\\{[^}]+\\}\\s*,\\s*func:\\s*(\\w+)\\s*\\}`,
+      's',
+    );
+    const m = bundle.match(re);
+    return m ? m[1] : null;
+  };
+  const deepseek = find('deepseek');
+  const kimi = find('kimi');
+  const glm = find('glm');
+  if (!deepseek || !kimi || !glm) return null;
+  return { deepseek, kimi, glm };
+}
 
 function extractAdapterSource(bundle, symbol) {
   const re = new RegExp(`\\b${symbol}\\s*=\\s*async\\s*(?:\\(?e\\)?\\s*=>|function\\s*\\(?e\\)?\\s*\\{)`, 'g');
@@ -72,28 +98,32 @@ async function runProviderE2E(page, providerId, adapterSource) {
       window.__cebPrevObserver = obs;
       window.addEventListener('message', obs);
 
-      // Wrap fetch to log requests
-      if (!window.__cebFetchWrapped) {
-        const origFetch = window.fetch;
-        window.fetch = function (...args) {
-          const [url, init] = args;
-          const reqInfo = { runId: rid, url: typeof url === 'string' ? url : url.url, method: (init && init.method) || 'GET', headers: init && init.headers ? JSON.parse(JSON.stringify(init.headers)) : undefined, bodyPreview: undefined, ts: Date.now() };
-          if (init && init.body) {
-            if (typeof init.body === 'string') reqInfo.bodyPreview = init.body.length > 200 ? init.body.slice(0, 200) + '...' : init.body;
-            else if (init.body instanceof ArrayBuffer) reqInfo.bodyPreview = `[ArrayBuffer ${init.body.byteLength}B]`;
-            else reqInfo.bodyPreview = `[${typeof init.body}]`;
-          }
-          window.__cebRequests = window.__cebRequests || [];
-          window.__cebRequests.push(reqInfo);
-          return origFetch.apply(this, args).then((resp) => {
-            const respInfo = { runId: rid, status: resp.status, statusText: resp.statusText, url: reqInfo.url, contentType: resp.headers.get('content-type') || '', ts: Date.now() };
-            window.__cebResponses = window.__cebResponses || [];
-            window.__cebResponses.push(respInfo);
-            return resp;
-          });
-        };
-        window.__cebFetchWrapped = true;
-      }
+      // Wrap fetch to log requests. We RE-WRAP on every run (not just once)
+      // because the wrapper closure captures `rid` — if we skip re-wrapping,
+      // the closure's `rid` is from the first test run, and the per-run
+      // filter at read time would drop the current run's requests.
+      // The previous wrapper (if any) is captured as `__cebPrevFetch` and
+      // we delegate to it, so we don't break nested wrapping.
+      const prevFetch = window.__cebFetchWrapped ? window.fetch : null;
+      const origFetch = prevFetch || window.fetch;
+      window.fetch = function (...args) {
+        const [url, init] = args;
+        const reqInfo = { runId: rid, url: typeof url === 'string' ? url : url.url, method: (init && init.method) || 'GET', headers: init && init.headers ? JSON.parse(JSON.stringify(init.headers)) : undefined, bodyPreview: undefined, ts: Date.now() };
+        if (init && init.body) {
+          if (typeof init.body === 'string') reqInfo.bodyPreview = init.body.length > 200 ? init.body.slice(0, 200) + '...' : init.body;
+          else if (init.body instanceof ArrayBuffer) reqInfo.bodyPreview = `[ArrayBuffer ${init.body.byteLength}B]`;
+          else reqInfo.bodyPreview = `[${typeof init.body}]`;
+        }
+        window.__cebRequests = window.__cebRequests || [];
+        window.__cebRequests.push(reqInfo);
+        return origFetch.apply(this, args).then((resp) => {
+          const respInfo = { runId: rid, status: resp.status, statusText: resp.statusText, url: reqInfo.url, contentType: resp.headers.get('content-type') || '', ts: Date.now() };
+          window.__cebResponses = window.__cebResponses || [];
+          window.__cebResponses.push(respInfo);
+          return resp;
+        });
+      };
+      window.__cebFetchWrapped = true;
     }, runId);
 
     // Probe cookies (for kimi-auth, chatglm_token, userToken) BEFORE the call
@@ -172,8 +202,13 @@ async function runProviderE2E(page, providerId, adapterSource) {
   const bundle = fs.readFileSync(BUNDLE_PATH, 'utf8');
   console.log(`[e2e] bundle: ${(bundle.length / 1024).toFixed(0)} KB`);
 
+  const adapterSyms = detectAdapterSymbols(bundle);
+  if (!adapterSyms) { console.error('[e2e] FATAL: dispatch table not found in bundle'); process.exit(1); }
+  console.log(`[e2e] auto-detected dispatch ${adapterSyms._dispatchSymbol} = { deepseek:${adapterSyms.deepseek}, kimi:${adapterSyms.kimi}, glm:${adapterSyms.glm} }`);
+
   const adapters = {};
-  for (const [providerId, symbol] of Object.entries(ADAPTER_SYMBOLS)) {
+  for (const providerId of ['deepseek', 'kimi', 'glm']) {
+    const symbol = adapterSyms[providerId];
     const src = extractAdapterSource(bundle, symbol);
     if (!src) { console.error(`[e2e] FATAL: cannot extract ${providerId} (${symbol})`); process.exit(1); }
     adapters[providerId] = src;

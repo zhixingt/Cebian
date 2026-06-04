@@ -1,7 +1,7 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 36 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix)
+Total commits: 37 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦ + ⑧ + selector-fix + ⑨ + ⑩+⑪ A-line + ⑪.6 E2E infra + Kimi auth fix + D GLM X-Sign rewrite)
 Tests: 201/201 passing (was 64 at ② start; +137 new)
 Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓ • `pnpm check` clean • E2E infrastructure in `scripts/e2e-content-fetch.cjs`
 
@@ -374,25 +374,17 @@ architecture.
 1. **DeepSeekHashV1 PoW** — confirmed by E2E: server returns this
    algorithm. Adapter surfaces a clear "unsupported algorithm — reload
    page" error. WASM solver is the next work item.
-2. **GLM X-Sign + endpoint** — confirmed by E2E: `/api/chat/v1/stream`
-   returns 405. Real endpoint is `/chatglm/backend-api/assistant/stream`
-   (chromeclaw), with `assistant_id: '65940acff94777010aa6b796'`,
-   `chat_type: 'user_chat'`, `meta_data` envelope, plus 10+ X-*
-   headers including **MD5 X-Sign** with secret
-   `8a1317a7468aa3ad86e997d08f3f31cb` and timestamp with checksum
-   digit. SSE response shape is `parts[].content[].text` (cumulative
-   delta — must dedupe). Full rewrite needed.
+2. **GLM X-Sign + endpoint** — **DONE in D commit** (see below).
 3. **Kimi server returns 200 with empty body** — confirmed by E2E:
    request accepted (200 OK + `application/connect+json` content-type)
    but body is empty. Authorization header is added when `kimi-auth`
    cookie is present (the user has none in MAIN world — `kimi-auth` is
    not in their cookie jar; only tracking cookies are). Server is not
    streaming — this is a server-side issue, not an adapter bug.
-4. **Real-extension E2E** — DONE in this commit: `scripts/e2e-content-fetch.cjs`
+4. **Real-extension E2E** — DONE in ⑪.6 commit: `scripts/e2e-content-fetch.cjs`
    connects to the user's Chrome at 9333, extracts adapter source from
    the **built bundle** (not source files), and runs the real adapter
-   inside the user's logged-in tabs. The infrastructure is in place;
-   only the GLM and DeepSeek adapter bodies need work to make 3/3 pass.
+   inside the user's logged-in tabs.
 
 ---
 
@@ -426,23 +418,56 @@ empty body even with the right shape.
 
 ---
 
-## What remains (post-A-line)
+### D — GLM X-Sign rewrite (DONE in D commit)
 
-### D — GLM X-Sign rewrite (concrete next work item)
-Real endpoint + body + headers + MD5 X-Sign + cumulative-delta SSE
-parser. ~130 LoC change. The chromeclaw reference is in
-`chromeclaw-research/.../providers/{glm-shared,glm-signing}.ts`.
+`web-provider-content-fetch-glm.ts` was completely rewritten to match
+chromeclaw's production GLM client. The previous version hit
+`/api/chat/v1/stream` (which returns 405 nginx) and skipped the HMAC
+signing. The new version:
+
+| Layer | What it does now |
+|---|---|
+| Endpoint | `POST /chatglm/backend-api/assistant/stream` (the real one) |
+| Auth | Reads `chatglm_token` from `document.cookie`; if missing but `chatglm_refresh_token` present, refreshes inline via `POST /chatglm/user-api/user/refresh` |
+| Body | `{ assistant_id: '65940acff94777010aa6b796', conversation_id, project_id, chat_type: 'user_chat', meta_data: {…}, messages: [{ role: 'user', content: [{ type: 'text', text }] }] }` |
+| Headers | 14 headers including `Authorization: Bearer ${token}`, 10 X-* headers, **X-Sign = MD5(timestamp-nonce-secret)** |
+| X-Sign | timestamp has a checksum digit (sum-of-digits % 10 inserted at second-to-last position); nonce = `crypto.randomUUID().replace(/-/g,'')`; sign = MD5 of `${ts}-${nonce}-${secret}` where `secret = '8a1317a7468aa3ad86e997d08f3f31cb'` |
+| X-Device-Id | Stable per-install UUID persisted in `localStorage` under `__cebGlmDeviceId__` |
+| SSE parser | **Cumulative delta dedup** — tracks `prevText` per phase (`logic_id`) and emits only the delta, otherwise bridge sees the same text repeated and user sees duplicated content |
+| Self-contained | All constants (`GLM_SIGN_SECRET`, `GLM_ASSISTANT_ID`, `GLM_STREAM_URL_SUFFIX`, …) and helpers (`md5Hex`, `generateGlmSign`, `readCookie`, `getOrCreateDeviceId`, `refreshGlmToken`) are inlined into the exported function body — avoids the "X is not defined" bug from `chrome.scripting.executeScript` serialization |
+
+**E2E v3 verification** (2026-06-04, against user's real Chrome):
+
+| Provider | URL | Response | Chunks | Done | First chunk |
+|---|---|---|---|---|---|
+| GLM | `chatglm.cn/chatglm/backend-api/assistant/stream` | 200 (text/event-stream) | **16** | ✓ | `data: {"content":"你好"}\n\n` |
+
+The full response streamed token-by-token:
+`"你好"` → `"！"` → `"很高兴"` → `"见到"` → `"你"` → `"。"` → ... (16 chunks)
+
+**E2E infrastructure upgrade** (in same commit):
+- Auto-detect adapter symbols from the dispatch table — no more
+  hardcoded `wyt/Tyt/Eyt` (renamed by minifier after the GLM rewrite)
+- Fixed fetch-wrapper bug where `reqs=0` on reused pages (closure
+  captured stale `runId` — now re-wraps on every run)
+
+---
+
+## What remains (post-A-line)
 
 ### E — DeepSeekHashV1 WASM solver (concrete next work item)
 Bundle the DeepSeekHashV1 WASM (separate from the SHA-256 JS solver
-already in `web-provider-content-fetch-deepseek.ts`).
+already in `web-provider-content-fetch-deepseek.ts`). E2E confirms
+DeepSeek reaches the PoW step and the server returns
+`algorithm: 'DeepSeekHashV1'` (so the adapter path is correct, only
+the solver is missing).
 
 ### F — Real Chrome validation by user
 User must **fully restart Chrome** (or remove+re-add the extension)
 so the SW picks up the new bundle with `mainWorldFetchByProvider` wired in
-+ the Kimi Authorization fix. Send one message each in sidepanel
-(Kimi / GLM / DeepSeek) and capture screenshots. With the
-above D + E work landed, all 3 should pass.
++ the Kimi Authorization fix + the GLM X-Sign rewrite. Send one
+message each in sidepanel (Kimi / GLM / DeepSeek) and capture
+screenshots. With D done and E done, all 3 should pass.
 
 ### G — Multi-turn conversation support (⑨.2, deferred)
 DOM-injection gives us "free" conversation continuity via the provider's
@@ -450,5 +475,5 @@ own UI; the ⑦ storage foundation stays for future restoration scenarios.
 
 ### H — Upstream PR (⑨.3, **deferred per user**)
 User explicitly opted NOT to submit PR to upstream `maotoumao/Cebian`.
-Branch state: 36 commits, 201/201 tests, 9.6 MB build, i18n parity,
-E2E infrastructure in.
+Branch state: 37 commits, 201/201 tests, 9.6 MB build, i18n parity,
+E2E infrastructure in (auto-detect + re-wrapping fixed).
