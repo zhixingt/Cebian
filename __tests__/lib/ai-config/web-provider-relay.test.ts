@@ -463,6 +463,140 @@ describe('processChatStream abort + timeout (T9: ③+④ cancellation)', () => {
   });
 });
 
+describe('processChatStream tool-call extraction (⑥: defensive feature)', () => {
+  // Helper to build a stream of SSE chunks for tool-call flows.
+  // Each input string is emitted as one UTF-8 chunk.
+  function makeStreamFromStrings(...chunks: string[]): ReadableStream<Uint8Array> {
+    const enc = new TextEncoder();
+    let i = 0;
+    return new ReadableStream({
+      pull(controller) {
+        if (i < chunks.length) {
+          controller.enqueue(enc.encode(chunks[i++]));
+        } else {
+          controller.close();
+        }
+      },
+    });
+  }
+
+  it('emits toolcall_start when first chunk has tool_calls[0].id + .function.name', async () => {
+    const stream = makeStreamFromStrings(
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_abc","function":{"name":"get_weather","arguments":""}}]}}]}\n\n',
+      'data: [DONE]\n\n',
+    );
+    const emitted: any[] = [];
+    await processChatStream(
+      stream,
+      { providerId: 'glm', endpoint: 'x', bodyTemplate: '{}', streamFormat: 'sse', endSignal: '[DONE]', deltaPath: 'choices.0.delta.content' },
+      (m) => emitted.push(m),
+    );
+    const start = emitted.find(m => m.type === 'WEB_LLM_TOOLCALL_START');
+    expect(start).toBeDefined();
+    expect(start.contentIndex).toBe(0);
+    expect(start.toolCall).toEqual({ type: 'toolCall', id: 'call_abc', name: 'get_weather' });
+  });
+
+  it('emits toolcall_delta for argument fragments across chunks', async () => {
+    // Simulate arguments "a"+"bc"+"def" accumulating into JSON-valid "abcdef"
+    // (not a realistic JSON but enough to verify delta accumulation + JSON.parse
+    // of the final value at end)
+    const stream = makeStreamFromStrings(
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_abc","function":{"name":"f","arguments":""}}]}}]}\n\n',
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"a"}}]}}]}\n\n',
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"bc"}}]}}]}\n\n',
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"def"}}]}}]}\n\n',
+      'data: [DONE]\n\n',
+    );
+    const emitted: any[] = [];
+    await processChatStream(
+      stream,
+      { providerId: 'glm', endpoint: 'x', bodyTemplate: '{}', streamFormat: 'sse', endSignal: '[DONE]', deltaPath: 'choices.0.delta.content' },
+      (m) => emitted.push(m),
+    );
+    const deltas = emitted.filter(m => m.type === 'WEB_LLM_TOOLCALL_DELTA').map((m: any) => m.delta);
+    expect(deltas).toEqual(['a', 'bc', 'def']);
+  });
+
+  it('emits toolcall_end with parsed arguments on finish_reason=tool_calls', async () => {
+    // Arguments: "{"a":1,"b":2}" — a complete JSON object as a string.
+    // All in one chunk to keep the test simple; verifies JSON.parse on end.
+    const stream = makeStreamFromStrings(
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_xyz","function":{"name":"sum","arguments":"{\\\"a\\\":1,\\\"b\\\":2}"}}]}}]}\n\n',
+      'data: {"choices":[{"finish_reason":"tool_calls"}]}\n\n',
+      'data: [DONE]\n\n',
+    );
+    const emitted: any[] = [];
+    await processChatStream(
+      stream,
+      { providerId: 'glm', endpoint: 'x', bodyTemplate: '{}', streamFormat: 'sse', endSignal: '[DONE]', deltaPath: 'choices.0.delta.content' },
+      (m) => emitted.push(m),
+    );
+    const end = emitted.find(m => m.type === 'WEB_LLM_TOOLCALL_END');
+    expect(end).toBeDefined();
+    expect(end.contentIndex).toBe(0);
+    expect(end.toolCall).toEqual({
+      type: 'toolCall',
+      id: 'call_xyz',
+      name: 'sum',
+      arguments: { a: 1, b: 2 },
+    });
+  });
+
+  it('handles MULTIPLE tool calls in parallel (different indices)', async () => {
+    const stream = makeStreamFromStrings(
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_a","function":{"name":"f1","arguments":""}},{"index":1,"id":"call_b","function":{"name":"f2","arguments":""}}]}}]}\n\n',
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"1"}},{"index":1,"function":{"arguments":"2"}}]}}]}\n\n',
+      'data: [DONE]\n\n',
+    );
+    const emitted: any[] = [];
+    await processChatStream(
+      stream,
+      { providerId: 'glm', endpoint: 'x', bodyTemplate: '{}', streamFormat: 'sse', endSignal: '[DONE]', deltaPath: 'choices.0.delta.content' },
+      (m) => emitted.push(m),
+    );
+    const starts = emitted.filter(m => m.type === 'WEB_LLM_TOOLCALL_START');
+    expect(starts).toHaveLength(2);
+    expect(starts.map((s: any) => s.contentIndex).sort()).toEqual([0, 1]);
+    const ends = emitted.filter(m => m.type === 'WEB_LLM_TOOLCALL_END');
+    expect(ends).toHaveLength(2);
+    const endedNames = ends.map((e: any) => e.toolCall.name).sort();
+    expect(endedNames).toEqual(['f1', 'f2']);
+  });
+
+  it('does NOT emit toolcall_start for malformed entries (no id)', async () => {
+    const stream = makeStreamFromStrings(
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{}"}}]}}]}\n\n',
+      'data: [DONE]\n\n',
+    );
+    const emitted: any[] = [];
+    await processChatStream(
+      stream,
+      { providerId: 'glm', endpoint: 'x', bodyTemplate: '{}', streamFormat: 'sse', endSignal: '[DONE]', deltaPath: 'choices.0.delta.content' },
+      (m) => emitted.push(m),
+    );
+    // Malformed: no id, so we don't emit toolcall_start
+    expect(emitted.find(m => m.type === 'WEB_LLM_TOOLCALL_START')).toBeUndefined();
+  });
+
+  it('ignores events with no tool_calls (text-only chat works as before)', async () => {
+    const stream = makeStreamFromStrings(
+      'data: {"choices":[{"delta":{"content":"hello"}}]}\n\n',
+      'data: [DONE]\n\n',
+    );
+    const emitted: any[] = [];
+    await processChatStream(
+      stream,
+      { providerId: 'glm', endpoint: 'x', bodyTemplate: '{}', streamFormat: 'sse', endSignal: '[DONE]', deltaPath: 'choices.0.delta.content' },
+      (m) => emitted.push(m),
+    );
+    expect(emitted).toEqual([
+      { type: 'WEB_LLM_CHUNK', providerId: 'glm', text: 'hello' },
+      { type: 'WEB_LLM_DONE', providerId: 'glm' },
+    ]);
+  });
+});
+
 describe('executeChatRequest (⑤.1: 401 detection + error mapping)', () => {
   function makeRequest(overrides: Partial<import('@/lib/ai-config/web-provider-relay').WebProviderChatRequest> = {}): import('@/lib/ai-config/web-provider-relay').WebProviderChatRequest {
     return {

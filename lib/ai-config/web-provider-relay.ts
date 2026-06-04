@@ -206,6 +206,11 @@ export const WEB_LLM_CHUNK = 'WEB_LLM_CHUNK' as const;
 export const WEB_LLM_DONE = 'WEB_LLM_DONE' as const;
 export const WEB_LLM_ERROR = 'WEB_LLM_ERROR' as const;
 export const WEB_LLM_NEEDS_RELOGIN = 'WEB_LLM_NEEDS_RELOGIN' as const;
+// ⑥: tool-call events (defensive — only emitted if a provider's LLM
+// emits `delta.tool_calls` in the stream; see processChatStream)
+export const WEB_LLM_TOOLCALL_START = 'WEB_LLM_TOOLCALL_START' as const;
+export const WEB_LLM_TOOLCALL_DELTA = 'WEB_LLM_TOOLCALL_DELTA' as const;
+export const WEB_LLM_TOOLCALL_END = 'WEB_LLM_TOOLCALL_END' as const;
 
 /**
  * Discriminated union of all messages the injected content scripts can send
@@ -216,7 +221,10 @@ export type WebProviderRelayMessage =
   | { type: typeof WEB_LLM_CHUNK; providerId: WebProvider['presetId']; text: string; reasoning?: string }
   | { type: typeof WEB_LLM_DONE; providerId: WebProvider['presetId']; stopReason?: string }
   | { type: typeof WEB_LLM_ERROR; providerId: WebProvider['presetId']; error: string }
-  | { type: typeof WEB_LLM_NEEDS_RELOGIN; providerId: WebProvider['presetId']; status: 401 | 403; message: string };
+  | { type: typeof WEB_LLM_NEEDS_RELOGIN; providerId: WebProvider['presetId']; status: 401 | 403; message: string }
+  | { type: typeof WEB_LLM_TOOLCALL_START; providerId: WebProvider['presetId']; contentIndex: number; toolCall: { type: 'toolCall'; id: string; name: string } }
+  | { type: typeof WEB_LLM_TOOLCALL_DELTA; providerId: WebProvider['presetId']; contentIndex: number; delta: string }
+  | { type: typeof WEB_LLM_TOOLCALL_END; providerId: WebProvider['presetId']; contentIndex: number; toolCall: { type: 'toolCall'; id: string; name: string; arguments: Record<string, unknown> } };
 
 /**
  * Chat request payload passed from the SW to the MAIN-world fetcher.
@@ -464,6 +472,37 @@ export async function processChatStream(
   let buffer = '';
   let doneEmitted = false;
 
+  // ⑥: track in-flight tool calls across chunks. OpenAI streaming sends
+  // tool_calls as an array per chunk, where each entry has an `index`
+  // and partial `function.arguments` (concatenated to form the final JSON).
+  // We accumulate, emit start on first id+name, delta for each args
+  // fragment, end on finish_reason=tool_calls OR on EOF.
+  interface ToolCallTracker {
+    id?: string;
+    name?: string;
+    argsBuffer: string;
+    startEmitted: boolean;
+    endEmitted: boolean;
+  }
+  const toolCalls = new Map<number, ToolCallTracker>();
+
+  /** Emit end events for any in-flight tool calls that haven't been ended yet. */
+  const flushToolCallEnds = () => {
+    for (const [idx, entry] of toolCalls) {
+      if (entry.endEmitted) continue;
+      if (!entry.id || !entry.name) continue;  // malformed, skip
+      let parsedArgs: Record<string, unknown> = {};
+      try { parsedArgs = JSON.parse(entry.argsBuffer); } catch { /* leave empty */ }
+      emit({
+        type: WEB_LLM_TOOLCALL_END,
+        providerId: request.providerId,
+        contentIndex: idx,
+        toolCall: { type: 'toolCall', id: entry.id, name: entry.name, arguments: parsedArgs },
+      });
+      entry.endEmitted = true;
+    }
+  };
+
   try {
     while (!controller.signal.aborted) {
       // Race reader.read() against the abort signal so a hanging stream
@@ -492,6 +531,8 @@ export async function processChatStream(
       for (const event of events) {
         // End signal check (e.g., 'data: [DONE]\n\n')
         if (event.data.trim() === request.endSignal) {
+          // ⑥: flush any in-flight tool-call ends before declaring done
+          flushToolCallEnds();
           emit({ type: WEB_LLM_DONE, providerId: request.providerId });
           doneEmitted = true;
           controller.abort();  // stop the loop
@@ -514,6 +555,8 @@ export async function processChatStream(
         if (request.stopReasonPath) {
           const stopReason = parseDelta(event.data, request.stopReasonPath);
           if (stopReason) {
+            // ⑥: flush tool-call ends if finish_reason signals tool use
+            if (stopReason === 'tool_calls') flushToolCallEnds();
             emit({
               type: WEB_LLM_DONE,
               providerId: request.providerId,
@@ -524,11 +567,57 @@ export async function processChatStream(
             break;
           }
         }
+        // ⑥: tool-call extraction. Parse event.data as JSON and look for
+        // choices[0].delta.tool_calls. Track by index across chunks; emit
+        // start/delta as fields arrive; end on finish_reason=tool_calls
+        // (handled above) or on data:[DONE] (handled at loop top).
+        let parsed: any = null;
+        try { parsed = JSON.parse(event.data); } catch { /* not JSON, skip */ }
+        const toolCallsDelta = parsed?.choices?.[0]?.delta?.tool_calls;
+        if (Array.isArray(toolCallsDelta)) {
+          for (const tc of toolCallsDelta) {
+            const idx: number = typeof tc?.index === 'number' ? tc.index : 0;
+            let entry = toolCalls.get(idx);
+            if (!entry) {
+              entry = { argsBuffer: '', startEmitted: false, endEmitted: false };
+              toolCalls.set(idx, entry);
+            }
+            if (typeof tc?.id === 'string') entry.id = tc.id;
+            if (typeof tc?.function?.name === 'string') entry.name = tc.function.name;
+            if (typeof tc?.function?.arguments === 'string') {
+              entry.argsBuffer += tc.function.arguments;
+            }
+            // Emit start on first appearance of id+name
+            if (!entry.startEmitted && entry.id && entry.name) {
+              entry.startEmitted = true;
+              emit({
+                type: WEB_LLM_TOOLCALL_START,
+                providerId: request.providerId,
+                contentIndex: idx,
+                toolCall: { type: 'toolCall', id: entry.id, name: entry.name },
+              });
+            }
+            // Emit delta for each args fragment (so the agent can stream-parse JSON)
+            if (typeof tc?.function?.arguments === 'string' && tc.function.arguments.length > 0) {
+              emit({
+                type: WEB_LLM_TOOLCALL_DELTA,
+                providerId: request.providerId,
+                contentIndex: idx,
+                delta: tc.function.arguments,
+              });
+            }
+          }
+        }
       }
     }
   } finally {
     if (timeoutId !== undefined) clearTimeout(timeoutId);
     try { reader.releaseLock(); } catch { /* already released */ }
+    // ⑥: ensure in-flight tool calls are ended even if stream was cut off
+    // abruptly (timeout, abort, network drop) without a finish_reason or
+    // data:[DONE] sentinel. Without this, a half-built tool call would
+    // leak in the agent's state.
+    flushToolCallEnds();
   }
 
   // Emit error if aborted (and we didn't already emit DONE)
