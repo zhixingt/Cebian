@@ -1,20 +1,25 @@
 /**
- * ③+④ T10 — pi-ai stream function for web session providers.
+ * ⑧: pi-ai stream function for web session providers (DOM-injection).
  *
  * Registers a custom api kind 'web-session' with pi-ai's ApiProvider registry.
  * When the agent (or ModelSelector) selects a Model<'web-session'>, pi-ai
- * dispatches to this stream function, which orchestrates the tab-based fetch.
+ * dispatches to this stream function, which orchestrates the DOM-injection
+ * relay into the provider's tab.
  *
  * Flow (called by pi-ai's complete()/stream()):
  *   1. Parse model.id → { providerId, modelId }
- *   2. Look up the preset to get chatApi config
- *   3. Resolve the cookie bundle (decrypted, cached)
- *   4. Build the chat request (substitute {{messages}} in bodyTemplate)
+ *   2. Look up the preset to get domStrategy
+ *   3. Resolve the cookie bundle (decrypted, cached) — validates login
+ *   4. Build the DOM relay request (text + strategy)
  *   5. Open/reuse a tab via TabRegistry
- *   6. Inject ISOLATED bridge + MAIN fetcher scripts
+ *   6. Inject ISOLATED bridge + MAIN orchestrator scripts
  *   7. Listen for messages from the tab (via deps.onMessage)
  *   8. Push pi-ai events to the returned AssistantMessageEventStream
  *   9. On abort/timeout/error → push error event
+ *
+ * ⑧: Replaces the old HTTP-replay flow (buildChatRequest with bodyTemplate
+ * substitution, etc.). The new flow just sends a text message to the tab
+ * and polls the DOM for the reply — no HTTP fetch, no SSE parsing.
  *
  * Testability: dependencies (openTab, injectScripts, onMessage, resolveBundle, presets)
  * are injected via WebSessionStreamDeps. Production uses the real chrome.* wrappers
@@ -31,10 +36,18 @@ import {
   type SimpleStreamOptions,
 } from '@earendil-works/pi-ai';
 import { resolveBundle as defaultResolveBundle } from './web-provider-bundle';
-import { getTabRegistry } from './web-provider-relay';
-import { injectRelayScripts, WEB_LLM_CHUNK, WEB_LLM_DONE, WEB_LLM_ERROR, type WebProviderRelayMessage } from './web-provider-relay';
+import { getTabRegistry, injectDomRelay } from './web-provider-relay';
+import {
+  WEB_LLM_CHUNK,
+  WEB_LLM_DONE,
+  WEB_LLM_ERROR,
+  WEB_LLM_RELAY_READY,
+  WEB_LLM_NEEDS_RELOGIN,
+  type WebProviderRelayMessage,
+} from './web-provider-relay';
 import { WEB_PROVIDER_PRESETS, type WebProviderPreset } from './web-provider-presets';
 import type { WebProvider } from '../types';
+import type { DomRelayRequest } from './web-provider-content-script';
 
 /** pi-ai sourceId for our custom provider. Used by unregisterApiProviders(). */
 export const WEB_SESSION_SOURCE_ID = 'cebian-web-provider';
@@ -50,8 +63,8 @@ export const WEB_SESSION_API = 'web-session' as const;
 export interface WebSessionStreamDeps {
   /** Open or reuse a Chrome tab for the provider. Returns the tabId. */
   openTab: (providerId: WebProvider['presetId'], url: string) => Promise<number>;
-  /** Inject the relay scripts (ISOLATED bridge + MAIN fetcher) into a tab. */
-  injectScripts: (tabId: number, request: import('./web-provider-relay').WebProviderChatRequest) => Promise<unknown>;
+  /** Inject the DOM relay scripts (ISOLATED bridge + MAIN orchestrator) into a tab. */
+  injectScripts: (tabId: number, request: DomRelayRequest) => Promise<unknown>;
   /** Register a chrome.runtime.onMessage handler; returns an unregister function. */
   onMessage: (handler: (msg: WebProviderRelayMessage) => void) => () => void;
   /** Resolve the decrypted cookie bundle for a provider. */
@@ -73,7 +86,7 @@ function getDefaultDeps(): WebSessionStreamDeps {
       getTabRegistry().markUsed(providerId);
       return tabId;
     },
-    injectScripts: (tabId, request) => injectRelayScripts(tabId, request),
+    injectScripts: (tabId, request) => injectDomRelay(tabId, request),
     onMessage: (handler) => {
       const listener = (msg: any) => {
         if (msg && typeof msg === 'object' && typeof msg.type === 'string') {
@@ -189,8 +202,9 @@ async function orchestrateStream(
     if (!preset) {
       throw new Error(`Unknown web provider: ${providerId}`);
     }
-    if (!preset.chatApi) {
-      throw new Error(`Provider ${providerId} has no chatApi configured (T3 not done?)`);
+    // ⑧: domStrategy is required (replaces old chatApi check)
+    if (!preset.domStrategy) {
+      throw new Error(`Provider ${providerId} has no domStrategy configured`);
     }
 
     // 3. Resolve bundle (validates login + decryption)
@@ -199,8 +213,8 @@ async function orchestrateStream(
       throw new Error(`Provider ${providerId} has no valid session — please log in via Settings`);
     }
 
-    // 4. Build chat request
-    const request = buildChatRequest(preset, modelId, context, bundle);
+    // 4. Build DOM relay request
+    const request = buildRelayRequest(preset, modelId, context);
 
     // 5. Open/reuse tab
     const tabId = await deps.openTab(providerId, preset.loginUrl);
@@ -212,11 +226,17 @@ async function orchestrateStream(
       if (msg.providerId !== providerId) return;
       switch (msg.type) {
         case WEB_LLM_CHUNK: {
-          accumulatedText += msg.text;
+          // ⑧: msg.text is the FULL text (not delta) because the DOM reader
+          // re-reads the whole textContent each poll. Compute delta ourselves.
+          const newText = msg.text;
+          const delta = newText.startsWith(accumulatedText)
+            ? newText.slice(accumulatedText.length)
+            : newText;  // reset, send all
+          accumulatedText = newText;
           stream.push({
             type: 'text_delta',
             contentIndex: 0,
-            delta: msg.text,
+            delta,
             partial: makePartial(providerId, modelId, accumulatedText),
           });
           break;
@@ -252,7 +272,19 @@ async function orchestrateStream(
           stream.end();
           break;
         }
-        // WEB_LLM_RELAY_READY is informational; ignore
+        case WEB_LLM_RELAY_READY: {
+          // Informational; the inject just confirmed the bridge is up.
+          break;
+        }
+        case WEB_LLM_NEEDS_RELOGIN: {
+          stream.push({
+            type: 'error',
+            reason: 'error',
+            error: makePartial(providerId, modelId, accumulatedText, 'error', msg.message),
+          });
+          stream.end();
+          break;
+        }
       }
     });
 
@@ -297,56 +329,38 @@ async function orchestrateStream(
 }
 
 /**
- * Build the WebProviderChatRequest for a given context.
- * Substitutes {{messages}} in the body template with the serialized message array.
- * Also injects the cookie headers from the bundle (the MAIN-world fetch can use
- * first-party cookies, but we set Authorization-like headers for providers that need them).
+ * Build the DomRelayRequest for a given context.
+ * ⑧: extracts the user message from the context.messages and combines
+ * with the preset's domStrategy. No body template, no auth headers —
+ * the tab's existing session does all the work.
  */
-function buildChatRequest(
+function buildRelayRequest(
   preset: WebProviderPreset,
   modelId: string,
   context: Context,
-  bundle: Record<string, string>,
-): import('./web-provider-relay').WebProviderChatRequest {
-  // Serialize messages in OpenAI format
-  const messages = context.messages.map((m) => ({
-    role: m.role,
-    content: typeof m.content === 'string'
-      ? m.content
-      : m.content
-          .filter((c: any) => c.type === 'text')
-          .map((c: any) => c.text)
-          .join(''),
-  }));
-
-  // Substitute {{messages}} and {{system}} in the body template
-  let body = preset.chatApi!.bodyTemplate
-    .replace(/\{\{messages\}\}/g, JSON.stringify(messages))
-    .replace(/\{\{system\}\}/g, JSON.stringify(context.systemPrompt));
-
-  // Build extra headers: pull any cookie values that look like auth tokens
-  // and put them in x-* headers. The MAIN-world fetch uses credentials: 'include'
-  // for first-party cookies, but some providers expect an Authorization header.
-  const extraHeaders: Record<string, string> = {
-    ...(preset.chatApi!.extraHeaders ?? {}),
-  };
-  // For Kimi: tokens come from localStorage, not cookies; nothing to inject.
-  // For GLM: chatglm_token is the access token; use as Bearer.
-  if (bundle['chatglm_token'] && !extraHeaders['Authorization']) {
-    extraHeaders['Authorization'] = `Bearer ${bundle['chatglm_token']}`;
+): DomRelayRequest {
+  // Extract the last user message (the one we want to send)
+  // ⑧: for MVP, only support a single text message. Multi-turn will be
+  //     handled in a follow-up (the storage foundation is already in place).
+  const lastUserMsg = [...context.messages].reverse().find((m) => m.role === 'user');
+  let messageText = '';
+  if (lastUserMsg) {
+    if (typeof lastUserMsg.content === 'string') {
+      messageText = lastUserMsg.content;
+    } else {
+      // Concatenate text parts; ignore image/file (MVP = text only)
+      messageText = lastUserMsg.content
+        .filter((c: any) => c.type === 'text')
+        .map((c: any) => c.text)
+        .join('\n');
+    }
   }
 
   return {
     providerId: preset.id,
-    endpoint: preset.chatApi!.endpoint,
-    method: 'POST',
-    bodyTemplate: body,
-    streamFormat: preset.chatApi!.streamFormat,
-    endSignal: preset.chatApi!.endSignal,
-    deltaPath: preset.chatApi!.deltaPath,
-    ...(preset.chatApi!.reasoningPath !== undefined ? { reasoningPath: preset.chatApi!.reasoningPath } : {}),
-    ...(preset.chatApi!.stopReasonPath !== undefined ? { stopReasonPath: preset.chatApi!.stopReasonPath } : {}),
-    ...(Object.keys(extraHeaders).length > 0 ? { extraHeaders } : {}),
+    modelId,
+    message: messageText,
+    domStrategy: preset.domStrategy,
   };
 }
 

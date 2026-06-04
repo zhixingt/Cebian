@@ -40,14 +40,15 @@ describe('resolveWebModel (T5: pi-ai Model<web-session> shape)', () => {
     const model = resolveWebModel('glm', 'glm-4.6');
     expect(model.reasoning).toBe(false);
     expect(model.api).toBe(WEB_SESSION_API);
-    expect(model.baseUrl).toBe('https://chatglm.cn/api/paas/v4/chat/completions');
+    // ⑧: baseUrl is the provider's login page (informational; no HTTP fetch)
+    expect(model.baseUrl).toBe('https://chatglm.cn');
   });
 
   it('returns a Model for DeepSeek with reasoning=true (per preset)', () => {
     const model = resolveWebModel('deepseek', 'deepseek-chat');
     expect(model.reasoning).toBe(true);
     expect(model.api).toBe(WEB_SESSION_API);
-    expect(model.baseUrl).toBe('https://chat.deepseek.com/chat/completions');
+    expect(model.baseUrl).toBe('https://chat.deepseek.com');
   });
 
   it('throws on unknown providerId', () => {

@@ -1,33 +1,18 @@
 import type { WebProvider, WebProviderUserOverrides } from '../types';
+import {
+  DOM_STRATEGIES,
+  type WebProviderDomStrategy,
+} from './web-provider-dom-strategy';
 
 /**
- * ③+④: per-preset chat API descriptor. Tells the relay how to talk to the
- * provider's web session. Optional in T2; T3 will populate for the 3 built-in
- * providers. If undefined, the provider is cookie-captured but cannot be used
- * for chat (set chatApi = null via A2 to skip; not exposed in MVP).
+ * ⑧: per-preset DOM strategy. Tells the relay how to inject the message into
+ * the provider's chat input and how to read the AI's reply from the DOM.
+ *
+ * Why DOM (not HTTP replay) — see web-provider-dom-strategy.ts header.
+ * Required for all built-in presets; if a preset is missing this, it cannot
+ * be used for chat. User-defined presets are a future feature.
  */
-export interface WebProviderChatApi {
-  /** Provider域的 chat endpoint（绝对 URL） */
-  endpoint: string;
-  /** HTTP method */
-  method: 'POST' | 'GET';
-  /** 流格式 */
-  streamFormat: 'sse' | 'jsonl';
-  /** 提取 delta text 的 JSON 路径（点号分隔，e.g. 'choices.0.delta.content'） */
-  deltaPath: string;
-  /** 提取 reasoning text 的 JSON 路径（可选） */
-  reasoningPath?: string;
-  /** 提取 stop reason 的 JSON 路径（可选） */
-  stopReasonPath?: string;
-  /** 请求 body 模板（{{messages}} {{system}} 占位；多轮 conversationId 缓存是 ⑦ 范围，本里程碑固定传全量历史） */
-  bodyTemplate: string;
-  /** 额外请求头（cookie 由 MAIN-world fetch 自动带，这里只填 x-*） */
-  extraHeaders?: Record<string, string>;
-  /** 流结束信号（'data: [DONE]' 或自定义） */
-  endSignal: string;
-  /** 是否支持 images（决定 Model.image: false 标记）。MVP 全部为 false */
-  supportsImages: false;
-}
+export type { WebProviderDomStrategy } from './web-provider-dom-strategy';
 
 /**
  * Built-in web AI provider presets.
@@ -66,8 +51,9 @@ export interface WebProviderPreset {
   /** ⭐ ②: optional URL to exchange refresh_token for access_token (GLM only) */
   refreshUrl?: string;
 
-  /** ⭐ ③+④: per-preset chat API descriptor (optional in T2; T3 populates) */
-  chatApi?: WebProviderChatApi;
+  /** ⭐ ⑧: per-preset DOM strategy. Replaces the old chatApi (HTTP replay)
+   *  approach which cannot work for any of the 3 built-in providers (T1). */
+  domStrategy: WebProviderDomStrategy;
 }
 
 export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
@@ -80,27 +66,15 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     defaultSupportsToolCalls: true,
     defaultSupportsReasoning: false,
     cookieDomain: 'chatglm.cn',
-    // Unverified guesses. User can override via A2 if wrong.
     sessionIndicators: ['chatglm_refresh_token', 'chatglm_token'],
     useLocalStorageFallback: false,
-    // GLM requires token exchange (chromeclaw confirms).
     refreshUrl: 'https://chatglm.cn/api/v1/auth/refresh',
-    // ⭐ ③+④ T3 (2026-06-04 web-search update): all 3 providers use
-    // OpenAI-compatible wire format (confirmed via published API docs).
-    // The PUBLIC API is open.bigmodel.cn/api/paas/v4/chat/completions;
-    // the WEB SESSION endpoint may differ (different host, cookie auth
-    // instead of Bearer). T1 (user DevTools research) confirms/corrects
-    // the host. Format (delta path, SSE, end signal) is correct as-is.
-    chatApi: {
-      endpoint: 'https://chatglm.cn/api/paas/v4/chat/completions',
-      method: 'POST',
-      streamFormat: 'sse',
-      deltaPath: 'choices.0.delta.content',
-      stopReasonPath: 'choices.0.finish_reason',
-      bodyTemplate: '{"model":"glm-4.6","messages":{{messages}},"stream":true}',
-      endSignal: 'data: [DONE]',
-      supportsImages: false,
-    },
+    // ⭐ ⑧: DOM strategy. Verified 2026-06-04 via T1 DevTools research.
+    //   - chat input: <textarea data-testid="chat-input">
+    //   - assistant message: .message-content.assistant-message-content
+    // GLM's HTTP API requires HMAC X-Sign (reverse-engineer JS) + 9
+    // per-request headers from localStorage. DOM injection bypasses all of that.
+    domStrategy: DOM_STRATEGIES.glm,
   },
   {
     id: 'kimi',
@@ -111,25 +85,14 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     defaultSupportsToolCalls: true,
     defaultSupportsReasoning: false,
     cookieDomain: 'kimi.moonshot.cn',
-    // Unverified; kimi uses localStorage per chromeclaw
     sessionIndicators: ['kimi-auth'],
     useLocalStorageFallback: true,
-    // No refresh exchange for Kimi
-    // ⭐ T3 (2026-06-04 web-search update): PUBLIC API is
-    // api.moonshot.ai/v1/chat/completions (OpenAI-compatible).
-    // The WEB SESSION endpoint is on a different host (likely
-    // kimi.moonshot.cn) and uses cookie auth instead of Bearer.
-    // T1 (user DevTools) confirms the exact web session host.
-    chatApi: {
-      endpoint: 'https://kimi.moonshot.cn/v1/chat/completions',
-      method: 'POST',
-      streamFormat: 'sse',
-      deltaPath: 'choices.0.delta.content',
-      stopReasonPath: 'choices.0.finish_reason',
-      bodyTemplate: '{"model":"kimi-k2-0711-preview","messages":{{messages}},"stream":true}',
-      endSignal: 'data: [DONE]',
-      supportsImages: false,
-    },
+    // ⭐ ⑧: DOM strategy. Verified 2026-06-04.
+    //   - chat input: <div class="chat-input-editor" contenteditable="true"> (Lexical editor)
+    //   - send: Enter key
+    //   - assistant message: last .markdown-body in chat content
+    // Kimi's HTTP API is gRPC-web binary protocol. Not feasible for relay.
+    domStrategy: DOM_STRATEGIES.kimi,
   },
   {
     id: 'deepseek',
@@ -140,24 +103,15 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     defaultSupportsToolCalls: true,
     defaultSupportsReasoning: true,
     cookieDomain: 'chat.deepseek.com',
-    // Django-style sessionid guess; user can override via A2
     sessionIndicators: ['sessionid'],
     useLocalStorageFallback: false,
-    // ⭐ T3 (2026-06-04 web-search update): DeepSeek's PUBLIC API is
-    // api.deepseek.com/chat/completions (OpenAI-compatible, supports
-    // thinking mode + tools). The WEB SESSION likely uses the SAME
-    // endpoint shape (with cookie auth) but on chat.deepseek.com.
-    // T1 (user DevTools) confirms the exact host.
-    chatApi: {
-      endpoint: 'https://chat.deepseek.com/chat/completions',
-      method: 'POST',
-      streamFormat: 'sse',
-      deltaPath: 'choices.0.delta.content',
-      stopReasonPath: 'choices.0.finish_reason',
-      bodyTemplate: '{"model":"deepseek-chat","messages":{{messages}},"stream":true}',
-      endSignal: 'data: [DONE]',
-      supportsImages: false,
-    },
+    // ⭐ ⑧: DOM strategy. Verified 2026-06-04.
+    //   - chat input: <textarea> (placeholder: "给 DeepSeek 发送消息")
+    //   - send: Enter key
+    //   - assistant message: last .ds-markdown
+    // DeepSeek's HTTP API requires PoW challenge (WebAssembly solver) + Bearer
+    // from localStorage. DOM injection bypasses both.
+    domStrategy: DOM_STRATEGIES.deepseek,
   },
 ] as const;
 

@@ -62,9 +62,11 @@ export function resolveWebModel(
     name: `${preset.displayNameKey} ${modelId}`,
     api: WEB_SESSION_API,
     provider: WEB_SESSION_API,  // Provider = KnownProvider | string; any string is allowed
-    baseUrl: preset.chatApi?.endpoint ?? 'about:blank',
+    // ⑧: baseUrl is the provider's login page (informational only; actual
+    // chat goes through the DOM in the tab, not via HTTP to this URL).
+    baseUrl: preset.loginUrl,
     reasoning: preset.defaultSupportsReasoning,
-    input: ['text'],  // MVP: no images (supportsImages: false in WebProviderChatApi)
+    input: ['text'],  // MVP: no images (text-only for web session)
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },  // free (user's own session)
     contextWindow: DEFAULT_CONTEXT_WINDOW,
     maxTokens: DEFAULT_MAX_TOKENS,

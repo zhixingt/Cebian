@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { WebProviderCard } from '@/components/settings/provider/WebProviderCard';
 import type { WebProvider } from '@/lib/types';
 import type { WebProviderPreset } from '@/lib/ai-config/web-provider-presets';
+import { GLM_DOM_STRATEGY } from '@/lib/ai-config/web-provider-dom-strategy';
 
 const fakeProvider: WebProvider = {
   presetId: 'glm',
@@ -31,6 +32,7 @@ const fakePreset: WebProviderPreset = {
   sessionIndicators: ['chatglm_refresh_token', 'chatglm_token'],
   useLocalStorageFallback: false,
   refreshUrl: 'https://chatglm.cn/api/v1/auth/refresh',
+  domStrategy: GLM_DOM_STRATEGY,  // ⑧: required field
 };
 
 describe('WebProviderCard', () => {

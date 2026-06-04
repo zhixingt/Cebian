@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { WEB_PROVIDER_PRESETS, resolveEffectiveConfig } from '@/lib/ai-config/web-provider-presets';
-import type { WebProviderChatApi } from '@/lib/ai-config/web-provider-presets';
+import type { WebProviderDomStrategy } from '@/lib/ai-config/web-provider-presets';
 import type { WebProvider } from '@/lib/types';
 
 describe('WEB_PROVIDER_PRESETS', () => {
@@ -41,60 +41,44 @@ describe('WEB_PROVIDER_PRESETS', () => {
     expect(ds.useLocalStorageFallback).toBe(false);
   });
 
-  it('T2: WebProviderChatApi interface has the 9 required fields (TDD: compile-time check)', () => {
+  it('T2: WebProviderDomStrategy interface has input + reader (TDD: compile-time check)', () => {
     // Compile-time: if interface is missing or has wrong shape, this line fails TS.
-    const sample: WebProviderChatApi = {
-      endpoint: 'https://example.com/api/chat',
-      method: 'POST',
-      streamFormat: 'sse',
-      deltaPath: 'choices.0.delta.content',
-      stopReasonPath: 'choices.0.finish_reason',
-      bodyTemplate: '{}',
-      extraHeaders: { 'X-Test': '1' },
-      endSignal: 'data: [DONE]',
-      supportsImages: false,
+    const sample: WebProviderDomStrategy = {
+      input: {
+        selector: 'textarea',
+        setMethod: 'textarea-setter',
+        sendMethod: 'enter',
+      },
+      reader: {
+        assistantMessageSelector: '.message',
+        pollIntervalMs: 100,
+        stableThresholdMs: 800,
+      },
     };
-    expect(sample.endpoint).toBeTruthy();
-    expect(sample.method).toBe('POST');
-    expect(sample.streamFormat).toBe('sse');
-    expect(sample.endSignal).toBe('data: [DONE]');
-    expect(sample.supportsImages).toBe(false);
+    expect(sample.input.selector).toBeTruthy();
+    expect(sample.reader.assistantMessageSelector).toBeTruthy();
   });
 
-  it('T2: presets have optional chatApi? field (undefined until T3 populates)', () => {
+  it('T2: presets have domStrategy field (replaces old chatApi from ③+④)', () => {
     for (const p of WEB_PROVIDER_PRESETS) {
-      // chatApi? is optional; T3 will populate, T2 only adds the type.
-      // After T2 lands, accessing .chatApi should not be a TS error.
-      const api: WebProviderChatApi | undefined = p.chatApi;
-      // T3: all 3 should now be populated (was undefined pre-T3).
-      expect(api).toBeDefined();
+      const dom: WebProviderDomStrategy = p.domStrategy;
+      expect(dom, `${p.id} should have domStrategy defined`).toBeDefined();
     }
   });
 
-  it('T3: all 3 presets have chatApi with required fields populated (placeholder values; T1 will refine)', () => {
+  it('T2: each preset domStrategy has input + reader', () => {
     for (const p of WEB_PROVIDER_PRESETS) {
-      const api = p.chatApi;
-      expect(api, `${p.id} should have chatApi defined`).toBeDefined();
-      // Required fields
-      expect(api!.endpoint).toMatch(/^https:\/\/[a-z0-9.-]+/);
-      expect(['POST', 'GET']).toContain(api!.method);
-      expect(['sse', 'jsonl']).toContain(api!.streamFormat);
-      expect(api!.deltaPath.length).toBeGreaterThan(0);
-      expect(api!.bodyTemplate.length).toBeGreaterThan(0);
-      expect(api!.endSignal.length).toBeGreaterThan(0);
-      expect(api!.supportsImages).toBe(false);
+      const dom = p.domStrategy;
+      expect(dom.input.selector.length, `${p.id} input selector`).toBeGreaterThan(0);
+      expect(['textarea-setter', 'contenteditable-setter', 'execCommand']).toContain(dom.input.setMethod);
+      expect(['enter', 'ctrl-enter', 'click-send-button']).toContain(dom.input.sendMethod);
+      expect(dom.reader.assistantMessageSelector.length, `${p.id} reader selector`).toBeGreaterThan(0);
     }
   });
 
-  it('T3: 3 preset endpoints are unique (no accidental copy-paste)', () => {
-    const endpoints = WEB_PROVIDER_PRESETS.map(p => p.chatApi!.endpoint);
-    expect(new Set(endpoints).size).toBe(3);
-  });
-
-  it('T3: bodyTemplate includes {{messages}} placeholder (T8 injectMessages will substitute)', () => {
-    for (const p of WEB_PROVIDER_PRESETS) {
-      expect(p.chatApi!.bodyTemplate).toContain('{{messages}}');
-    }
+  it('T2: 3 preset input selectors are unique (no accidental copy-paste)', () => {
+    const selectors = WEB_PROVIDER_PRESETS.map(p => p.domStrategy.input.selector);
+    expect(new Set(selectors).size).toBe(3);
   });
 });
 

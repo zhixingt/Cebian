@@ -74,7 +74,7 @@ describe('T14 #7: Logout flow → next chat shows "please log in" error (no wast
       name: `${preset.id} ${preset.defaultModelId}`,
       api: WEB_SESSION_API,
       provider: WEB_SESSION_API,
-      baseUrl: preset.chatApi?.endpoint ?? 'about:blank',
+      baseUrl: preset.loginUrl,
       reasoning: preset.defaultSupportsReasoning,
       input: ['text'],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
