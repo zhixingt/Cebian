@@ -28,6 +28,7 @@ import {
 import { recordingToAttachment } from '@/lib/recorder/to-attachment';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
 import { useRecorder } from '@/hooks/useRecorder';
+import { useWebProviders } from '@/hooks/useWebProviders';
 import { useMobileEmulation } from '@/hooks/useMobileEmulation';
 import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
 import { t } from '@/lib/i18n';
@@ -75,8 +76,10 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
 
   const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
   const [currentThinkingLevel, setCurrentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
-  const [providers] = useStorageItem(providerCredentials, {});
-  const [customProviderList] = useStorageItem(customProvidersStorage, []);
+const [providers] = useStorageItem(providerCredentials, {});
+const [customProviderList] = useStorageItem(customProvidersStorage, []);
+// ③+④: feed Web (Browser Session) providers into the model selector
+const { providers: webProvidersList } = useWebProviders();
 
   const isReasoningModel = useMemo(() => {
     if (!currentModel) return false;
@@ -867,6 +870,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
               activeModel={currentModel}
               configuredProviders={providers}
               customProviders={customProviderList}
+              webProviders={webProvidersList}
               onSelect={handleModelSelect}
               onOpenSettings={onOpenSettings ?? (() => {})}
             />

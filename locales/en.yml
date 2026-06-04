@@ -561,6 +561,9 @@ webProviders:
     loggedIn: "Logged in"
     loggedOut: "Not logged in"
     neverChecked: "Never checked"
+  # ③+④ T12: shown in the chat model selector dropdown
+  selector:
+    groupLabel: "Web (Logged in)"
   messages:
     loadFailed: "Failed to load web providers. Please reopen the settings page."
     recheckFailed: "Login check failed. Please make sure you're signed in to the website."

@@ -550,6 +550,9 @@ webProviders:
     loggedIn: "已登入"
     loggedOut: "未登入"
     neverChecked: "從未檢查"
+  # ③+④ T12: 聊天模型選擇器下拉選單中顯示
+  selector:
+    groupLabel: "網頁（已登入）"
   messages:
     loadFailed: "載入網頁版供應商失敗，請重新開啟設定頁。"
     recheckFailed: "登入檢查失敗，請確認你已在該網站登入。"

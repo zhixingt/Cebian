@@ -551,6 +551,9 @@ webProviders:
     loggedIn: "已登录"
     loggedOut: "未登录"
     neverChecked: "从未检查"
+  # ③+④ T12: 聊天模型选择器下拉菜单中显示
+  selector:
+    groupLabel: "网页（已登录）"
   messages:
     loadFailed: "加载网页版提供商失败，请重新打开设置页。"
     recheckFailed: "登录检查失败，请确认你已在该网站登录。"
