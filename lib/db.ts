@@ -1,6 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { WebProvider } from './types';
+import type { WebProviderConversationState } from './ai-config/web-provider-conversations';
 
 // ─── Schema ───
 
@@ -17,11 +18,24 @@ export interface SessionRecord {
   messages: AgentMessage[];
 }
 
+/**
+ * Dexie row shape for the webProviderConversations table. The primary key
+ * is a synthetic `id` of the form `${providerId}::${modelId}`; the data
+ * fields are the full WebProviderConversationState minus the synthetic id.
+ */
+export interface WebProviderConversationRecord
+  extends Omit<WebProviderConversationState, 'providerId' | 'modelId'> {
+  id: string;
+  providerId: string;
+  modelId: string;
+}
+
 // ─── Database ───
 
 const db = new Dexie('cebian') as Dexie & {
   sessions: EntityTable<SessionRecord, 'id'>;
   webProviders: EntityTable<WebProvider, 'presetId'>;
+  webProviderConversations: EntityTable<WebProviderConversationRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -35,6 +49,18 @@ db.version(1).stores({
 db.version(2).stores({
   sessions: 'id, updatedAt',
   webProviders: 'presetId, enabled, updatedAt',
+});
+
+// version(3) is strictly additive — introduces webProviderConversations
+// for the ⑦ Conversation Caching foundation. Stores server-side
+// conversation/session/parent_message ids per (provider, model). The
+// relay integration that populates this table is provider-specific and
+// gated on T1 DevTools research; this migration just creates the table
+// so the storage layer is ready when the hook lands.
+db.version(3).stores({
+  sessions: 'id, updatedAt',
+  webProviders: 'presetId, enabled, updatedAt',
+  webProviderConversations: 'id, providerId, modelId, lastUpdated',
 });
 
 /**

@@ -1,8 +1,8 @@
 # Changelog — Web (Browser Session) Provider
 
 Branch: `feat/web-browser-session-provider`
-Total commits: 29 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥)
-Tests: 187/187 passing (was 64 at ② start; +123 new)
+Total commits: 30 (② + B + ③+④ + ⑤ + T1-partial + T14#7-#8 + CHANGELOG + ⑥ + ⑦)
+Tests: 193/193 passing (was 64 at ② start; +129 new)
 Build: 9.6 MB clean • i18n: en/zh_CN/zh_TW parity ✓
 
 ---
@@ -147,6 +147,43 @@ emitting tool_calls, the agent now has the events to consume.
 
 ---
 
+## ⑦ — Conversation caching (storage foundation)
+
+**1 commit.** Adds the durable storage layer for per-(provider, model)
+server-side conversation ids. The actual relay integration (extracting
+and echoing back `conversation_id`/`parent_message_id` from the
+provider's response/request) remains blocked on T1 because we don't
+yet know the per-provider protocol. But the storage is now ready.
+
+| Component | File | Behavior |
+|---|---|---|
+| Interface | `lib/ai-config/web-provider-conversations.ts` | `WebProviderConversationState { providerId, modelId, conversationId?, parentMessageId?, lastUpdated }` |
+| Storage | same file | `getConversation(providerId, modelId)`, `setConversation(state)` (upsert), `clearConversation(providerId, modelId)` (idempotent) |
+| Schema | `lib/db.ts` v3 | New `webProviderConversations` table; key = `${providerId}::${modelId}`; indexed by `providerId`, `modelId`, `lastUpdated` for future LRU eviction |
+| Migration | `db.version(3).stores(...)` | Strictly additive — existing `sessions` and `webProviders` data preserved; new table starts empty |
+
+**6 new tests** in `__tests__/lib/ai-config/web-provider-conversations.test.ts`:
+1. `getConversation` returns null for missing key
+2. `setConversation` then `getConversation` round-trips
+3. `clearConversation` removes state
+4. Multiple providers+models are isolated (clearing one doesn't affect others)
+5. `setConversation` upserts (overwrites previous state for same key)
+6. Handles state with only required fields (no conversationId/parentMessageId)
+
+**Why this is bounded YAGNI-safe**: the storage is testable in
+isolation, uses Dexie's standard patterns, and has zero behavioral
+impact on current providers (no relay code reads from it yet). When T1
+unblocks the relay integration, the hook point is a one-line addition
+per provider.
+
+**Why now and not earlier**: the design originally bundled ⑦'s
+storage with its protocol-specific relay integration. Splitting them
+was the natural way to make progress without T1 — the storage is
+provider-agnostic infrastructure, the relay hook is provider-specific
+behavior. Same pattern as ⑥ (defensive feature with bounded cost).
+
+---
+
 ## T14 — E2E verification status (9 items)
 
 | # | Item | Status | Coverage |
@@ -172,7 +209,7 @@ emitting tool_calls, the agent now has the events to consume.
 |---|---|---|
 | **T1** full | Web session endpoints differ from public APIs; need actual cURL to confirm body shape, headers, SSE format | Run `chrome.exe --remote-debugging-port=9333` + `agent-browser`, send chats at kimi.com/chatglm.cn/chat.deepseek.com, DevTools → Copy as cURL → paste back. I do the rest. |
 | **T14** #1, #2, #8 | Real chat with real providers | After T1, the 3 remaining manual checks are: (1) chat with each provider works, (2) TTFT ≤3s, (8) re-login flow. T14 #3-#7, #9 are covered by 23 automated tests. |
-| **⑦** Conversation caching | Provider-specific protocols | After T1, the request/response for conversation memory is known. Implementing requires per-provider session-id field name + storage. |
+| **⑦** Relay hook | Provider-specific protocol unknown | After T1, I add the per-provider relay code that calls `getConversation` before the request and `setConversation` after each SSE event. The storage layer is already in place (this commit). |
 
 ---
 
@@ -181,7 +218,7 @@ emitting tool_calls, the agent now has the events to consume.
 ```bash
 cd D:\Project\CebianX\cebian-web-provider
 pnpm install        # 1 minute
-pnpm test           # 187/187 pass in ~30s
+pnpm test           # 193/193 pass in ~30s
 pnpm run check      # WXT types + TS + i18n lint
 pnpm run build      # 9.6 MB output
 ```
@@ -196,7 +233,8 @@ pnpm run build      # 9.6 MB output
 ## Branch state
 
 ```
-$ git log --oneline -29
+$ git log --oneline -30
+[⑦ pending] feat(db): add webProviderConversations table + storage helpers (⑦ foundation)
 9dd8ae3 feat(relay): extract tool_calls from SSE stream (⑥ defensive)
 80a92cb test(integration): add logout flow + parseWebModelId round-trip tests (T14 #7-#8)
 afad161 docs: add comprehensive CHANGELOG for ②+B+③+④+⑤+T1-partial+T14#7-#8 effort
