@@ -633,12 +633,14 @@ field — see H-remaining below.
 
 ### H-remaining — Kimi server validation (deferred — needs DevTools)
 The adapter is correct; the server rejects with `invalid_argument`.
-**Code-based attempts tried** (all in same commit, all kept as
+**Code-based attempts tried** (all in this + previous commits, all kept as
 robustness improvements even though they didn't fix the error):
 1. `chat_id` always included (use existingChatId if present, else
    mint a UUID) — E2E: still `invalid_argument`
 2. `message_id` now a UUID (was empty string per chromeclaw) — E2E: still `invalid_argument`
 3. `options: {}` (empty, was `{thinking: false}`) — E2E: still `invalid_argument`
+4. `device_id` added (stable UUID from localStorage, mirrors GLM
+   adapter's `getOrCreateDeviceId` pattern) — E2E: still `invalid_argument`
 
 These changes are still kept because they make the adapter more
 robust and match a fresh UI tab's behavior; the server-side
@@ -649,7 +651,7 @@ chromeclaw didn't document, or a scenario name drift).
 DevTools (Network tab → click an existing message → "Replay as cURL")
 and compare with what the adapter sends. Remaining likely candidates
 not yet tried:
-- `device_id` / `trace_id` / `parent_chat_id` (additional required fields)
+- `trace_id` / `parent_chat_id` (additional required fields)
 - `scenario` name may have drifted from `SCENARIO_K2`
 - Auth header format may have changed (e.g., header name, scheme, or
   signature — the JWT in `kimi-auth` is HS512; some Kimi endpoints

@@ -89,6 +89,21 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
   // The "thinking" key may have been removed/renamed in a recent
   // Kimi server update — sending an unknown key triggers the same
   // `invalid_argument` validation rejection.
+  // ⑪.7: include a stable `device_id` (UUID, persisted in localStorage
+  // per origin). Many web APIs require a device fingerprint for
+  // rate-limiting / abuse detection; omitting it commonly triggers
+  // `invalid_argument`. Mirrors the pattern from the GLM adapter's
+  // `getOrCreateDeviceId`.
+  const KIMI_DEVICE_ID_KEY = '__cebKimiDeviceId__';
+  let deviceId = '';
+  try {
+    const cached = localStorage.getItem(KIMI_DEVICE_ID_KEY);
+    if (cached && /^[0-9a-f-]{36}$/i.test(cached)) deviceId = cached;
+  } catch { /* ignore */ }
+  if (!deviceId) {
+    deviceId = crypto.randomUUID();
+    try { localStorage.setItem(KIMI_DEVICE_ID_KEY, deviceId); } catch { /* ignore */ }
+  }
   const kimiBody = JSON.stringify({
     scenario,
     message: {
@@ -98,6 +113,7 @@ export const kimiMainWorldFetch = async (request: ContentFetchRequest): Promise<
     },
     options: {},
     chat_id: chatId,
+    device_id: deviceId,
   });
 
   // The shared runtime will:
