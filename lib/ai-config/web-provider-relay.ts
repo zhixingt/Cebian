@@ -205,6 +205,7 @@ export const WEB_LLM_RELAY_READY = 'WEB_LLM_RELAY_READY' as const;
 export const WEB_LLM_CHUNK = 'WEB_LLM_CHUNK' as const;
 export const WEB_LLM_DONE = 'WEB_LLM_DONE' as const;
 export const WEB_LLM_ERROR = 'WEB_LLM_ERROR' as const;
+export const WEB_LLM_NEEDS_RELOGIN = 'WEB_LLM_NEEDS_RELOGIN' as const;
 
 /**
  * Discriminated union of all messages the injected content scripts can send
@@ -214,7 +215,8 @@ export type WebProviderRelayMessage =
   | { type: typeof WEB_LLM_RELAY_READY; providerId: WebProvider['presetId'] }
   | { type: typeof WEB_LLM_CHUNK; providerId: WebProvider['presetId']; text: string; reasoning?: string }
   | { type: typeof WEB_LLM_DONE; providerId: WebProvider['presetId']; stopReason?: string }
-  | { type: typeof WEB_LLM_ERROR; providerId: WebProvider['presetId']; error: string };
+  | { type: typeof WEB_LLM_ERROR; providerId: WebProvider['presetId']; error: string }
+  | { type: typeof WEB_LLM_NEEDS_RELOGIN; providerId: WebProvider['presetId']; status: 401 | 403; message: string };
 
 /**
  * Chat request payload passed from the SW to the MAIN-world fetcher.
@@ -311,10 +313,45 @@ function installIsolatedBridge(providerId: string): void {
  * self-contained (no closure references to outer scope).
  *
  * T8 implementation: real fetch + SSE parsing + delta extraction.
+ * ⑤.1 enhancement: 401/403 → WEB_LLM_NEEDS_RELOGIN (not generic error).
  */
 async function runMainFetcher(request: WebProviderChatRequest): Promise<void> {
+  return executeChatRequest(
+    // Bind fetch to the page context (window.fetch), not the SW context.
+    // The MAIN-world script runs in the page's realm; fetch there picks up
+    // the page's cookies automatically.
+    fetch.bind(window),
+    request,
+    (payload) => {
+      window.postMessage({
+        source: 'ceb-web-provider-main',
+        providerId: request.providerId,
+        payload,
+      }, '*');
+    },
+  );
+}
+
+/**
+ * Execute a chat request and emit relay messages. Pure-ish:
+ *   - Takes a fetch function (testable with mocks; prod uses page fetch)
+ *   - Takes a postMessage-like callback (testable spy; prod uses window.postMessage)
+ *   - Returns when the stream is done or an error/relogin is emitted
+ *
+ * Error mapping (⑤.1):
+ *   - 401 or 403 → WEB_LLM_NEEDS_RELOGIN (user must re-login via Settings)
+ *   - Other non-2xx → WEB_LLM_ERROR with HTTP status
+ *   - Network failure → WEB_LLM_ERROR with original message
+ *   - 200 with null body → WEB_LLM_ERROR 'Response has no body'
+ *   - 200 with valid body → processChatStream (CHUNK / DONE / ERROR as parsed)
+ */
+export async function executeChatRequest(
+  fetchFn: typeof fetch,
+  request: WebProviderChatRequest,
+  postMessage: (msg: WebProviderRelayMessage) => void,
+): Promise<void> {
   try {
-    const response = await fetch(request.endpoint, {
+    const response = await fetchFn(request.endpoint, {
       method: request.method ?? 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -324,30 +361,44 @@ async function runMainFetcher(request: WebProviderChatRequest): Promise<void> {
       credentials: 'include',  // first-party cookies
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} ${response.statusText}`);
-    }
-    if (!response.body) {
-      throw new Error('Response has no body');
+    // ⑤.1: 401/403 → needs-relogin (more specific than generic error)
+    if (response.status === 401 || response.status === 403) {
+      const message = `Provider rejected the session (HTTP ${response.status}). ` +
+        `Please re-login to ${request.providerId} via Settings → Web Providers.`;
+      postMessage({
+        type: WEB_LLM_NEEDS_RELOGIN,
+        providerId: request.providerId,
+        status: response.status as 401 | 403,
+        message,
+      });
+      return;
     }
 
-    await processChatStream(response.body, request, (payload) => {
-      window.postMessage({
-        source: 'ceb-web-provider-main',
-        providerId: request.providerId,
-        payload,
-      }, '*');
-    });
-  } catch (err) {
-    window.postMessage({
-      source: 'ceb-web-provider-main',
-      providerId: request.providerId,
-      payload: {
+    if (!response.ok) {
+      postMessage({
         type: WEB_LLM_ERROR,
         providerId: request.providerId,
-        error: err instanceof Error ? err.message : String(err),
-      },
-    }, '*');
+        error: `HTTP ${response.status} ${response.statusText}`,
+      });
+      return;
+    }
+    if (!response.body) {
+      postMessage({
+        type: WEB_LLM_ERROR,
+        providerId: request.providerId,
+        error: 'Response has no body',
+      });
+      return;
+    }
+
+    await processChatStream(response.body, request, postMessage);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    postMessage({
+      type: WEB_LLM_ERROR,
+      providerId: request.providerId,
+      error: message,
+    });
   }
 }
 

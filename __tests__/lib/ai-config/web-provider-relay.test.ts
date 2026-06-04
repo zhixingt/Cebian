@@ -10,12 +10,14 @@ import {
   WEB_LLM_CHUNK,
   WEB_LLM_DONE,
   WEB_LLM_ERROR,
-  type WebProviderRelayMessage,
   parseSseFrames,
   parseDelta,
   type SseEvent,
   processChatStream,
   WEB_SESSION_TIMEOUT_MS,
+  executeChatRequest,
+  WEB_LLM_NEEDS_RELOGIN,
+  type WebProviderRelayMessage,
 } from '@/lib/ai-config/web-provider-relay';
 import type { WebProvider } from '@/lib/types';
 
@@ -458,6 +460,118 @@ describe('processChatStream abort + timeout (T9: ③+④ cancellation)', () => {
       { type: 'WEB_LLM_CHUNK', providerId: 'glm', text: 'hello' },
       { type: 'WEB_LLM_DONE', providerId: 'glm' },
     ]);
+  });
+});
+
+describe('executeChatRequest (⑤.1: 401 detection + error mapping)', () => {
+  function makeRequest(overrides: Partial<import('@/lib/ai-config/web-provider-relay').WebProviderChatRequest> = {}): import('@/lib/ai-config/web-provider-relay').WebProviderChatRequest {
+    return {
+      providerId: 'glm',
+      endpoint: 'https://chatglm.cn/api/chat',
+      method: 'POST',
+      bodyTemplate: '{}',
+      streamFormat: 'sse',
+      endSignal: 'data: [DONE]',
+      deltaPath: 'choices.0.delta.content',
+      ...overrides,
+    };
+  }
+
+  function makeResponse(status: number, body?: ReadableStream<Uint8Array>): Response {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      statusText: status === 401 ? 'Unauthorized' : 'Error',
+      body: body ?? null,
+    } as unknown as Response;
+  }
+
+  it('emits WEB_LLM_NEEDS_RELOGIN on 401 response (not WEB_LLM_ERROR)', async () => {
+    const fetchFn = vi.fn(() => Promise.resolve(makeResponse(401)));
+    const emitted: WebProviderRelayMessage[] = [];
+    await executeChatRequest(
+      fetchFn as any,
+      makeRequest(),
+      (m: WebProviderRelayMessage) => emitted.push(m),
+    );
+    const reLogin = emitted.find(m => m.type === WEB_LLM_NEEDS_RELOGIN) as Extract<WebProviderRelayMessage, { type: typeof WEB_LLM_NEEDS_RELOGIN }> | undefined;
+    expect(reLogin).toBeDefined();
+    expect(reLogin!.providerId).toBe('glm');
+    expect(reLogin!.status).toBe(401);
+    expect(reLogin!.message).toMatch(/re-login/i);
+    // Must NOT also emit a generic error
+    expect(emitted.find(m => m.type === 'WEB_LLM_ERROR')).toBeUndefined();
+  });
+
+  it('emits WEB_LLM_NEEDS_RELOGIN for both 401 and 403 (expired token / forbidden)', async () => {
+    for (const status of [401, 403]) {
+      const fetchFn = vi.fn(() => Promise.resolve(makeResponse(status)));
+      const emitted: WebProviderRelayMessage[] = [];
+      await executeChatRequest(fetchFn as any, makeRequest(), (m: WebProviderRelayMessage) => emitted.push(m));
+      expect(emitted.find(m => m.type === WEB_LLM_NEEDS_RELOGIN)).toBeDefined();
+    }
+  });
+
+  it('emits WEB_LLM_ERROR on other 4xx/5xx (not needs-relogin)', async () => {
+    for (const status of [400, 404, 429, 500, 502, 503]) {
+      const fetchFn = vi.fn(() => Promise.resolve(makeResponse(status)));
+      const emitted: WebProviderRelayMessage[] = [];
+      await executeChatRequest(fetchFn as any, makeRequest(), (m: WebProviderRelayMessage) => emitted.push(m));
+      const err = emitted.find(m => m.type === 'WEB_LLM_ERROR') as Extract<WebProviderRelayMessage, { type: typeof WEB_LLM_ERROR }> | undefined;
+      expect(err, `status ${status} should emit error`).toBeDefined();
+      expect(err!.error).toMatch(new RegExp(`HTTP ${status}`));
+      expect(emitted.find(m => m.type === WEB_LLM_NEEDS_RELOGIN)).toBeUndefined();
+    }
+  });
+
+  it('emits WEB_LLM_ERROR on network failure (fetch throws)', async () => {
+    const fetchFn = vi.fn(() => Promise.reject(new Error('NetworkError: offline')));
+    const emitted: WebProviderRelayMessage[] = [];
+    await executeChatRequest(fetchFn as any, makeRequest(), (m: WebProviderRelayMessage) => emitted.push(m));
+    const err = emitted.find(m => m.type === 'WEB_LLM_ERROR') as Extract<WebProviderRelayMessage, { type: typeof WEB_LLM_ERROR }> | undefined;
+    expect(err).toBeDefined();
+    expect(err!.error).toMatch(/NetworkError/);
+  });
+
+  it('emits WEB_LLM_ERROR when response has no body (200 but body=null)', async () => {
+    const fetchFn = vi.fn(() => Promise.resolve(makeResponse(200, undefined as any)));
+    const emitted: WebProviderRelayMessage[] = [];
+    await executeChatRequest(fetchFn as any, makeRequest(), (m: WebProviderRelayMessage) => emitted.push(m));
+    const err = emitted.find(m => m.type === 'WEB_LLM_ERROR') as Extract<WebProviderRelayMessage, { type: typeof WEB_LLM_ERROR }> | undefined;
+    expect(err).toBeDefined();
+    expect(err!.error).toMatch(/no body/);
+  });
+
+  it('happy path: 200 with SSE stream → chunks + done via processChatStream', async () => {
+    const stream = makeStream([
+      'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n',
+      'data: [DONE]\n\n',
+    ]);
+    const fetchFn = vi.fn(() => Promise.resolve(makeResponse(200, stream)));
+    const emitted: WebProviderRelayMessage[] = [];
+    await executeChatRequest(fetchFn as any, makeRequest(), (m: WebProviderRelayMessage) => emitted.push(m));
+    expect(emitted.map(m => m.type)).toEqual([
+      'WEB_LLM_CHUNK',
+      'WEB_LLM_DONE',
+    ]);
+  });
+
+  it('passes request body, method, and headers to fetch()', async () => {
+    const fetchFn = vi.fn(() => Promise.resolve(makeResponse(500)));
+    await executeChatRequest(
+      fetchFn as any,
+      makeRequest({ endpoint: 'https://example.com/x', bodyTemplate: '{"k":"v"}' }),
+      () => {},
+    );
+    expect(fetchFn).toHaveBeenCalledWith(
+      'https://example.com/x',
+      expect.objectContaining({
+        method: 'POST',
+        body: '{"k":"v"}',
+        credentials: 'include',
+        headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
+      }),
+    );
   });
 });
 });
