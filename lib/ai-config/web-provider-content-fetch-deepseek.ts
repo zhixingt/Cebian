@@ -107,6 +107,15 @@ export function filterDeepSeekStream(
 /** Re-export a stable type for consumers of the stream result. */
 export type deepSeekStreamResult = DeepSeekFilteredEvent;
 
+/**
+ * ⑬: Max wall-clock for the entire adapter call. If the user can reach
+ * DeepSeek's HTML but not the streaming endpoint (e.g. `hif-dliq.deepseek.com`
+ * DNS-blocked in their network), `fetch` may eventually fail or the
+ * reader can stall. We cap the call at this duration so the sidepanel
+ * spinner never spins forever; after 90s we surface a clear error.
+ */
+const ADAPTER_TIMEOUT_MS = 90_000;
+
 export const deepseekMainWorldFetch = async (request: ContentFetchRequest): Promise<void> => {
   const { requestId, init } = request;
   const origin = window.location.origin;
@@ -122,6 +131,62 @@ export const deepseekMainWorldFetch = async (request: ContentFetchRequest): Prom
       detail: { ...data, providerId: request.providerId },
     }));
   };
+
+  // ⑬: Adapter-level wall-clock timeout. Race the body against a
+  // timer so a hung fetch / stalled reader can't pin the sidepanel
+  // in a loading state. The body is wrapped in an inner async so
+  // EVERY exit path (early returns, exceptions, normal completion)
+  // clears the timer exactly once via finally. The outer Promise.race
+  // guarantees a timely resolution; whichever wins decides the
+  // error message.
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const work = (async () => {
+    await runDeepseekBody(request, requestId, init, origin, postToBridge);
+  })();
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `DeepSeek adapter timed out after ${Math.round(
+              ADAPTER_TIMEOUT_MS / 1000,
+            )}s. The streaming endpoint (likely hif-dliq.deepseek.com) may be unreachable from this network.`,
+          ),
+        ),
+      ADAPTER_TIMEOUT_MS,
+    );
+  });
+
+  try {
+    await Promise.race([work, timeout]);
+  } catch (err) {
+    postToBridge(
+      {
+        type: 'WEB_LLM_ERROR',
+        requestId,
+        error: err instanceof Error ? err.message : String(err),
+      },
+      origin,
+    );
+    postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
+  } finally {
+    if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+  }
+};
+
+/**
+ * Inner body of the DeepSeek adapter. Pulled out so the outer
+ * `deepseekMainWorldFetch` can race it against a timeout without
+ * littering every early-return with `clearTimeout`. Returns when
+ * the stream has been fully drained and DONE has been emitted.
+ */
+const runDeepseekBody = async (
+  request: ContentFetchRequest,
+  requestId: string,
+  init: RequestInit,
+  origin: string,
+  postToBridge: (data: Record<string, unknown>, origin?: string) => void,
+): Promise<void> => {
 
   // ── Helper: Solve DeepSeekHashV1 PoW challenge via embedded WASM ──
   // SHA3-based hash compiled to WASM (from chromeclaw reference impl).

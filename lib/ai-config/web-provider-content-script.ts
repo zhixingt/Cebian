@@ -346,15 +346,45 @@ export async function runDomRelayMainWorld(request: DomRelayRequest): Promise<vo
  * Stringified and injected; must be self-contained.
  */
 export function installIsolatedBridge(providerId: string, debug: boolean = false): void {
-  const w = window as unknown as { __cebWebProviderBridge?: { providerId: string } };
-  if (w.__cebWebProviderBridge?.providerId === providerId) return;
+  // ⑬ FIX: extension reload survival. When the SW is reloaded (user
+  // clicks "Reload" in chrome://extensions, or the extension is
+  // updated), the old content script's listener still has a live
+  // reference to the (now-defunct) old SW via chrome.runtime. A new
+  // injection of this function sees the existing `__cebWebProviderBridge`
+  // guard and exits early — but the OLD listener is the one that's
+  // actually attached to the document, holding the dead SW ref.
+  // Every event it tries to forward throws "Extension context
+  // invalidated", while the new content script's listener never gets
+  // a chance to run.
+  //
+  // Fix: store the listener function on the window so a fresh
+  // injection can removeEventListener on the old one before adding
+  // the new one. The providerId guard still prevents duplicate
+  // listeners within a single page (no extra cost on the happy
+  // path — same providerId, same listener ref).
+  const w = window as unknown as {
+    __cebWebProviderBridge?: {
+      providerId: string;
+      listener?: EventListener;
+    };
+  };
+  const existing = w.__cebWebProviderBridge;
+  if (existing?.providerId === providerId && existing.listener) {
+    // Same provider, same listener ref: nothing to do.
+    return;
+  }
+  if (existing?.listener) {
+    // Stale (different SW generation, different provider, or first
+    // call after reload): clean up before installing the new one.
+    document.removeEventListener('ceb-web-provider-message', existing.listener);
+  }
 
   // ⑫ FIX: cross-world messaging. window.postMessage doesn't cross the
   // MAIN↔ISOLATED world boundary (each world has its own `window`).
   // document.dispatchEvent(CustomEvent) IS shared because both worlds
   // share the same `document`. Adapters dispatch 'ceb-web-provider-message'
   // on document; the bridge listens here.
-  document.addEventListener('ceb-web-provider-message', ((event: Event) => {
+  const listener = ((event: Event) => {
     const data = (event as CustomEvent<Record<string, unknown>>).detail;
     if (!data || typeof data !== 'object') return;
     // ⑫ DIAG: log every event the bridge sees. We can't use the ⑨.4
@@ -386,9 +416,10 @@ export function installIsolatedBridge(providerId: string, debug: boolean = false
       // them even when diag is off so we don't lose this signal.
       console.warn('[WS-DIAG-BRIDGE] sendMessage failed:', err);
     });
-  }) as EventListener);
+  }) as EventListener;
 
-  w.__cebWebProviderBridge = { providerId };
+  document.addEventListener('ceb-web-provider-message', listener);
+  w.__cebWebProviderBridge = { providerId, listener };
   chrome.runtime.sendMessage({
     type: 'WEB_LLM_RELAY_READY',
     providerId,
