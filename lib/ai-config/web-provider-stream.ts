@@ -300,7 +300,13 @@ async function orchestrateStream(
     let accumulatedText = '';
     const textDone = { value: false };
     unregisterMsg = deps.onMessage((msg) => {
-      if (msg.providerId !== providerId) return;
+      // ⑫ DIAG: log every message the SW listener receives (regardless of
+      // providerId, so we can see messages being dropped or routed)
+      console.log(`[WS-DIAG-LISTENER] received`, msg);
+      if (msg.providerId !== providerId) {
+        console.log(`[WS-DIAG-LISTENER] DROPPING (providerId mismatch: got ${msg.providerId}, want ${providerId})`);
+        return;
+      }
       switch (msg.type) {
         case WEB_LLM_CHUNK: {
           // ⑧ (DOM path): msg.text is the FULL text (not delta) because the

@@ -352,9 +352,32 @@ export function installIsolatedBridge(providerId: string): void {
   window.addEventListener('message', (event: MessageEvent) => {
     const data = event.data;
     if (!data || typeof data !== 'object') return;
-    if (data.source !== 'ceb-web-provider-main') return;
-    if (data.providerId !== providerId) return;
-    chrome.runtime.sendMessage(data.payload).catch((err) => {
+    // ⑫ DIAG: log every postMessage the bridge sees
+    console.log('[WS-DIAG-BRIDGE] received postMessage', {
+      type: (data as Record<string, unknown>).type,
+      source: (data as Record<string, unknown>).source,
+      providerId: (data as Record<string, unknown>).providerId,
+      hasPayload: !!(data as Record<string, unknown>).payload,
+      keys: Object.keys(data as Record<string, unknown>).slice(0, 8),
+    });
+    // Accept BOTH message shapes:
+    //   1. Wrapped: { source: 'ceb-web-provider-main', providerId, payload: { type, ... } }
+    //   2. Direct:  { type: 'WEB_LLM_*', providerId, ... } (what GLM/DeepSeek adapters use)
+    // The original filter (`data.source !== 'ceb-web-provider-main'`) silently
+    // DROPPED every message from the GLM/DeepSeek adapters, which is why
+    // orchestrateStream logged "step 8 resolved" but no chunks ever
+    // arrived. Fix: accept direct messages too, filter by providerId +
+    // type-prefix, and forward the unwrapped payload.
+    const d = data as Record<string, unknown>;
+    const isWrapped = d.source === 'ceb-web-provider-main' && d.providerId === providerId;
+    const isDirect = typeof d.type === 'string' && d.type.startsWith('WEB_LLM_') && d.providerId === providerId;
+    if (!isWrapped && !isDirect) {
+      console.log('[WS-DIAG-BRIDGE] DROPPING (not wrapped + not direct for this provider)');
+      return;
+    }
+    const payload = isWrapped ? d.payload : d;
+    console.log('[WS-DIAG-BRIDGE] forwarding', (payload as Record<string, unknown>).type, 'to SW');
+    chrome.runtime.sendMessage(payload).catch((err) => {
       console.warn('[ceb-web-provider-bridge] sendMessage failed:', err);
     });
   });
