@@ -48,6 +48,7 @@ import {
 } from './web-provider-relay';
 import { getConversation, setConversation } from './web-provider-conversations';
 import { diag, diagError, diagWarn } from './web-provider-diag';
+import { serializeCrossProviderHistory } from './web-provider-cross-context';
 import { WEB_PROVIDER_PRESETS, type WebProviderPreset } from './web-provider-presets';
 // ⑪: Import per-provider content-fetch adapters so the bundler retains
 // their function bodies (chromeclaw-style HTTP-replay path). The export
@@ -554,6 +555,25 @@ export async function buildContentFetchRequest(
   const stored = await getConversation(preset.id, modelId);
   const chatId = stored?.conversationId ?? '';
   const parentMessageId = stored?.parentMessageId;
+
+  // ⑨.5: Cross-provider context preservation. When this provider
+  // has no stored session id (chatId is empty), the user is either
+  // starting fresh OR just switched from a different web provider
+  // mid-session. The latter case is the interesting one: the new
+  // provider has no idea what was said before, but the user expects
+  // the conversation to "follow them" across models. We serialize
+  // the current session's prior turns (excluding this turn) as a
+  // textual history block and prepend it to the prompt.
+  if (chatId === '' && context.messages.length > 1) {
+    const enriched = serializeCrossProviderHistory(context.messages, messageText);
+    if (enriched !== messageText) {
+      diag('WS-DIAG', 'injected cross-provider history', {
+        priorTurns: context.messages.length - 1,
+        prefixChars: enriched.length - messageText.length,
+      });
+      messageText = enriched;
+    }
+  }
 
   return {
     type: 'WEB_LLM_FETCH',
