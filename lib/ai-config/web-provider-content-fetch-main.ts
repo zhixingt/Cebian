@@ -50,6 +50,12 @@ export interface ContentFetchRequest {
    */
   providerId: string;
   /**
+   * ⑨.2: Model id within the provider (e.g. 'glm-4.6', 'deepseek-chat').
+   * Adapters echo this back in WEB_LLM_CONVERSATION_UPDATE events so
+   * the SW listener can key the persisted state by (providerId, modelId).
+   */
+  modelId: string;
+  /**
    * The fully-built `url` and `init` for the provider's main chat endpoint.
    * Providers fill this in from their own auth + body construction.
    * Optional — adapters that build the URL internally (Kimi/GLM/DeepSeek) ignore it.

@@ -39,12 +39,14 @@ import { resolveBundle as defaultResolveBundle } from './web-provider-bundle';
 import { getTabRegistry, injectDomRelay, getAuthHeadersForProvider } from './web-provider-relay';
 import {
   WEB_LLM_CHUNK,
+  WEB_LLM_CONVERSATION_UPDATE,
   WEB_LLM_DONE,
   WEB_LLM_ERROR,
   WEB_LLM_RELAY_READY,
   WEB_LLM_NEEDS_RELOGIN,
   type WebProviderRelayMessage,
 } from './web-provider-relay';
+import { getConversation, setConversation } from './web-provider-conversations';
 import { WEB_PROVIDER_PRESETS, type WebProviderPreset } from './web-provider-presets';
 // ⑪: Import per-provider content-fetch adapters so the bundler retains
 // their function bodies (chromeclaw-style HTTP-replay path). The export
@@ -382,6 +384,23 @@ async function orchestrateStream(
           stream.end();
           break;
         }
+        case WEB_LLM_CONVERSATION_UPDATE: {
+          // ⑨.2: persist the server-issued conversation/parent_message id
+          // so the next turn's buildContentFetchRequest can echo it back.
+          // Fire-and-forget; a failed Dexie write just means the next
+          // turn starts a new session (graceful degradation).
+          void setConversation({
+            providerId: msg.providerId,
+            modelId: msg.modelId,
+            ...(msg.conversationId !== undefined ? { conversationId: msg.conversationId } : {}),
+            ...(msg.parentMessageId !== undefined ? { parentMessageId: msg.parentMessageId } : {}),
+            lastUpdated: Date.now(),
+          }).catch((err) => {
+            // ⑨.2: log only on failure — keep production console clean
+            console.warn('[web-provider] failed to persist conversation state:', err);
+          });
+          break;
+        }
       }
     });
 
@@ -483,15 +502,18 @@ function buildRelayRequest(
  *   1. The user prompt in `init.body` (so the adapter can extract it)
  *   2. The auth header from SW-side `chrome.cookies.getAll` (for
  *      HttpOnly cookies the MAIN world can't see)
+ *   3. ⑨.2: the stored conversation id from webProviderConversations
+ *      (for DeepSeek's `parent_message_id`, GLM's `conversation_id`)
+ *      so the server can keep context across turns.
  *
- * The stub `fetchEntry.request` from the dispatch table has neither
- * — the adapter would throw on `init.body` and the HttpOnly
+ * The stub `fetchEntry.request` from the dispatch table has none of
+ * these — the adapter would throw on `init.body` and the HttpOnly
  * `kimi-auth` would be invisible. This function builds a complete
  * request the adapter can actually consume.
  */
-async function buildContentFetchRequest(
+export async function buildContentFetchRequest(
   preset: WebProviderPreset,
-  _modelId: string,
+  modelId: string,
   context: Context,
   deps: WebSessionStreamDeps,
 ): Promise<ContentFetchRequest> {
@@ -516,13 +538,27 @@ async function buildContentFetchRequest(
   // localStorage or non-HttpOnly cookies (DeepSeek, GLM) ignore it.
   const authHeader = await deps.getAuthHeaders(preset.id);
 
+  // ⑨.2: Read any stored conversation state so the adapter can echo
+  // the server-issued id back on the next message. Per-provider body
+  // field names differ: DeepSeek uses `parent_message_id`, GLM uses
+  // `conversation_id`. We expose both under a single `chatId` field
+  // and a `parentMessageId` field; each adapter reads what it needs.
+  const stored = await getConversation(preset.id, modelId);
+  const chatId = stored?.conversationId ?? '';
+  const parentMessageId = stored?.parentMessageId;
+
   return {
     type: 'WEB_LLM_FETCH',
     requestId: crypto.randomUUID(),
     providerId: preset.id,  // ⑫ bridge filter needs this to NOT drop messages
+    modelId,                 // ⑨.2: adapter echoes this in CONVERSATION_UPDATE
     init: {
       method: 'POST',
-      body: JSON.stringify({ prompt: messageText, chatId: '' }),
+      body: JSON.stringify({
+        prompt: messageText,
+        chatId,
+        ...(parentMessageId !== undefined ? { parentMessageId } : {}),
+      }),
     },
     ...(authHeader ? { authHeader } : {}),
   };

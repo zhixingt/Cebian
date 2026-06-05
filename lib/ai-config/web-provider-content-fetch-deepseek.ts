@@ -469,9 +469,21 @@ export const deepseekMainWorldFetch = async (request: ContentFetchRequest): Prom
   }
 
   if (chatSessionId) {
-    // ⑫: chat_session_id is internal — don't leak the raw SSE envelope
-    // to the sidepanel. ⑨.2 multi-turn will read it from a follow-up
-    // request via getConversation()/setConversation() storage.
+    // ⑨.2: tell the SW to persist this session id so the next turn's
+    // buildContentFetchRequest can echo it back as `chatId` in init.body.
+    // ⑫: don't leak the raw `data: {deepseek:chat_session_id}` envelope
+    // to the sidepanel — that was a UX bug fixed in the same commit family.
+    // Fire-and-forget; SW listener will call setConversation() and any
+    // Dexie failure is just a console.warn there.
+    postToBridge(
+      {
+        type: 'WEB_LLM_CONVERSATION_UPDATE',
+        requestId,
+        modelId: request.modelId,
+        conversationId: chatSessionId,
+      },
+      origin,
+    );
   }
 
   const decoder = new TextDecoder();
@@ -497,6 +509,32 @@ export const deepseekMainWorldFetch = async (request: ContentFetchRequest): Prom
           // (request_message_id, updated_at, etc.) which we skip.
           if (typeof json.v === 'string' && json.v.length > 0) {
             postToBridge({ type: 'WEB_LLM_CHUNK', requestId, chunk: json.v }, origin);
+          } else if (json.v && typeof json.v === 'object') {
+            // ⑨.2: response container — may carry the assistant message id
+            // that the next request needs as `parent_message_id`. The field
+            // name varies by server version, so we try a few common shapes.
+            const container = json.v as Record<string, unknown>;
+            const candidates: unknown[] = [
+              container.message_id,
+              container.msg_id,
+              container.id,
+              (container.message as Record<string, unknown> | undefined)?.message_id,
+              (container.message as Record<string, unknown> | undefined)?.id,
+            ];
+            for (const c of candidates) {
+              if (typeof c === 'string' && c.length > 0) {
+                postToBridge(
+                  {
+                    type: 'WEB_LLM_CONVERSATION_UPDATE',
+                    requestId,
+                    modelId: request.modelId,
+                    parentMessageId: c,
+                  },
+                  origin,
+                );
+                break;
+              }
+            }
           }
         } catch { /* skip non-JSON lines */ }
       }

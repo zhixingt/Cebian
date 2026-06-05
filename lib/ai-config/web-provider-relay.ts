@@ -209,6 +209,12 @@ export const WEB_LLM_CHUNK = 'WEB_LLM_CHUNK' as const;
 export const WEB_LLM_DONE = 'WEB_LLM_DONE' as const;
 export const WEB_LLM_ERROR = 'WEB_LLM_ERROR' as const;
 export const WEB_LLM_NEEDS_RELOGIN = 'WEB_LLM_NEEDS_RELOGIN' as const;
+// ⑨.2: multi-turn — adapter emits this when it has the canonical
+// conversation/session/parent_message id from the server. The SW listener
+// persists it to webProviderConversations so the next buildContentFetchRequest
+// can echo it back. Providers that don't track a session id (or whose
+// server is stateless) simply don't emit this event.
+export const WEB_LLM_CONVERSATION_UPDATE = 'WEB_LLM_CONVERSATION_UPDATE' as const;
 
 /**
  * Discriminated union of messages the content script sends to the SW.
@@ -227,7 +233,14 @@ export type WebProviderRelayMessage =
     }
   | { type: typeof WEB_LLM_DONE; providerId: WebProvider['presetId']; stopReason?: string }
   | { type: typeof WEB_LLM_ERROR; providerId: WebProvider['presetId']; error: string }
-  | { type: typeof WEB_LLM_NEEDS_RELOGIN; providerId: WebProvider['presetId']; status: 401 | 403; message: string };
+  | { type: typeof WEB_LLM_NEEDS_RELOGIN; providerId: WebProvider['presetId']; status: 401 | 403; message: string }
+  | {
+      type: typeof WEB_LLM_CONVERSATION_UPDATE;
+      providerId: WebProvider['presetId'];
+      modelId: string;
+      conversationId?: string;
+      parentMessageId?: string;
+    };
 
 // ====================================================================
 // ⑧ injectDomRelay: SW → ISOLATED bridge → MAIN fetcher
