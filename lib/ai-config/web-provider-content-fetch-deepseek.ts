@@ -19,6 +19,14 @@ import type { ContentFetchRequest } from './web-provider-content-fetch-main';
 export const deepseekMainWorldFetch = async (request: ContentFetchRequest): Promise<void> => {
   const { requestId, init } = request;
   const origin = window.location.origin;
+  // ⑫ DIAG: log every step in the MAIN adapter
+  console.log('[DS-DIAG] adapter started, origin=', origin, 'requestId=', requestId);
+
+  if (!origin.includes('deepseek')) {
+    console.log('[DS-DIAG] origin check FAILED');
+    return;
+  }
+  console.log('[DS-DIAG] origin check passed');
 
   // ── Step 1: Bearer token from localStorage ──
   const extractBearerToken = async (): Promise<string> => {

@@ -179,14 +179,18 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
   // ── Main logic ──
   const { requestId, init } = request;
   const origin = window.location.origin;
+  // ⑫ DIAG: log every step in the MAIN adapter
+  console.log('[GLM-DIAG] adapter started, origin=', origin, 'requestId=', requestId);
 
   if (!origin.includes('chatglm.cn')) {
+    console.log('[GLM-DIAG] origin check FAILED');
     window.postMessage(
       { type: 'WEB_LLM_ERROR', requestId, error: `GLM adapter requires chatglm.cn origin, got ${origin}` },
       origin,
     );
     return;
   }
+  console.log('[GLM-DIAG] origin check passed');
 
   let glmPrompt = '';
   let existingChatId = '';
@@ -195,16 +199,21 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     glmPrompt = bodyObj.prompt ?? '';
     existingChatId = bodyObj.chatId ?? '';
   } catch { /* defaults */ }
+  console.log('[GLM-DIAG] parsed body, prompt length=', glmPrompt.length);
 
   let authToken = readCookie('chatglm_token');
   const refreshToken = readCookie('chatglm_refresh_token');
+  console.log('[GLM-DIAG] cookies from document.cookie: authToken=', authToken ? 'present(' + authToken.length + 'B)' : 'EMPTY', 'refreshToken=', refreshToken ? 'present' : 'EMPTY', '— HttpOnly cookies are INVISIBLE to document.cookie!');
 
   if (!authToken && refreshToken) {
+    console.log('[GLM-DIAG] trying refresh…');
     const refreshed = await refreshGlmToken(`${origin}${GLM_REFRESH_URL_SUFFIX}`, refreshToken);
     if (refreshed) authToken = refreshed;
+    console.log('[GLM-DIAG] refresh result=', refreshed ? 'OK' : 'FAILED');
   }
 
   if (!authToken) {
+    console.log('[GLM-DIAG] NO AUTH TOKEN — posting WEB_LLM_ERROR');
     window.postMessage(
       {
         type: 'WEB_LLM_ERROR',
@@ -215,6 +224,7 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     );
     return;
   }
+  console.log('[GLM-DIAG] auth token obtained, making fetch…');
 
   const deviceId = getOrCreateDeviceId();
   const { timestamp, nonce, sign } = generateGlmSign();
