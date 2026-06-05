@@ -469,8 +469,9 @@ export const deepseekMainWorldFetch = async (request: ContentFetchRequest): Prom
   }
 
   if (chatSessionId) {
-    const idChunk = `data: ${JSON.stringify({ type: 'deepseek:chat_session_id', chat_session_id: chatSessionId })}\n\n`;
-    postToBridge({ type: 'WEB_LLM_CHUNK', requestId, chunk: idChunk }, origin);
+    // ⑫: chat_session_id is internal — don't leak the raw SSE envelope
+    // to the sidepanel. ⑨.2 multi-turn will read it from a follow-up
+    // request via getConversation()/setConversation() storage.
   }
 
   const decoder = new TextDecoder();
