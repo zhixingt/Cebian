@@ -16,6 +16,97 @@
  */
 import type { ContentFetchRequest } from './web-provider-content-fetch-main';
 
+/**
+ * ⑨.5: DeepSeek R1 "thinking mode" emits a chain-of-thought preamble
+ * before the real answer. The preamble typically ends with a literal
+ * "FINISHED" sentinel followed by the actual response. To keep the
+ * sidepanel clean (the user only wants the answer, not the CoT), we
+ * buffer every chunk until we see the boundary, then emit only the
+ * post-boundary content.
+ *
+ * Exported for unit testing in `web-provider-content-fetch-deepseek.test.ts`.
+ * The actual integration lives in `deepseekMainWorldFetch` below, which
+ * feeds parsed JSON SSE payloads into this function and forwards the
+ * resulting events to the bridge.
+ */
+export interface DeepSeekRawChunk {
+  v: string;
+}
+
+export interface DeepSeekFilteredEvent {
+  type: 'text' | 'finish';
+  text?: string;
+}
+
+/**
+ * Find the byte offset of the FINISHED sentinel in a chunk string.
+ * Returns -1 if not found. The sentinel may appear at any position;
+ * trailing whitespace and a single trailing newline are tolerated.
+ */
+export function findFinishedOffset(chunk: string): number {
+  const idx = chunk.indexOf('FINISHED');
+  if (idx < 0) return -1;
+  return idx;
+}
+
+/**
+ * Filter DeepSeek's stream of SSE JSON payloads into a list of
+ * bridge events. The returned events are:
+ *   - `{ type: 'text', text }` concatenating all chunks after the
+ *     FINISHED marker (or all chunks if no marker is found —
+ *     the model is in non-thinking mode)
+ *   - `{ type: 'finish' }` always emitted last
+ *
+ * Any chunk emitted before the FINISHED marker is dropped — it is
+ * assumed to be CoT and should not reach the sidepanel.
+ */
+export function filterDeepSeekStream(
+  rawChunks: DeepSeekRawChunk[],
+): DeepSeekFilteredEvent[] {
+  const events: DeepSeekFilteredEvent[] = [];
+  let seenFinished = false;
+  let answerText = '';
+
+  for (const chunk of rawChunks) {
+    if (typeof chunk.v !== 'string' || chunk.v.length === 0) continue;
+
+    if (seenFinished) {
+      answerText += chunk.v;
+      continue;
+    }
+
+    const offset = findFinishedOffset(chunk.v);
+    if (offset >= 0) {
+      // The text after the marker is part of the answer.
+      const after = chunk.v
+        .slice(offset + 'FINISHED'.length)
+        .replace(/^\s*\n?/, '');
+      answerText += after;
+      seenFinished = true;
+    }
+    // else: no marker yet — chunk is still CoT, drop it.
+  }
+
+  // If we never saw FINISHED, fall back to treating every chunk as
+  // the answer (non-thinking mode). Otherwise the user would see an
+  // empty sidepanel for any model that doesn't emit the marker.
+  if (!seenFinished) {
+    answerText = rawChunks
+      .filter((c) => typeof c.v === 'string' && c.v.length > 0)
+      .map((c) => c.v)
+      .join('');
+  }
+
+  if (answerText.length > 0) {
+    events.push({ type: 'text', text: answerText });
+  }
+  events.push({ type: 'finish' });
+  return events;
+}
+
+/** Re-export a stable type for consumers of the stream result. */
+export type deepSeekStreamResult = DeepSeekFilteredEvent;
+
 export const deepseekMainWorldFetch = async (request: ContentFetchRequest): Promise<void> => {
   const { requestId, init } = request;
   const origin = window.location.origin;
@@ -488,80 +579,118 @@ export const deepseekMainWorldFetch = async (request: ContentFetchRequest): Prom
 
   const decoder = new TextDecoder();
   let buffer = '';
-  while (true) {
+  // ⑨.5: we want to hide DeepSeek's chain-of-thought preamble and
+  // only emit the post-FINISHED content. Two streaming goals:
+  //   (a) post-FINISHED text should arrive incrementally so the
+  //       sidepanel renders it chunk-by-chunk (better UX than a
+  //       single all-at-once reveal);
+  //   (b) the no-FINISHED case (non-thinking mode) should still
+  //       show every chunk in order.
+  // Strategy: track a flag + accumulate the post-FINISHED text
+  // across read iterations, flushing after every reader.read() once
+  // the boundary has been crossed. For the no-FINISHED case, we keep
+  // a separate list of pre-boundary chunks and emit them at end.
+  let seenFinished = false;
+  let pendingPostFinished = '';
+  const preBoundaryTextChunks: string[] = [];
+  let streamEnded = false;
+
+  const flushPending = (): void => {
+    if (pendingPostFinished.length > 0) {
+      postToBridge(
+        { type: 'WEB_LLM_CHUNK', requestId, chunk: pendingPostFinished },
+        origin,
+      );
+      pendingPostFinished = '';
+    }
+  };
+
+  const processLine = (line: string): void => {
+    if (!line.startsWith('data: ')) return;
+    const payload = line.slice(6);
+    if (payload === '[DONE]') {
+      streamEnded = true;
+      return;
+    }
+    let json: Record<string, unknown>;
+    try {
+      json = JSON.parse(payload) as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    if (typeof json.v === 'string' && json.v.length > 0) {
+      if (seenFinished) {
+        pendingPostFinished += json.v;
+      } else {
+        const offset = findFinishedOffset(json.v);
+        if (offset >= 0) {
+          const after = json.v
+            .slice(offset + 'FINISHED'.length)
+            .replace(/^\s*\n?/, '');
+          pendingPostFinished += after;
+          seenFinished = true;
+        } else {
+          preBoundaryTextChunks.push(json.v);
+        }
+      }
+    } else if (json.v && typeof json.v === 'object') {
+      // ⑨.2: response container — may carry the assistant message id
+      // that the next request needs as `parent_message_id`. The field
+      // name varies by server version, so we try a few common shapes.
+      const container = json.v as Record<string, unknown>;
+      const candidates: unknown[] = [
+        container.message_id,
+        container.msg_id,
+        container.id,
+        (container.message as Record<string, unknown> | undefined)?.message_id,
+        (container.message as Record<string, unknown> | undefined)?.id,
+      ];
+      for (const c of candidates) {
+        if (typeof c === 'string' && c.length > 0) {
+          postToBridge(
+            {
+              type: 'WEB_LLM_CONVERSATION_UPDATE',
+              requestId,
+              modelId: request.modelId,
+              parentMessageId: c,
+            },
+            origin,
+          );
+          break;
+        }
+      }
+    }
+  };
+
+  while (!streamEnded) {
     const { done, value } = await dsReader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    while (buffer.includes('\n')) {
+    while (buffer.includes('\n') && !streamEnded) {
       const lineEnd = buffer.indexOf('\n');
       const line = buffer.slice(0, lineEnd).trim();
       buffer = buffer.slice(lineEnd + 1);
-      if (line.startsWith('data: ')) {
-        const payload = line.slice(6);
-        if (payload === '[DONE]') {
-          postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
-          continue;
-        }
-        try {
-          const json = JSON.parse(payload) as Record<string, unknown>;
-          // DeepSeek format: {"v":"text"} for content fragments, or
-          // {"v":{...}} for response container, or metadata fields
-          // (request_message_id, updated_at, etc.) which we skip.
-          if (typeof json.v === 'string' && json.v.length > 0) {
-            postToBridge({ type: 'WEB_LLM_CHUNK', requestId, chunk: json.v }, origin);
-          } else if (json.v && typeof json.v === 'object') {
-            // ⑨.2: response container — may carry the assistant message id
-            // that the next request needs as `parent_message_id`. The field
-            // name varies by server version, so we try a few common shapes.
-            const container = json.v as Record<string, unknown>;
-            const candidates: unknown[] = [
-              container.message_id,
-              container.msg_id,
-              container.id,
-              (container.message as Record<string, unknown> | undefined)?.message_id,
-              (container.message as Record<string, unknown> | undefined)?.id,
-            ];
-            for (const c of candidates) {
-              if (typeof c === 'string' && c.length > 0) {
-                postToBridge(
-                  {
-                    type: 'WEB_LLM_CONVERSATION_UPDATE',
-                    requestId,
-                    modelId: request.modelId,
-                    parentMessageId: c,
-                  },
-                  origin,
-                );
-                break;
-              }
-            }
-          }
-        } catch { /* skip non-JSON lines */ }
-      }
+      processLine(line);
     }
+    // Flush incremental post-FINISHED text so the user sees it
+    // arrive in real time. Before FINISHED, nothing is flushed.
+    if (seenFinished) flushPending();
   }
-  const tail = decoder.decode();
-  if (tail) buffer += tail;
-  while (buffer.includes('\n')) {
-    const lineEnd = buffer.indexOf('\n');
-    const line = buffer.slice(0, lineEnd).trim();
-    buffer = buffer.slice(lineEnd + 1);
-    if (line.startsWith('data: ')) {
-      postToBridge({ type: 'WEB_LLM_CHUNK', requestId, chunk: `${line}\n\n` }, origin);
-    }
+
+  // ⑨.5: tail bytes that didn't end with a newline. Process them
+  // the same way (one last line) and re-enter the loop logic.
+  const tail = buffer.trim();
+  if (tail.startsWith('data: ')) {
+    processLine(tail);
+    if (seenFinished) flushPending();
   }
-  const tailLine = buffer.trim();
-  if (tailLine.startsWith('data: ')) {
-    const payload = tailLine.slice(6);
-    if (payload === '[DONE]') {
-      postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
-    } else {
-      try {
-        const json = JSON.parse(payload) as Record<string, unknown>;
-        if (typeof json.v === 'string' && json.v.length > 0) {
-          postToBridge({ type: 'WEB_LLM_CHUNK', requestId, chunk: json.v }, origin);
-        }
-      } catch { /* skip */ }
+
+  // ⑨.5: if we never saw a FINISHED marker, treat the entire stream
+  // as the answer (non-thinking mode). Emit the pre-boundary chunks
+  // as individual CHUNK events so the sidepanel renders them in order.
+  if (!seenFinished && preBoundaryTextChunks.length > 0) {
+    for (const text of preBoundaryTextChunks) {
+      postToBridge({ type: 'WEB_LLM_CHUNK', requestId, chunk: text }, origin);
     }
   }
   postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
