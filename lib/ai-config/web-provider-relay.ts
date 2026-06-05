@@ -204,6 +204,8 @@ export function _getTabEntryForTesting(
 // ⑧ Message contract (re-export from content script for SW convenience)
 // ====================================================================
 
+import { diag, diagError } from './web-provider-diag';
+
 export const WEB_LLM_RELAY_READY = 'WEB_LLM_RELAY_READY' as const;
 export const WEB_LLM_CHUNK = 'WEB_LLM_CHUNK' as const;
 export const WEB_LLM_DONE = 'WEB_LLM_DONE' as const;
@@ -299,8 +301,10 @@ export async function injectContentFetch(
 ): Promise<unknown> {
   // ⑫: DIAGNOSTIC — trace each executeScript call. User flow failures
   // often manifest as silent chrome.scripting.executeScript rejections
-  // (host_permissions, CSP, wrong target tabId, etc.).
-  console.log(`[WS-DIAG] injectContentFetch: tabId=${tabId} providerId=${providerId}`);
+  // (host_permissions, CSP, wrong target tabId, etc.). Routed through
+  // the ⑨.4 diag gate — silent in production unless the user has
+  // enabled `web_provider_debug` in chrome.storage.local.
+  diag('WS-DIAG', `injectContentFetch: tabId=${tabId} providerId=${providerId}`);
 
   // 1. ISOLATED bridge first (so it can attach a window.message listener
   //    that forwards WEB_LLM_* events to chrome.runtime).
@@ -312,9 +316,9 @@ export async function injectContentFetch(
       func: installIsolatedBridge,
       args: [providerId],
     });
-    console.log(`[WS-DIAG] ISOLATED bridge installed for ${providerId}`);
+    diag('WS-DIAG', `ISOLATED bridge installed for ${providerId}`);
   } catch (e) {
-    console.error(`[WS-DIAG] ISOLATED bridge FAILED for ${providerId}:`, e);
+    diagError('WS-DIAG', `ISOLATED bridge FAILED for ${providerId}`, e);
     throw e;
   }
   // 2. MAIN world per-provider fetch.
@@ -325,9 +329,9 @@ export async function injectContentFetch(
       func: mainWorldFetch,
       args: [request],
     });
-    console.log(`[WS-DIAG] MAIN adapter invoked for ${providerId}`);
+    diag('WS-DIAG', `MAIN adapter invoked for ${providerId}`);
   } catch (e) {
-    console.error(`[WS-DIAG] MAIN adapter invoke FAILED for ${providerId}:`, e);
+    diagError('WS-DIAG', `MAIN adapter invoke FAILED for ${providerId}`, e);
     throw e;
   }
   return isolatedResult;

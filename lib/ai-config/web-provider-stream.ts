@@ -47,6 +47,7 @@ import {
   type WebProviderRelayMessage,
 } from './web-provider-relay';
 import { getConversation, setConversation } from './web-provider-conversations';
+import { diag, diagError, diagWarn } from './web-provider-diag';
 import { WEB_PROVIDER_PRESETS, type WebProviderPreset } from './web-provider-presets';
 // ⑪: Import per-provider content-fetch adapters so the bundler retains
 // their function bodies (chromeclaw-style HTTP-replay path). The export
@@ -221,8 +222,12 @@ function runWebSessionStream(
 
   // Fire-and-forget orchestration
   void orchestrateStream(model, context, stream, deps).catch((err) => {
-    // Defensive: any uncaught error from the orchestrator
-    console.error('[web-session-stream] uncaught error:', err);
+    // Defensive: any uncaught error from the orchestrator. This path
+    // is reached only when the orchestrator's try/catch failed to push
+    // an error event into the stream (e.g. thrown before try/catch
+    // wraps the code). Log uncondiionally — surfacing this is more
+    // valuable than gating it behind a flag.
+    diagError('WS-DIAG', 'uncaught orchestration error', err);
   });
 
   return stream;
@@ -239,45 +244,45 @@ async function orchestrateStream(
   // ⑫: DIAGNOSTIC — user flow vs E2E: E2E calls the adapter directly via
   // page.evaluate, bypassing this entire orchestration layer. If GLM/DeepSeek
   // fail in the real extension but pass in E2E, the failure is in one of
-  // these steps. Logs are prefixed with [WS-DIAG] for easy filtering.
-  const diag = (msg: string, extra?: unknown) => {
-    console.log(`[WS-DIAG] ${msg}`, extra ?? '');
-  };
+  // these steps. Logs go through the diag() gate (⑨.4): silent in
+  // production unless the user has enabled `web_provider_debug` in
+  // chrome.storage.local. Tagged with [WS-DIAG] for easy filtering.
+  const diagStep = (msg: string, extra?: unknown) => diag('WS-DIAG', msg, extra);
 
   try {
     // 1. Parse model id
     const { providerId, modelId } = parseWebModelId(model.id);
-    diag(`step 1: parsed modelId`, { providerId, modelId });
+    diagStep(`step 1: parsed modelId`, { providerId, modelId });
 
     // 2. Look up preset
     const preset = deps.presets.find((p) => p.id === providerId);
     if (!preset) {
-      diag(`step 2 FAIL: no preset for ${providerId}`);
+      diagStep(`step 2 FAIL: no preset for ${providerId}`);
       throw new Error(`Unknown web provider: ${providerId}`);
     }
-    diag(`step 2: preset found`, { loginUrl: preset.loginUrl });
+    diagStep(`step 2: preset found`, { loginUrl: preset.loginUrl });
 
     // ⑧: domStrategy is required (replaces old chatApi check)
     if (!preset.domStrategy) {
-      diag(`step 2 FAIL: no domStrategy for ${providerId}`);
+      diagStep(`step 2 FAIL: no domStrategy for ${providerId}`);
       throw new Error(`Provider ${providerId} has no domStrategy configured`);
     }
 
     // 3. Resolve bundle (validates login + decryption)
     const bundle = await deps.resolveBundle(providerId);
     if (!bundle) {
-      diag(`step 3 FAIL: resolveBundle returned null for ${providerId} (not logged in or decryption failed)`);
+      diagStep(`step 3 FAIL: resolveBundle returned null for ${providerId} (not logged in or decryption failed)`);
       throw new Error(`Provider ${providerId} has no valid session — please log in via Settings`);
     }
-    diag(`step 3: bundle resolved (keys: ${Object.keys(bundle).join(',')})`);
+    diagStep(`step 3: bundle resolved (keys: ${Object.keys(bundle).join(',')})`);
 
     // 4. Build request(s) and open/reuse tab
     let tabId: number;
     try {
       tabId = await deps.openTab(providerId, preset.loginUrl);
-      diag(`step 4: tabId=${tabId}`);
+      diagStep(`step 4: tabId=${tabId}`);
     } catch (e) {
-      diag(`step 4 FAIL: openTab threw`, e);
+      diagStep(`step 4 FAIL: openTab threw`, e);
       throw e;
     }
 
@@ -304,9 +309,12 @@ async function orchestrateStream(
     unregisterMsg = deps.onMessage((msg) => {
       // ⑫ DIAG: log every message the SW listener receives (regardless of
       // providerId, so we can see messages being dropped or routed)
-      console.log(`[WS-DIAG-LISTENER] received`, msg);
+      diag('WS-DIAG-LISTENER', 'received', msg);
       if (msg.providerId !== providerId) {
-        console.log(`[WS-DIAG-LISTENER] DROPPING (providerId mismatch: got ${msg.providerId}, want ${providerId})`);
+        diag(
+          'WS-DIAG-LISTENER',
+          `DROPPING (providerId mismatch: got ${msg.providerId}, want ${providerId})`,
+        );
         return;
       }
       switch (msg.type) {
@@ -397,7 +405,7 @@ async function orchestrateStream(
             lastUpdated: Date.now(),
           }).catch((err) => {
             // ⑨.2: log only on failure — keep production console clean
-            console.warn('[web-provider] failed to persist conversation state:', err);
+            diagWarn('WS-DIAG', 'failed to persist conversation state', err);
           });
           break;
         }
@@ -418,18 +426,18 @@ async function orchestrateStream(
 
     // 8. Inject (DOM relay vs content-fetch, per provider capability)
     if (useContentFetch) {
-      diag(`step 8: injecting content-fetch into tabId=${tabId}`);
+      diagStep(`step 8: injecting content-fetch into tabId=${tabId}`);
       try {
         await import('./web-provider-relay').then(({ injectContentFetch }) =>
           injectContentFetch(tabId, providerId, fetchEntry!.func, fetchRequest!),
         );
-        diag(`step 8: injectContentFetch resolved (adapter invoked in MAIN world)`);
+        diagStep(`step 8: injectContentFetch resolved (adapter invoked in MAIN world)`);
       } catch (e) {
-        diag(`step 8 FAIL: injectContentFetch threw`, e);
+        diagStep(`step 8 FAIL: injectContentFetch threw`, e);
         throw e;
       }
     } else {
-      diag(`step 8: injecting DOM relay into tabId=${tabId}`);
+      diagStep(`step 8: injecting DOM relay into tabId=${tabId}`);
       await deps.injectScripts(tabId, relayRequest!);
     }
   } catch (err) {

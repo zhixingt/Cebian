@@ -18,6 +18,7 @@
  */
 
 import type { WebProviderDomStrategy } from './web-provider-dom-strategy';
+import { diag, diagWarn } from './web-provider-diag';
 
 export interface DomRelayRequest {
   providerId: string;
@@ -357,23 +358,27 @@ export function installIsolatedBridge(providerId: string): void {
   document.addEventListener('ceb-web-provider-message', ((event: Event) => {
     const data = (event as CustomEvent<Record<string, unknown>>).detail;
     if (!data || typeof data !== 'object') return;
-    // ⑫ DIAG: log every event the bridge sees
-    console.log('[WS-DIAG-BRIDGE] received CustomEvent', {
+    // ⑫ DIAG: log every event the bridge sees. Routed through the
+    // ⑨.4 diag gate — silent in production unless the user has
+    // enabled `web_provider_debug` in chrome.storage.local.
+    diag('WS-DIAG-BRIDGE', 'received CustomEvent', {
       type: data.type,
       providerId: data.providerId,
       keys: Object.keys(data).slice(0, 8),
     });
     if (data.providerId !== providerId) {
-      console.log('[WS-DIAG-BRIDGE] DROPPING (providerId mismatch)');
+      diag('WS-DIAG-BRIDGE', 'DROPPING (providerId mismatch)');
       return;
     }
     if (typeof data.type !== 'string' || !data.type.startsWith('WEB_LLM_')) {
-      console.log('[WS-DIAG-BRIDGE] DROPPING (not WEB_LLM_ type)');
+      diag('WS-DIAG-BRIDGE', 'DROPPING (not WEB_LLM_ type)');
       return;
     }
-    console.log('[WS-DIAG-BRIDGE] forwarding', data.type, 'to SW');
+    diag('WS-DIAG-BRIDGE', 'forwarding to SW', data.type);
     chrome.runtime.sendMessage(data).catch((err) => {
-      console.warn('[ceb-web-provider-bridge] sendMessage failed:', err);
+      // sendMessage failures are real (no SW receiver, etc.) — surface
+      // them even when diag is off so we don't lose this signal.
+      diagWarn('WS-DIAG-BRIDGE', 'sendMessage failed', err);
     });
   }) as EventListener);
 
