@@ -28,6 +28,12 @@
 import type { ContentFetchRequest } from './web-provider-content-fetch-main';
 
 export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<void> => {
+  // ⑫ FIX: cross-world messaging via document CustomEvent
+  // (window.postMessage doesn't cross the MAIN↔ISOLATED world boundary)
+  const postToBridge = (data: Record<string, unknown>, _origin?: string): void => {
+    document.dispatchEvent(new CustomEvent('ceb-web-provider-message', { detail: data }));
+  };
+
   // ── Inlined constants (cannot be module-scope — would be undefined
   //    when this function is serialized via chrome.scripting.executeScript) ──
   const GLM_SIGN_SECRET = '8a1317a7468aa3ad86e997d08f3f31cb';
@@ -179,18 +185,14 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
   // ── Main logic ──
   const { requestId, init } = request;
   const origin = window.location.origin;
-  // ⑫ DIAG: log every step in the MAIN adapter
-  console.log('[GLM-DIAG] adapter started, origin=', origin, 'requestId=', requestId);
 
   if (!origin.includes('chatglm.cn')) {
-    console.log('[GLM-DIAG] origin check FAILED');
-    window.postMessage(
+    postToBridge(
       { type: 'WEB_LLM_ERROR', requestId, error: `GLM adapter requires chatglm.cn origin, got ${origin}` },
       origin,
     );
     return;
   }
-  console.log('[GLM-DIAG] origin check passed');
 
   let glmPrompt = '';
   let existingChatId = '';
@@ -199,22 +201,17 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     glmPrompt = bodyObj.prompt ?? '';
     existingChatId = bodyObj.chatId ?? '';
   } catch { /* defaults */ }
-  console.log('[GLM-DIAG] parsed body, prompt length=', glmPrompt.length);
 
   let authToken = readCookie('chatglm_token');
   const refreshToken = readCookie('chatglm_refresh_token');
-  console.log('[GLM-DIAG] cookies from document.cookie: authToken=', authToken ? 'present(' + authToken.length + 'B)' : 'EMPTY', 'refreshToken=', refreshToken ? 'present' : 'EMPTY', '— HttpOnly cookies are INVISIBLE to document.cookie!');
 
   if (!authToken && refreshToken) {
-    console.log('[GLM-DIAG] trying refresh…');
     const refreshed = await refreshGlmToken(`${origin}${GLM_REFRESH_URL_SUFFIX}`, refreshToken);
     if (refreshed) authToken = refreshed;
-    console.log('[GLM-DIAG] refresh result=', refreshed ? 'OK' : 'FAILED');
   }
 
   if (!authToken) {
-    console.log('[GLM-DIAG] NO AUTH TOKEN — posting WEB_LLM_ERROR');
-    window.postMessage(
+    postToBridge(
       {
         type: 'WEB_LLM_ERROR',
         requestId,
@@ -224,7 +221,6 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     );
     return;
   }
-  console.log('[GLM-DIAG] auth token obtained, making fetch…');
 
   const deviceId = getOrCreateDeviceId();
   const { timestamp, nonce, sign } = generateGlmSign();
@@ -271,7 +267,6 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     body: glmBody,
     credentials: 'include',
   });
-  console.log('[GLM-DIAG] fetch returned', { status: glmResponse.status, ok: glmResponse.ok, contentType: glmResponse.headers.get('content-type') });
 
   if (!glmResponse.ok) {
     let errorBody = '';
@@ -281,8 +276,7 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     } catch { /* ignore */ }
     const authHint = glmResponse.status === 401 || glmResponse.status === 403
       ? ' Please visit chatglm.cn to verify your account.' : '';
-    console.log('[GLM-DIAG] HTTP error', glmResponse.status, errorBody.slice(0, 200));
-    window.postMessage(
+    postToBridge(
       {
         type: 'WEB_LLM_ERROR',
         requestId,
@@ -295,15 +289,13 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
 
   const reader = glmResponse.body?.getReader();
   if (!reader) {
-    console.log('[GLM-DIAG] NO READER');
-    window.postMessage({ type: 'WEB_LLM_ERROR', requestId, error: 'No response body from GLM' }, origin);
+    postToBridge({ type: 'WEB_LLM_ERROR', requestId, error: 'No response body from GLM' }, origin);
     return;
   }
-  console.log('[GLM-DIAG] reader obtained, starting SSE stream…');
 
   if (existingChatId) {
     const idChunk = `data: ${JSON.stringify({ type: 'glm:chat_id', chat_id: existingChatId })}\n\n`;
-    window.postMessage({ type: 'WEB_LLM_CHUNK', requestId, chunk: idChunk }, origin);
+    postToBridge({ type: 'WEB_LLM_CHUNK', requestId, chunk: idChunk }, origin);
   }
 
   let buffer = '';
@@ -358,18 +350,9 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
   };
 
   try {
-    let readCount = 0;
-    let chunkCount = 0;
     while (true) {
       const { done, value } = await reader.read();
-      readCount++;
-      if (readCount <= 3 || readCount % 20 === 0) {
-        console.log('[GLM-DIAG] reader.read()', { readCount, done, bytes: value?.byteLength });
-      }
-      if (done) {
-        console.log('[GLM-DIAG] stream done after', readCount, 'reads,', chunkCount, 'chunks posted');
-        break;
-      }
+      if (done) break;
       buffer += decoder.decode(value, { stream: true });
       let guard = 0;
       while (guard++ < 100) {
@@ -377,23 +360,17 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
           const out = flushSse();
           if (out === null) break;
           if (out === '__DONE__') {
-            console.log('[GLM-DIAG] SSE [DONE] received, posting WEB_LLM_DONE');
-            window.postMessage({ type: 'WEB_LLM_DONE', requestId }, origin);
+            postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
             return;
           }
           if (out) {
-            chunkCount++;
-            window.postMessage(
+            postToBridge(
               { type: 'WEB_LLM_CHUNK', requestId, chunk: `data: ${JSON.stringify({ content: out })}\n\n` },
               origin,
             );
-            if (chunkCount <= 3 || chunkCount % 20 === 0) {
-              console.log('[GLM-DIAG] posted chunk', chunkCount, 'len=', out.length);
-            }
           }
         } catch (err) {
-          console.log('[GLM-DIAG] SSE parse error', err);
-          window.postMessage(
+          postToBridge(
             {
               type: 'WEB_LLM_ERROR',
               requestId,
@@ -412,19 +389,19 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
       const out = flushSse();
       if (out === null) break;
       if (out === '__DONE__') {
-        window.postMessage({ type: 'WEB_LLM_DONE', requestId }, origin);
+        postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
         return;
       }
       if (out) {
-        window.postMessage(
+        postToBridge(
           { type: 'WEB_LLM_CHUNK', requestId, chunk: `data: ${JSON.stringify({ content: out })}\n\n` },
           origin,
         );
       }
     }
-    window.postMessage({ type: 'WEB_LLM_DONE', requestId }, origin);
+    postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
   } catch (err) {
-    window.postMessage(
+    postToBridge(
       {
         type: 'WEB_LLM_ERROR',
         requestId,
