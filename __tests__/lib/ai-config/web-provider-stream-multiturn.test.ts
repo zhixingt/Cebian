@@ -162,4 +162,88 @@ describe('9.2 multi-turn: buildContentFetchRequest + listener integration', () =
     const body = JSON.parse(req.init.body as string);
     expect(body.chatId).toBe('');
   });
+
+  it('injects cross-provider history when no stored state for new provider', async () => {
+    // Simulate a session that was chatting with GLM, then switches to DeepSeek.
+    // The DeepSeek entry in webProviderConversations is empty.
+    const { buildContentFetchRequest } = await import('@/lib/ai-config/web-provider-stream');
+    const preset = {
+      id: 'deepseek' as const,
+      label: 'DeepSeek',
+      loginUrl: 'https://chat.deepseek.com/',
+      domStrategy: { selector: 'textarea' },
+    };
+    const deps = {
+      getAuthHeaders: async () => null,
+      openTab: async () => 0,
+      injectScripts: async () => undefined,
+      onMessage: () => () => undefined,
+      resolveBundle: async () => ({}),
+      presets: [preset] as any,
+    };
+    const crossContext = {
+      messages: [
+        { role: 'user', content: '我叫张三' },
+        { role: 'assistant', content: '你好张三！' },
+        { role: 'user', content: '我叫什么' }, // current turn
+      ],
+      systemPrompt: '',
+      tools: [],
+    };
+    const req = await buildContentFetchRequest(
+      preset as any,
+      'deepseek-chat',
+      crossContext as any,
+      deps as any,
+    );
+    const body = JSON.parse(req.init.body as string);
+    // The new prompt should include the previous turn's user/assistant text
+    expect(body.prompt).toContain('我叫张三');
+    expect(body.prompt).toContain('你好张三！');
+    expect(body.prompt).toContain('我叫什么');
+    // And it should be wrapped with a "history" indicator
+    expect(body.prompt).toMatch(/history|context|prior/i);
+    // chatId should be empty (no stored state for DS)
+    expect(body.chatId).toBe('');
+  });
+
+  it('does NOT inject cross-provider history when stored state exists for same provider', async () => {
+    // Same-provider multi-turn: the server has context, no need to inject.
+    await setConversation({
+      providerId: 'glm',
+      modelId: 'glm-4.6',
+      conversationId: 'conv_existing',
+      lastUpdated: Date.now(),
+    });
+    const { buildContentFetchRequest } = await import('@/lib/ai-config/web-provider-stream');
+    const preset = { id: 'glm' as const, domStrategy: { selector: 'textarea' } };
+    const deps = {
+      getAuthHeaders: async () => null,
+      openTab: async () => 0,
+      injectScripts: async () => undefined,
+      onMessage: () => () => undefined,
+      resolveBundle: async () => ({}),
+      presets: [preset] as any,
+    };
+    const context = {
+      messages: [
+        { role: 'user', content: 'first' },
+        { role: 'assistant', content: 'first reply' },
+        { role: 'user', content: 'follow-up' },
+      ],
+      systemPrompt: '',
+      tools: [],
+    };
+    const req = await buildContentFetchRequest(
+      preset as any,
+      'glm-4.6',
+      context as any,
+      deps as any,
+    );
+    const body = JSON.parse(req.init.body as string);
+    // chatId should be the existing one — no cross-provider injection
+    expect(body.chatId).toBe('conv_existing');
+    // The new prompt should be just the latest turn, not prepended with history
+    expect(body.prompt).toBe('follow-up');
+  });
 });
