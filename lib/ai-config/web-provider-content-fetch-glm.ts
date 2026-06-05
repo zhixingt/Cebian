@@ -271,6 +271,7 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     body: glmBody,
     credentials: 'include',
   });
+  console.log('[GLM-DIAG] fetch returned', { status: glmResponse.status, ok: glmResponse.ok, contentType: glmResponse.headers.get('content-type') });
 
   if (!glmResponse.ok) {
     let errorBody = '';
@@ -280,6 +281,7 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     } catch { /* ignore */ }
     const authHint = glmResponse.status === 401 || glmResponse.status === 403
       ? ' Please visit chatglm.cn to verify your account.' : '';
+    console.log('[GLM-DIAG] HTTP error', glmResponse.status, errorBody.slice(0, 200));
     window.postMessage(
       {
         type: 'WEB_LLM_ERROR',
@@ -293,9 +295,11 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
 
   const reader = glmResponse.body?.getReader();
   if (!reader) {
+    console.log('[GLM-DIAG] NO READER');
     window.postMessage({ type: 'WEB_LLM_ERROR', requestId, error: 'No response body from GLM' }, origin);
     return;
   }
+  console.log('[GLM-DIAG] reader obtained, starting SSE stream…');
 
   if (existingChatId) {
     const idChunk = `data: ${JSON.stringify({ type: 'glm:chat_id', chat_id: existingChatId })}\n\n`;
@@ -354,9 +358,18 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
   };
 
   try {
+    let readCount = 0;
+    let chunkCount = 0;
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      readCount++;
+      if (readCount <= 3 || readCount % 20 === 0) {
+        console.log('[GLM-DIAG] reader.read()', { readCount, done, bytes: value?.byteLength });
+      }
+      if (done) {
+        console.log('[GLM-DIAG] stream done after', readCount, 'reads,', chunkCount, 'chunks posted');
+        break;
+      }
       buffer += decoder.decode(value, { stream: true });
       let guard = 0;
       while (guard++ < 100) {
@@ -364,16 +377,22 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
           const out = flushSse();
           if (out === null) break;
           if (out === '__DONE__') {
+            console.log('[GLM-DIAG] SSE [DONE] received, posting WEB_LLM_DONE');
             window.postMessage({ type: 'WEB_LLM_DONE', requestId }, origin);
             return;
           }
           if (out) {
+            chunkCount++;
             window.postMessage(
               { type: 'WEB_LLM_CHUNK', requestId, chunk: `data: ${JSON.stringify({ content: out })}\n\n` },
               origin,
             );
+            if (chunkCount <= 3 || chunkCount % 20 === 0) {
+              console.log('[GLM-DIAG] posted chunk', chunkCount, 'len=', out.length);
+            }
           }
         } catch (err) {
+          console.log('[GLM-DIAG] SSE parse error', err);
           window.postMessage(
             {
               type: 'WEB_LLM_ERROR',
