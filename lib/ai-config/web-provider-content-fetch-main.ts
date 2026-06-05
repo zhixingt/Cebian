@@ -44,6 +44,12 @@ export interface ContentFetchRequest {
   type: 'WEB_LLM_FETCH';
   requestId: string;
   /**
+   * ⑫: Provider id (e.g. 'glm', 'deepseek'). The ISOLATED bridge
+   * filters incoming events by this field — events with a mismatched
+   * providerId are dropped. Adapters must include it in every event.
+   */
+  providerId: string;
+  /**
    * The fully-built `url` and `init` for the provider's main chat endpoint.
    * Providers fill this in from their own auth + body construction.
    * Optional — adapters that build the URL internally (Kimi/GLM/DeepSeek) ignore it.

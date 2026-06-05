@@ -519,6 +519,7 @@ async function buildContentFetchRequest(
   return {
     type: 'WEB_LLM_FETCH',
     requestId: crypto.randomUUID(),
+    providerId: preset.id,  // ⑫ bridge filter needs this to NOT drop messages
     init: {
       method: 'POST',
       body: JSON.stringify({ prompt: messageText, chatId: '' }),

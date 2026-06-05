@@ -30,8 +30,14 @@ import type { ContentFetchRequest } from './web-provider-content-fetch-main';
 export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<void> => {
   // ⑫ FIX: cross-world messaging via document CustomEvent
   // (window.postMessage doesn't cross the MAIN↔ISOLATED world boundary)
+  // ⑫ providerId must be in the event detail — the ISOLATED bridge
+  // filters by data.providerId === installed-providerId, and drops
+  // anything that doesn't match. We capture it from the request so
+  // every postToBridge call automatically includes it.
   const postToBridge = (data: Record<string, unknown>, _origin?: string): void => {
-    document.dispatchEvent(new CustomEvent('ceb-web-provider-message', { detail: data }));
+    document.dispatchEvent(new CustomEvent('ceb-web-provider-message', {
+      detail: { ...data, providerId: request.providerId },
+    }));
   };
 
   // ── Inlined constants (cannot be module-scope — would be undefined
