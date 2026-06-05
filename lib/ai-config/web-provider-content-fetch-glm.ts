@@ -27,7 +27,19 @@
  */
 import type { ContentFetchRequest } from './web-provider-content-fetch-main';
 
+/**
+ * ⑬: Max wall-clock for the entire adapter call. If the GLM SSE
+ * stream stalls (server side hang, network drop, etc.) the reader
+ * never resolves and the sidepanel stays in a loading state
+ * forever. We cap the call at this duration so the spinner
+ * disappears and the user sees a clear error.
+ */
+const ADAPTER_TIMEOUT_MS = 90_000;
+
 export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<void> => {
+  const requestId = request.requestId;
+  const origin = window.location.origin;
+
   // ⑫ FIX: cross-world messaging via document CustomEvent
   // (window.postMessage doesn't cross the MAIN↔ISOLATED world boundary)
   // ⑫ providerId must be in the event detail — the ISOLATED bridge
@@ -39,6 +51,58 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
       detail: { ...data, providerId: request.providerId },
     }));
   };
+
+  // ⑬: Adapter-level wall-clock timeout. Race the body against a
+  // timer so a hung stream can't pin the sidepanel. Inner async +
+  // Promise.race + finally ensures the timer is cleared exactly once
+  // on every exit path.
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+  const work = (async () => {
+    await runGlmBody(request, requestId, origin, postToBridge);
+  })();
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `GLM adapter timed out after ${Math.round(
+              ADAPTER_TIMEOUT_MS / 1000,
+            )}s. The streaming endpoint may be unreachable.`,
+          ),
+        ),
+      ADAPTER_TIMEOUT_MS,
+    );
+  });
+
+  try {
+    await Promise.race([work, timeout]);
+  } catch (err) {
+    postToBridge(
+      {
+        type: 'WEB_LLM_ERROR',
+        requestId,
+        error: err instanceof Error ? err.message : String(err),
+      },
+      origin,
+    );
+    postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
+  } finally {
+    if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+  }
+};
+
+/**
+ * Inner body of the GLM adapter. Pulled out so the outer
+ * `glmMainWorldFetch` can race it against a timeout without
+ * littering every early-return with `clearTimeout`.
+ */
+const runGlmBody = async (
+  request: ContentFetchRequest,
+  requestId: string,
+  origin: string,
+  postToBridge: (data: Record<string, unknown>, origin?: string) => void,
+): Promise<void> => {
+  const init = request.init;
 
   // ── Inlined constants (cannot be module-scope — would be undefined
   //    when this function is serialized via chrome.scripting.executeScript) ──
@@ -189,9 +253,8 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
   };
 
   // ── Main logic ──
-  const { requestId, init } = request;
-  const origin = window.location.origin;
-
+  // (requestId, init, origin come from the runGlmBody parameters
+  //  declared above.)
   if (!origin.includes('chatglm.cn')) {
     postToBridge(
       { type: 'WEB_LLM_ERROR', requestId, error: `GLM adapter requires chatglm.cn origin, got ${origin}` },
