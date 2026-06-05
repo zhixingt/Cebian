@@ -371,7 +371,7 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
           }
           if (out) {
             postToBridge(
-              { type: 'WEB_LLM_CHUNK', requestId, chunk: `data: ${JSON.stringify({ content: out })}\n\n` },
+              { type: 'WEB_LLM_CHUNK', requestId, chunk: out },
               origin,
             );
           }
@@ -400,7 +400,7 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
       }
       if (out) {
         postToBridge(
-          { type: 'WEB_LLM_CHUNK', requestId, chunk: `data: ${JSON.stringify({ content: out })}\n\n` },
+          { type: 'WEB_LLM_CHUNK', requestId, chunk: out },
           origin,
         );
       }

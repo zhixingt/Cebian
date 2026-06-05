@@ -484,10 +484,20 @@ export const deepseekMainWorldFetch = async (request: ContentFetchRequest): Prom
       const line = buffer.slice(0, lineEnd).trim();
       buffer = buffer.slice(lineEnd + 1);
       if (line.startsWith('data: ')) {
-        postToBridge(
-          { type: 'WEB_LLM_CHUNK', requestId, chunk: `${line}\n\n` },
-          origin,
-        );
+        const payload = line.slice(6);
+        if (payload === '[DONE]') {
+          postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
+          continue;
+        }
+        try {
+          const json = JSON.parse(payload) as Record<string, unknown>;
+          // DeepSeek format: {"v":"text"} for content fragments, or
+          // {"v":{...}} for response container, or metadata fields
+          // (request_message_id, updated_at, etc.) which we skip.
+          if (typeof json.v === 'string' && json.v.length > 0) {
+            postToBridge({ type: 'WEB_LLM_CHUNK', requestId, chunk: json.v }, origin);
+          }
+        } catch { /* skip non-JSON lines */ }
       }
     }
   }
@@ -501,11 +511,19 @@ export const deepseekMainWorldFetch = async (request: ContentFetchRequest): Prom
       postToBridge({ type: 'WEB_LLM_CHUNK', requestId, chunk: `${line}\n\n` }, origin);
     }
   }
-  if (buffer.trim().startsWith('data: ')) {
-    postToBridge(
-      { type: 'WEB_LLM_CHUNK', requestId, chunk: `${buffer.trim()}\n\n` },
-      origin,
-    );
+  const tailLine = buffer.trim();
+  if (tailLine.startsWith('data: ')) {
+    const payload = tailLine.slice(6);
+    if (payload === '[DONE]') {
+      postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
+    } else {
+      try {
+        const json = JSON.parse(payload) as Record<string, unknown>;
+        if (typeof json.v === 'string' && json.v.length > 0) {
+          postToBridge({ type: 'WEB_LLM_CHUNK', requestId, chunk: json.v }, origin);
+        }
+      } catch { /* skip */ }
+    }
   }
   postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
 };
