@@ -300,14 +300,30 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
   }
 
   if (existingChatId) {
-    const idChunk = `data: ${JSON.stringify({ type: 'glm:chat_id', chat_id: existingChatId })}\n\n`;
-    postToBridge({ type: 'WEB_LLM_CHUNK', requestId, chunk: idChunk }, origin);
+    // ⑨.2: tell the SW to persist this session id so a follow-up
+    // turn (or a future session) can re-use it. The SW listener calls
+    // setConversation() and any Dexie failure is just a console.warn.
+    // ⑫: don't leak the raw `data: {glm:chat_id}` envelope to the
+    // sidepanel — that was a UX bug fixed in the same commit family.
+    postToBridge(
+      {
+        type: 'WEB_LLM_CONVERSATION_UPDATE',
+        requestId,
+        modelId: request.modelId,
+        conversationId: existingChatId,
+      },
+      origin,
+    );
   }
 
   let buffer = '';
   let prevText = '';
   let prevThink = '';
   let prevLogicId = '';
+  // ⑨.2: GLM's first response carries the new conversation_id at the
+  // top level of the JSON. Capture it once and tell the SW to persist
+  // it so the next turn can echo it back as conversation_id.
+  let seenConversationId: string | null = existingChatId || null;
   const decoder = new TextDecoder();
   const flushSse = (): string | null => {
     const idx = buffer.indexOf('\n\n');
@@ -323,6 +339,19 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     if (data === '[DONE]') return '__DONE__';
     let parsed: Record<string, unknown>;
     try { parsed = JSON.parse(data) as Record<string, unknown>; } catch { return ''; }
+    // ⑨.2: surface the new conversation_id the first time we see it
+    if (!seenConversationId && typeof parsed.conversation_id === 'string' && parsed.conversation_id.length > 0) {
+      seenConversationId = parsed.conversation_id;
+      postToBridge(
+        {
+          type: 'WEB_LLM_CONVERSATION_UPDATE',
+          requestId,
+          modelId: request.modelId,
+          conversationId: seenConversationId,
+        },
+        origin,
+      );
+    }
     if (parsed.error) {
       const err = parsed.error as Record<string, unknown>;
       throw new Error((err.message as string | undefined) ?? 'GLM error');
