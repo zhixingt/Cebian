@@ -204,7 +204,7 @@ export function _getTabEntryForTesting(
 // ⑧ Message contract (re-export from content script for SW convenience)
 // ====================================================================
 
-import { diag, diagError } from './web-provider-diag';
+import { diag, diagError, isDiagEnabled } from './web-provider-diag';
 
 export const WEB_LLM_RELAY_READY = 'WEB_LLM_RELAY_READY' as const;
 export const WEB_LLM_CHUNK = 'WEB_LLM_CHUNK' as const;
@@ -263,11 +263,14 @@ export async function injectDomRelay(
   request: DomRelayRequest,
 ): Promise<unknown> {
   // 1. ISOLATED bridge: forwards window.postMessage from MAIN to SW
+  // ⑨.4: pass the diag flag as an arg so the bridge's per-message
+  // log gate works without a module-scope import.
+  const debug = await isDiagEnabled();
   const isolatedResult = await chrome.scripting.executeScript({
     target: { tabId },
     world: 'ISOLATED',
     func: installIsolatedBridge,
-    args: [request.providerId],
+    args: [request.providerId, debug],
   });
 
   // 2. MAIN orchestrator: set message + send + poll DOM
@@ -310,11 +313,16 @@ export async function injectContentFetch(
   //    that forwards WEB_LLM_* events to chrome.runtime).
   let isolatedResult: unknown;
   try {
+    // ⑨.4: pass the diag flag as an arg so the bridge's per-message
+    // log gate works without a module-scope import (the function is
+    // serialized by chrome.scripting.executeScript and re-parsed in
+    // the ISOLATED world — module imports would be `undefined` there).
+    const debug = await isDiagEnabled();
     isolatedResult = await chrome.scripting.executeScript({
       target: { tabId },
       world: 'ISOLATED',
       func: installIsolatedBridge,
-      args: [providerId],
+      args: [providerId, debug],
     });
     diag('WS-DIAG', `ISOLATED bridge installed for ${providerId}`);
   } catch (e) {

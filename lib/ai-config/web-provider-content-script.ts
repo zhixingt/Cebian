@@ -18,7 +18,6 @@
  */
 
 import type { WebProviderDomStrategy } from './web-provider-dom-strategy';
-import { diag, diagWarn } from './web-provider-diag';
 
 export interface DomRelayRequest {
   providerId: string;
@@ -346,7 +345,7 @@ export async function runDomRelayMainWorld(request: DomRelayRequest): Promise<vo
  * ISOLATED-world bridge. Forwards window.postMessage from MAIN to SW.
  * Stringified and injected; must be self-contained.
  */
-export function installIsolatedBridge(providerId: string): void {
+export function installIsolatedBridge(providerId: string, debug: boolean = false): void {
   const w = window as unknown as { __cebWebProviderBridge?: { providerId: string } };
   if (w.__cebWebProviderBridge?.providerId === providerId) return;
 
@@ -358,27 +357,34 @@ export function installIsolatedBridge(providerId: string): void {
   document.addEventListener('ceb-web-provider-message', ((event: Event) => {
     const data = (event as CustomEvent<Record<string, unknown>>).detail;
     if (!data || typeof data !== 'object') return;
-    // ⑫ DIAG: log every event the bridge sees. Routed through the
-    // ⑨.4 diag gate — silent in production unless the user has
-    // enabled `web_provider_debug` in chrome.storage.local.
-    diag('WS-DIAG-BRIDGE', 'received CustomEvent', {
+    // ⑫ DIAG: log every event the bridge sees. We can't use the ⑨.4
+    // diag gate here directly because this function is serialized by
+    // `chrome.scripting.executeScript` and re-parsed in the ISOLATED
+    // world — module-scope imports would be `undefined` in the target
+    // context, throwing "X is not defined" on the first message. The
+    // SW reads the flag and passes it as the `debug` arg, so the gate
+    // is respected without a module reference.
+    const log = (...args: unknown[]): void => {
+      if (debug) console.log(...args);
+    };
+    log('[WS-DIAG-BRIDGE] received CustomEvent', {
       type: data.type,
       providerId: data.providerId,
       keys: Object.keys(data).slice(0, 8),
     });
     if (data.providerId !== providerId) {
-      diag('WS-DIAG-BRIDGE', 'DROPPING (providerId mismatch)');
+      log('[WS-DIAG-BRIDGE] DROPPING (providerId mismatch)');
       return;
     }
     if (typeof data.type !== 'string' || !data.type.startsWith('WEB_LLM_')) {
-      diag('WS-DIAG-BRIDGE', 'DROPPING (not WEB_LLM_ type)');
+      log('[WS-DIAG-BRIDGE] DROPPING (not WEB_LLM_ type)');
       return;
     }
-    diag('WS-DIAG-BRIDGE', 'forwarding to SW', data.type);
+    log('[WS-DIAG-BRIDGE] forwarding to SW', data.type);
     chrome.runtime.sendMessage(data).catch((err) => {
       // sendMessage failures are real (no SW receiver, etc.) — surface
       // them even when diag is off so we don't lose this signal.
-      diagWarn('WS-DIAG-BRIDGE', 'sendMessage failed', err);
+      console.warn('[WS-DIAG-BRIDGE] sendMessage failed:', err);
     });
   }) as EventListener);
 
