@@ -75,7 +75,6 @@ export interface ContentFetchRequest {
    *  - `connect-json`: 5-byte header [flags:1][len:4] then JSON payload
    *  - `gemini-chunks`: same envelope, different framing
    *  - `glm-intl`: same envelope, different framing
-   *  - `deepseek`: same envelope, different framing
    *  - `chatgpt`: same envelope, different framing
    *  - `doubao`: same envelope, different framing
    *  - `rakuten`: same envelope, different framing
@@ -84,7 +83,6 @@ export interface ContentFetchRequest {
     | 'connect-json'
     | 'gemini-chunks'
     | 'glm-intl'
-    | 'deepseek'
     | 'chatgpt'
     | 'doubao'
     | 'rakuten';
