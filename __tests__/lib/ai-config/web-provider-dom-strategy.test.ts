@@ -5,7 +5,6 @@ import {
   startReader,
   DOM_STRATEGIES,
   GLM_DOM_STRATEGY,
-  DEEPSEEK_DOM_STRATEGY,
   type ReaderStrategy,
   type ReaderCallbacks,
   type Scheduler,
@@ -362,21 +361,15 @@ describe('startReader', () => {
 // ===== Per-provider strategies =====
 
 describe('DOM_STRATEGIES (verified via T1 DevTools, 2026-06-04)', () => {
-  it('has both built-in providers (GLM + DeepSeek; Kimi removed)', () => {
+  it('has only GLM (DeepSeek and Kimi removed)', () => {
     expect(DOM_STRATEGIES.glm).toBeDefined();
-    expect(DOM_STRATEGIES.deepseek).toBeDefined();
+    expect(Object.keys(DOM_STRATEGIES)).toEqual(['glm']);
   });
 
   it('GLM uses textarea-setter + enter (verified via plain <textarea> selector)', () => {
     expect(GLM_DOM_STRATEGY.input.selector).toBe('textarea');
     expect(GLM_DOM_STRATEGY.input.setMethod).toBe('textarea-setter');
     expect(GLM_DOM_STRATEGY.input.sendMethod).toBe('enter');
-  });
-
-  it('DeepSeek uses textarea-setter + enter (verified: <textarea placeholder="给 DeepSeek 发送消息">)', () => {
-    expect(DEEPSEEK_DOM_STRATEGY.input.selector).toBe('textarea');
-    expect(DEEPSEEK_DOM_STRATEGY.input.setMethod).toBe('textarea-setter');
-    expect(DEEPSEEK_DOM_STRATEGY.input.sendMethod).toBe('enter');
   });
 
   it('all strategies have a reader with non-empty assistantMessageSelector', () => {

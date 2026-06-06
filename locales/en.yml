@@ -538,12 +538,6 @@ webProviders:
     glm:
       name: "GLM (Zhipu)"
       description: "ChatGLM web version"
-    kimi:
-      name: "Kimi (Moonshot)"
-      description: "Moonshot AI web version"
-    deepseek:
-      name: "DeepSeek"
-      description: "DeepSeek web version"
   fields:
     enabled: "Enabled"
     modelIdLabel: "Model ID"

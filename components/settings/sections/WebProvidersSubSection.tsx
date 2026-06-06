@@ -9,6 +9,9 @@ import {
 } from '@/lib/ai-config/web-provider-presets';
 import { getWebProviderRepository } from '@/lib/ai-config/web-provider-store';
 import { invalidateBundle } from '@/lib/ai-config/web-provider-bundle';
+import { shouldClearActiveModel } from '@/lib/ai-config/web-provider-active-model';
+import { useStorageItem } from '@/hooks/useStorageItem';
+import { activeModel } from '@/lib/storage';
 import type { WebProvider, WebProviderUserOverrides } from '@/lib/types';
 import { t } from '@/lib/i18n';
 import { WebProviderCard } from '../provider/WebProviderCard';
@@ -62,6 +65,11 @@ export function WebProvidersSubSection() {
     [login],
   );
 
+  // Mirror activeModel so the logout handler can clear it if the user had
+  // the about-to-be-logged-out provider selected. See shouldClearActiveModel
+  // JSDoc for the why.
+  const [currentActiveModel] = useStorageItem(activeModel, null);
+
   // ⑤.3: clear stored cookies + set loggedOut + invalidate bundle cache.
   // Direct repo call (not via the hook) because the hook only exposes the
   // common setters; clearEncryptedCookieBundle is a ⑤ addition. Invalidate
@@ -76,13 +84,21 @@ export function WebProvidersSubSection() {
         invalidateBundle(id);
         // Clear the A1 capture display for this provider.
         setCaptureByProvider(prev => ({ ...prev, [id]: undefined }));
+        // If the user's active model points at this just-logged-out provider,
+        // clear it. Otherwise the model selector won't show it (because
+        // getAvailableWebModels filters by loginStatus='loggedIn') and the
+        // next chat attempt would resolve the model to null → confusing
+        // "No model selected or model not found" error.
+        if (shouldClearActiveModel(currentActiveModel, id)) {
+          await activeModel.setValue(null);
+        }
         toast.success(t('webProviders.messages.logoutSuccess'));
       } catch (err) {
         console.warn('[web-providers] logout failed:', err);
         toast.error(t('webProviders.messages.logoutFailed'));
       }
     },
-    [update],
+    [update, currentActiveModel],
   );
 
   // Re-check should NOT clear capture — it just verifies the stored bundle.

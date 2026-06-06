@@ -76,27 +76,6 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     // per-request headers from localStorage. DOM injection bypasses all of that.
     domStrategy: DOM_STRATEGIES.glm,
   },
-  {
-    id: 'deepseek',
-    displayNameKey: 'webProviders.presets.deepseek.name',
-    descriptionKey: 'webProviders.presets.deepseek.description',
-    loginUrl: 'https://chat.deepseek.com',
-    defaultModelId: 'deepseek-chat',
-    defaultSupportsToolCalls: true,
-    defaultSupportsReasoning: true,
-    cookieDomain: 'chat.deepseek.com',
-    // DeepSeek login signals may appear in either cookie or localStorage
-    // depending on rollout/region. Keep both to reduce false "Logging in...".
-    sessionIndicators: ['sessionid', 'userToken'],
-    useLocalStorageFallback: true,
-    // ⭐ ⑧: DOM strategy. Verified 2026-06-04.
-    //   - chat input: <textarea> (placeholder: "给 DeepSeek 发送消息")
-    //   - send: Enter key
-    //   - assistant message: last .ds-markdown
-    // DeepSeek's HTTP API requires PoW challenge (WebAssembly solver) + Bearer
-    // from localStorage. DOM injection bypasses both.
-    domStrategy: DOM_STRATEGIES.deepseek,
-  },
 ] as const;
 
 /**

@@ -1,4 +1,5 @@
 import { storage } from '#imports';
+import { isValidActiveModel } from './ai-config/web-provider-active-model-validation';
 
 // ─── Provider credential types ───
 
@@ -111,7 +112,17 @@ export const providerCredentials = storage.defineItem<ProviderCredentials>(
 
 export const activeModel = storage.defineItem<ActiveModel | null>(
   'local:activeModel',
-  { fallback: null },
+  {
+    fallback: null,
+    // Stale-value cleanup is performed at startup in
+    // `entrypoints/background/index.ts` (see `cleanupStaleActiveModel`)
+    // and at runtime in `agent-manager.resolveModelObj` (self-heal).
+    // WXT's `migrations` (version-bump + map) is not used here because
+    // migrations only run when the version number is bumped, and a
+    // single bump cleans up at most one user cohort. The startup pass
+    // is idempotent and runs on every load — guaranteed to catch
+    // any future stale values without a code change.
+  },
 );
 
 export const customProviders = storage.defineItem<CustomProviderConfig[]>(

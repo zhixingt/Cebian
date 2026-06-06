@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getWebProviderRepository } from '@/lib/ai-config/web-provider-store';
 import { getDb } from '@/lib/db';
 import type { WebProvider } from '@/lib/types';
@@ -11,13 +11,10 @@ describe('WebProviderRepository', () => {
   });
 
   describe('list()', () => {
-    it('seeds 2 presets on empty DB', async () => {
+    it('seeds 1 preset on empty DB', async () => {
       const providers = await getWebProviderRepository().list();
-      expect(providers).toHaveLength(2);
-      expect(providers.map((p) => p.presetId).sort()).toEqual([
-        'deepseek',
-        'glm',
-      ]);
+      expect(providers).toHaveLength(1);
+      expect(providers.map((p) => p.presetId)).toEqual(['glm']);
     });
 
     it('all seeded providers have encryptedCookieBundle === null', async () => {
@@ -35,6 +32,70 @@ describe('WebProviderRepository', () => {
       const second = await repo.list();
       const glm = second.find((p) => p.presetId === 'glm');
       expect(glm?.enabled).toBe(false); // update preserved, not overwritten
+    });
+  });
+
+  describe('list() stale-row cleanup', () => {
+    it('removes rows whose presetId is not in current WEB_PROVIDER_PRESETS', async () => {
+      const repo = getWebProviderRepository();
+      await repo.list();  // seeds 1 GLM row
+      // Manually insert a stale row (simulates a user previously logged in to deepseek)
+      const db = (await import('@/lib/db')).getDb();
+      await db.webProviders.add({
+        presetId: 'deepseek' as any,  // bypass narrow type for this test
+        enabled: true,
+        loginStatus: 'loggedIn',
+        modelId: 'deepseek-chat',
+        supportsToolCalls: false,
+        supportsReasoning: false,
+        lastCheckedAt: null,
+        encryptedCookieBundle: 'old-bundle',
+        userOverrides: null,
+        loginAuditLog: [],
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      });
+      // Verify pre-state: 2 rows
+      expect(await db.webProviders.count()).toBe(2);
+
+      // Act: call list() — should trigger cleanup
+      const providers = await repo.list();
+
+      // Post-state: only GLM remains
+      expect(providers).toHaveLength(1);
+      expect(providers[0].presetId).toBe('glm');
+      expect(await db.webProviders.count()).toBe(1);
+    });
+
+    it('logs a warning when stale rows are deleted (operational visibility)', async () => {
+      const { getDb } = await import('@/lib/db');
+      await getDb().webProviders.clear();
+      const repo = getWebProviderRepository();
+      await repo.list();
+      await getDb().webProviders.add({
+        presetId: 'kimi' as any,
+        enabled: true,
+        loginStatus: 'loggedOut',
+        modelId: 'moonshot-v1',
+        supportsToolCalls: false,
+        supportsReasoning: false,
+        lastCheckedAt: null,
+        encryptedCookieBundle: null,
+        userOverrides: null,
+        loginAuditLog: [],
+        createdAt: '2026-01-01T00:00:00Z',
+        updatedAt: '2026-01-01T00:00:00Z',
+      });
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await repo.list();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('web-provider-stale-cleanup'),
+        expect.objectContaining({ deletedPresetIds: ['kimi'] }),
+      );
+      warnSpy.mockRestore();
     });
   });
 
@@ -74,8 +135,8 @@ describe('WebProviderRepository', () => {
     it('persists loggedIn and updates lastCheckedAt', async () => {
       const repo = getWebProviderRepository();
       await repo.list();
-      await repo.setLoginStatus('deepseek', 'loggedIn');
-      const result = await repo.get('deepseek');
+      await repo.setLoginStatus('glm', 'loggedIn');
+      const result = await repo.get('glm');
       expect(result?.loginStatus).toBe('loggedIn');
       expect(result?.lastCheckedAt).not.toBeNull();
     });
@@ -83,8 +144,8 @@ describe('WebProviderRepository', () => {
     it('persists loggedOut', async () => {
       const repo = getWebProviderRepository();
       await repo.list();
-      await repo.setLoginStatus('deepseek', 'loggedOut');
-      const result = await repo.get('deepseek');
+      await repo.setLoginStatus('glm', 'loggedOut');
+      const result = await repo.get('glm');
       expect(result?.loginStatus).toBe('loggedOut');
     });
   });
@@ -111,8 +172,8 @@ describe('WebProviderRepository', () => {
     it('updates supportsReasoning', async () => {
       const repo = getWebProviderRepository();
       await repo.list();
-      await repo.setCapability('deepseek', 'supportsReasoning', false);
-      const result = await repo.get('deepseek');
+      await repo.setCapability('glm', 'supportsReasoning', false);
+      const result = await repo.get('glm');
       expect(result?.supportsReasoning).toBe(false);
     });
   });

@@ -9,11 +9,11 @@ describe('useWebProviders', () => {
     await getDb().webProviders.clear();
   });
 
-  it('starts with isLoading=true, then resolves to 2 seeded providers', async () => {
+  it('starts with isLoading=true, then resolves to 1 seeded provider', async () => {
     const { result } = renderHook(() => useWebProviders());
     expect(result.current.isLoading).toBe(true);
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.providers).toHaveLength(2);
+    expect(result.current.providers).toHaveLength(1);
     expect(result.current.error).toBeNull();
   });
 
@@ -31,22 +31,20 @@ describe('useWebProviders', () => {
     const { result } = renderHook(() => useWebProviders());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     await act(async () => {
-      await result.current.update.setLoginStatus('deepseek', 'loggedIn');
+      await result.current.update.setLoginStatus('glm', 'loggedIn');
     });
-    const kimi = result.current.providers.find((p) => p.presetId === 'deepseek');
-    expect(kimi?.loginStatus).toBe('loggedIn');
+    const glm = result.current.providers.find((p) => p.presetId === 'glm');
+    expect(glm?.loginStatus).toBe('loggedIn');
   });
 
   it('setModelId updates state', async () => {
     const { result } = renderHook(() => useWebProviders());
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     await act(async () => {
-      await result.current.update.setModelId('deepseek', 'deepseek-coder');
+      await result.current.update.setModelId('glm', 'GLM-5');
     });
-    const deepseek = result.current.providers.find(
-      (p) => p.presetId === 'deepseek',
-    );
-    expect(deepseek?.modelId).toBe('deepseek-coder');
+    const glm = result.current.providers.find((p) => p.presetId === 'glm');
+    expect(glm?.modelId).toBe('GLM-5');
   });
 
   it('setCapability updates the correct capability', async () => {
@@ -80,7 +78,7 @@ describe('useWebProviders', () => {
       }
     });
     // hook itself remains stable
-    expect(result.current.providers).toHaveLength(2);
+    expect(result.current.providers).toHaveLength(1);
   });
 
   it('cancelled unmount does not set state after unmount', async () => {

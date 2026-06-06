@@ -21,18 +21,18 @@ describe('WEB_PROVIDER_PRESETS', () => {
     }
   });
 
-  it('only GLM has refreshUrl set (DeepSeek does not need token exchange)', () => {
-    const glm = WEB_PROVIDER_PRESETS.find(p => p.id === 'glm')!;
-    const ds = WEB_PROVIDER_PRESETS.find(p => p.id === 'deepseek')!;
-    expect(glm.refreshUrl).toBeDefined();
-    expect(glm.refreshUrl).toMatch(/^https:\/\//);
-    expect(ds.refreshUrl).toBeUndefined();
+  it('only GLM is in the preset list (DeepSeek and Kimi removed)', () => {
+    expect(WEB_PROVIDER_PRESETS).toHaveLength(1);
+    expect(WEB_PROVIDER_PRESETS[0].id).toBe('glm');
   });
 
-  it('DeepSeek uses localStorage fallback (provider token may be localStorage-backed)', () => {
-    const ds = WEB_PROVIDER_PRESETS.find(p => p.id === 'deepseek')!;
-    expect(ds.useLocalStorageFallback).toBe(true);
-    // GLM should NOT use localStorage fallback
+  it('GLM has refreshUrl set', () => {
+    const glm = WEB_PROVIDER_PRESETS.find(p => p.id === 'glm')!;
+    expect(glm.refreshUrl).toBeDefined();
+    expect(glm.refreshUrl).toMatch(/^https:\/\//);
+  });
+
+  it('GLM does NOT use localStorage fallback (cookie-backed token)', () => {
     const glm = WEB_PROVIDER_PRESETS.find(p => p.id === 'glm')!;
     expect(glm.useLocalStorageFallback).toBe(false);
   });

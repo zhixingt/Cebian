@@ -41,25 +41,25 @@ describe('handleWebProviderNeedsRelogin (⑤.4: sidepanel handler for 401/403)',
   it('shows a toast with the user-friendly message (destructive variant for 401/403)', () => {
     const deps = makeDeps();
     handleWebProviderNeedsRelogin(
-      makeMsg({ providerId: 'kimi', status: 403, message: 'Forbidden' }),
+      makeMsg({ providerId: 'glm', status: 403, message: 'Forbidden' }),
       deps,
     );
     expect(deps.showToast).toHaveBeenCalledWith(
       expect.objectContaining({
         variant: 'destructive',
-        description: expect.stringMatching(/Kimi|re-login/i),
+        description: expect.stringMatching(/GLM|re-login/i),
       }),
     );
   });
 
   it('calls openSettings to navigate the user to the Web providers section', () => {
     const deps = makeDeps();
-    handleWebProviderNeedsRelogin(makeMsg({ providerId: 'deepseek' }), deps);
-    expect(deps.openSettings).toHaveBeenCalledWith('deepseek');
+    handleWebProviderNeedsRelogin(makeMsg({ providerId: 'glm' }), deps);
+    expect(deps.openSettings).toHaveBeenCalledWith('glm');
   });
 
-  it('handles all 3 built-in providers (glm, kimi, deepseek)', () => {
-    for (const providerId of ['glm', 'kimi', 'deepseek'] as const) {
+  it('handles the sole built-in provider (glm)', () => {
+    for (const providerId of ['glm'] as const) {
       const deps = makeDeps();
       handleWebProviderNeedsRelogin(makeMsg({ providerId }), deps);
       expect(deps.openSettings).toHaveBeenCalledWith(providerId);

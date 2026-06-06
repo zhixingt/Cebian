@@ -53,7 +53,6 @@ import { WEB_PROVIDER_PRESETS, type WebProviderPreset } from './web-provider-pre
 // ⑪: Import per-provider content-fetch adapters so the bundler retains
 // their function bodies (chromeclaw-style HTTP-replay path). The export
 // `defaultMainWorldFetchByProvider` wires them up for the default deps.
-import { deepseekMainWorldFetch } from './web-provider-content-fetch-deepseek';
 import { glmMainWorldFetch } from './web-provider-content-fetch-glm';
 import type { ContentFetchRequest } from './web-provider-content-fetch-main';
 import type { WebProvider } from '../types';
@@ -111,10 +110,6 @@ let _defaultDeps: WebSessionStreamDeps | null = null;
  * one of these at runtime based on the resolved providerId.
  */
 export const defaultMainWorldFetchByProvider: WebSessionStreamDeps['mainWorldFetchByProvider'] = {
-  deepseek: {
-    request: { type: 'WEB_LLM_FETCH' } as unknown as object,
-    func: deepseekMainWorldFetch as unknown as (request: unknown) => Promise<void>,
-  },
   glm: {
     request: { type: 'WEB_LLM_FETCH' } as unknown as object,
     func: glmMainWorldFetch as unknown as (request: unknown) => Promise<void>,

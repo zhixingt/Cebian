@@ -11,6 +11,25 @@ export class WebProviderRepository {
   constructor(private db: CebianDB) {}
 
   async list(): Promise<WebProvider[]> {
+    // ② startup cleanup: delete rows whose presetId is no longer registered.
+    // This handles the case where a user previously logged in to a provider
+    // that was later removed from WEB_PROVIDER_PRESETS (e.g. Kimi / DeepSeek
+    // removal in 2026-06). Without this, the stale row would survive
+    // indefinitely and any caller that doesn't defensively filter would
+    // throw on resolveWebModel (e.g. agent-manager.resolveModelObj).
+    const all = await this.db.webProviders.toArray();
+    const validIds = new Set(WEB_PROVIDER_PRESETS.map((p) => p.id));
+    const staleIds = all
+      .map((p) => p.presetId)
+      .filter((id) => !validIds.has(id));
+    if (staleIds.length > 0) {
+      console.warn('[web-provider-stale-cleanup] deleting rows for removed presets', {
+        deletedPresetIds: staleIds,
+      });
+      await this.db.webProviders.bulkDelete(staleIds);
+    }
+
+    // Continue with the original seed-if-missing logic.
     const existing = await this.db.webProviders.toArray();
     const existingIds = new Set(existing.map((p) => p.presetId));
     const missing = WEB_PROVIDER_PRESETS

@@ -16,14 +16,12 @@ export interface WebProviderNeedsReloginDeps {
   /** Show a toast (sonner-compatible). Called with { variant, title, description }. */
   showToast: (opts: { variant: 'destructive' | 'default'; title: string; description: string }) => void;
   /** Open Settings view, scrolled to the failed provider. */
-  openSettings: (providerId: 'glm' | 'kimi' | 'deepseek') => void;
+  openSettings: (providerId: 'glm') => void;
 }
 
 /** Human-friendly provider display name (for toast title). */
-const PROVIDER_DISPLAY_NAME: Record<'glm' | 'kimi' | 'deepseek', string> = {
+const PROVIDER_DISPLAY_NAME: Record<'glm', string> = {
   glm: 'GLM',
-  kimi: 'Kimi',
-  deepseek: 'DeepSeek',
 };
 
 /**

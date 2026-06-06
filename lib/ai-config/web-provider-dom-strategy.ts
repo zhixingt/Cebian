@@ -400,31 +400,6 @@ export const GLM_DOM_STRATEGY: WebProviderDomStrategy = {
   },
 };
 
-export const DEEPSEEK_DOM_STRATEGY: WebProviderDomStrategy = {
-  input: {
-    // DeepSeek uses a controlled <textarea>. Verified: page probe showed
-    // `placeholder="给 DeepSeek 发送消息"` and found via querySelector('textarea').
-    selector: 'textarea',
-    setMethod: 'textarea-setter',
-    sendMethod: 'enter',
-    settleDelayMs: 200,
-    scrollIntoView: true,
-  },
-  reader: {
-    // DeepSeek renders assistant messages with class containing "markdown".
-    // Verified 2026-06-04: 2 `[class*="markdown"]` elements; the last is the
-    // AI's latest reply.
-    assistantMessageSelector: '[class*="markdown"]:last-of-type',
-    // DeepSeek shows a stop button while generating (label "停止生成" or "Stop").
-    thinkingIndicatorSelector: 'button[class*="stop"], [data-testid="stop-generating"]',
-    pollIntervalMs: 100,
-    stableThresholdMs: 700,
-    maxTotalMs: 60_000,
-    textMode: 'innerText',
-  },
-};
-
 export const DOM_STRATEGIES: Record<WebProvider['presetId'], WebProviderDomStrategy> = {
   glm: GLM_DOM_STRATEGY,
-  deepseek: DEEPSEEK_DOM_STRATEGY,
 };

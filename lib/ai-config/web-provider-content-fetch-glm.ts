@@ -27,18 +27,22 @@
  */
 import type { ContentFetchRequest } from './web-provider-content-fetch-main';
 
-/**
- * ⑬: Max wall-clock for the entire adapter call. If the GLM SSE
- * stream stalls (server side hang, network drop, etc.) the reader
- * never resolves and the sidepanel stays in a loading state
- * forever. We cap the call at this duration so the spinner
- * disappears and the user sees a clear error.
- */
-const ADAPTER_TIMEOUT_MS = 90_000;
-
 export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<void> => {
   const requestId = request.requestId;
   const origin = window.location.origin;
+
+  // ⑬: Max wall-clock for the entire adapter call. If the GLM SSE
+  // stream stalls (server side hang, network drop, etc.) the reader
+  // never resolves and the sidepanel stays in a loading state
+  // forever. We cap the call at this duration so the spinner
+  // disappears and the user sees a clear error.
+  //
+  // CRITICAL: this MUST be declared inside the function body. The function
+  // is serialized via `chrome.scripting.executeScript({func})` which uses
+  // `Function.prototype.toString()` — module-scope identifiers are NOT
+  // captured, so the function would reference an undefined symbol in MAIN
+  // world → runtime `ReferenceError` (e.g. "qyt is not defined" after minify).
+  const ADAPTER_TIMEOUT_MS = 90_000;
 
   // ⑫ FIX: cross-world messaging via document CustomEvent
   // (window.postMessage doesn't cross the MAIN↔ISOLATED world boundary)

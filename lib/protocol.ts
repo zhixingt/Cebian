@@ -78,7 +78,7 @@ export type ServerMessage =
   | { type: 'recorder_session'; session: RecordedSession }
   /** ⑤.4: SW broadcasts when a web provider's session expired (401/403).
    *  Sidepanel should show a toast + open Settings. */
-  | { type: 'web_provider_needs_relogin'; providerId: 'glm' | 'kimi' | 'deepseek'; status: 401 | 403; message: string }
+  | { type: 'web_provider_needs_relogin'; providerId: 'glm'; status: 401 | 403; message: string }
   /** Sent in reply to `recorder_start` when the BG refuses to start a
    *  recording. `busy` = another sidepanel instance currently owns the
    *  recorder; `before_hello` = the requesting port never sent its

@@ -528,12 +528,6 @@ webProviders:
     glm:
       name: "GLM（智谱）"
       description: "智谱 ChatGLM 网页版"
-    kimi:
-      name: "Kimi（月之暗面）"
-      description: "月之暗面 Moonshot 网页版"
-    deepseek:
-      name: "DeepSeek（深度求索）"
-      description: "深度求索网页版"
   fields:
     enabled: "已启用"
     modelIdLabel: "模型 ID"

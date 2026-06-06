@@ -200,7 +200,14 @@ class AgentManager {
     if (modelCfg.provider === 'web') {
       const providers = await getWebProviderRepository().list();
       const webModel = resolveSelectedWebModel(modelCfg, providers);
-      if (!webModel) return null;
+      if (!webModel) {
+        // 2026-06: self-heal — if activeModel points at a removed or
+        // otherwise unresolvable web provider, clear it so the user is
+        // prompted to pick a fresh model instead of staying stuck on a
+        // ghost reference. Idempotent; safe to call repeatedly.
+        await activeModelStorage.setValue(null);
+        return null;
+      }
       return {
         model: webModel as unknown as Model<Api>,
         provider: modelCfg.provider,

@@ -12,6 +12,8 @@ import { registerCookieService } from '@/lib/ai-config/web-provider-cookie-servi
 import { registerWebProviderStream } from '@/lib/ai-config/web-provider-stream';
 import { registerWebProviderReloginHandler, type WebProviderNeedsReloginMessage } from './web-provider-relogin';
 import { invalidateBundle } from '@/lib/ai-config/web-provider-bundle';
+import { isValidActiveModel } from '@/lib/ai-config/web-provider-active-model-validation';
+import { activeModel as activeModelStorage } from '@/lib/storage';
 
 /**
  * Grace period after the last subscribed port disconnects before the agent
@@ -30,6 +32,22 @@ export default defineBackground(() => {
   chrome.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })
     .catch((error) => console.error(error));
+
+  // 2026-06: cleanup stale activeModel values left over from removed web
+  // providers (Kimi / DeepSeek) or corrupted values (e.g. {}). Idempotent
+  // and runs on every SW boot. The agent-manager.resolveModelObj() path
+  // also self-heals at runtime; this is the defense-in-depth start-up pass.
+  void (async () => {
+    try {
+      const current = await activeModelStorage.getValue();
+      if (current !== null && !isValidActiveModel(current)) {
+        console.warn('[activeModel-stale-cleanup] clearing', { current });
+        await activeModelStorage.setValue(null);
+      }
+    } catch (err) {
+      console.warn('[activeModel-stale-cleanup] failed', err);
+    }
+  })();
 
   setupOAuthRefresh();
   registerCookieService();

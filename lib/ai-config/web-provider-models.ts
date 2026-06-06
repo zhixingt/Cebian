@@ -79,10 +79,18 @@ export function resolveWebModel(
  *
  * Caller is responsible for fetching providers (e.g., from useWebProviders hook
  * or getWebProviderRepository().list()). Keeping this pure for testability.
+ *
+ * Defensive: a Dexie row whose `presetId` no longer exists in
+ * `WEB_PROVIDER_PRESETS` (e.g. user had DeepSeek/Kimi logged in before those
+ * presets were removed; `list()` does not delete stale rows, so the row
+ * lingers) is silently skipped. Without this guard, `resolveWebModel`
+ * throws "Unknown web provider" inside the `.map()` callback, which crashes
+ * the React tree at render time (blank sidepanel).
  */
 export function getAvailableWebModels(providers: WebProvider[]): WebProviderModel[] {
   return providers
     .filter(p => p.enabled && p.loginStatus === 'loggedIn')
+    .filter(p => WEB_PROVIDER_PRESETS.some(preset => preset.id === p.presetId))
     .map(p => resolveWebModel(p.presetId, p.modelId));
 }
 
@@ -105,6 +113,14 @@ export function resolveSelectedWebModel(
 
   const provider = providers.find(p => p.presetId === parsed.providerId);
   if (!provider || !provider.enabled || provider.loginStatus !== 'loggedIn') {
+    return null;
+  }
+  // Defensive: skip presets that have been removed from WEB_PROVIDER_PRESETS
+  // (e.g. user previously had DeepSeek selected; the Dexie row still exists
+  // even though the preset is gone). Without this guard, resolveWebModel
+  // throws "Unknown web provider" — a fatal crash inside the agent's
+  // getModel() chain.
+  if (!WEB_PROVIDER_PRESETS.some(preset => preset.id === parsed.providerId)) {
     return null;
   }
 

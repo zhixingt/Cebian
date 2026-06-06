@@ -50,7 +50,7 @@ describe('T14 #7: Logout flow → next chat shows "please log in" error (no wast
     };
   });
 
-  async function setupLoggedInProvider(providerId: 'glm' | 'deepseek' = 'glm') {
+  async function setupLoggedInProvider(providerId: 'glm' = 'glm') {
     const repo = getWebProviderRepository();
     await repo.list();  // creates default provider records
     const ciphertext = await encryptCookieBundle(JSON.stringify({ sessionid: 'old' }));
@@ -60,14 +60,14 @@ describe('T14 #7: Logout flow → next chat shows "please log in" error (no wast
     await resolveBundle(providerId);
   }
 
-  async function logout(providerId: 'glm' | 'deepseek') {
+  async function logout(providerId: 'glm' = 'glm') {
     const repo = getWebProviderRepository();
     await repo.clearEncryptedCookieBundle(providerId);
     await repo.setLoginStatus(providerId, 'loggedOut');
     invalidateBundle(providerId);
   }
 
-  function makeModel(providerId: 'glm' | 'deepseek' = 'glm'): Model<typeof WEB_SESSION_API> {
+  function makeModel(providerId: 'glm' = 'glm'): Model<typeof WEB_SESSION_API> {
     const preset = WEB_PROVIDER_PRESETS.find(p => p.id === providerId)!;
     return {
       id: `web:${providerId}:${preset.defaultModelId}`,
@@ -142,31 +142,31 @@ describe('T14 #7: Logout flow → next chat shows "please log in" error (no wast
   });
 
   it('logout invalidates the 5min bundle cache (next resolveBundle reads from DB, sees loggedOut)', async () => {
-    await setupLoggedInProvider('deepseek');
+    await setupLoggedInProvider('glm');
     // Simulate the cache being populated
-    const cached = await resolveBundle('deepseek');
+    const cached = await resolveBundle('glm');
     expect(cached).not.toBeNull();
     // User logs out
-    await logout('deepseek');
+    await logout('glm');
     // Even if the cache had the decrypted cookies, invalidateBundle clears them.
     // The next resolveBundle reads from DB → sees loginStatus=loggedOut → returns null.
-    const after = await resolveBundle('deepseek');
+    const after = await resolveBundle('glm');
     expect(after).toBeNull();
   });
 
   it('logout then re-login restores chat capability (the loop closes)', async () => {
-    await setupLoggedInProvider('deepseek');
-    await logout('deepseek');
+    await setupLoggedInProvider('glm');
+    await logout('glm');
     // After logout: null
-    const afterLogout = await resolveBundle('deepseek' as any);
+    const afterLogout = await resolveBundle('glm');
     expect(afterLogout).toBeNull();
     // User re-logs in: seed a new bundle
     const repo = getWebProviderRepository();
     const newCipher = await encryptCookieBundle(JSON.stringify({ sessionid: 'new' }));
-    await repo.setEncryptedCookieBundle('deepseek' as any, newCipher);
-    await repo.setLoginStatus('deepseek' as any, 'loggedIn');
+    await repo.setEncryptedCookieBundle('glm', newCipher);
+    await repo.setLoginStatus('glm', 'loggedIn');
     // resolveBundle now returns the new bundle (re-read from DB, status=loggedIn)
-    const afterRelogin = await resolveBundle('deepseek' as any);
+    const afterRelogin = await resolveBundle('glm');
     expect(afterRelogin).not.toBeNull();
     expect(afterRelogin!.sessionid).toBe('new');
   });
@@ -174,7 +174,6 @@ describe('T14 #7: Logout flow → next chat shows "please log in" error (no wast
   it('parseWebModelId round-trips correctly (sanity for the id format)', () => {
     const cases = [
       { id: 'web:glm:GLM-4.6', expected: { providerId: 'glm', modelId: 'GLM-4.6' } },
-      { id: 'web:deepseek:deepseek-chat', expected: { providerId: 'deepseek', modelId: 'deepseek-chat' } },
     ];
     for (const c of cases) {
       const parsed = parseWebModelId(c.id);

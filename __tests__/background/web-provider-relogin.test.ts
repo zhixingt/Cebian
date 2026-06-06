@@ -56,21 +56,21 @@ describe('handleWebProviderRelogin (⑤.2: SW-side re-login orchestration)', () 
   it('broadcasts web_provider_needs_relogin with providerId, status, message', () => {
     const msg: WebProviderRelayMessage = {
       type: WEB_LLM_NEEDS_RELOGIN,
-      providerId: 'deepseek',
+      providerId: 'glm',
       status: 403,
       message: 'Provider rejected the session',
     };
     handleWebProviderRelogin(msg, deps);
     expect(deps.broadcast).toHaveBeenCalledWith({
       type: 'web_provider_needs_relogin',
-      providerId: 'deepseek',
+      providerId: 'glm',
       status: 403,
       message: 'Provider rejected the session',
     });
   });
 
-  it('handles all 3 built-in providers (glm, kimi, deepseek)', () => {
-    for (const providerId of ['glm', 'deepseek', 'deepseek'] as const) {
+  it('handles the sole built-in provider (glm)', () => {
+    for (const providerId of ['glm'] as const) {
       const localDeps: WebProviderReloginDeps = {
         broadcast: vi.fn(),
         invalidateBundle: vi.fn(),
