@@ -28,7 +28,12 @@ describe('resolveWebModel (T5: pi-ai Model<web-session> shape)', () => {
     expect(model.id).toBe('web:glm:glm-4.6');
     expect(model.name).toContain('glm-4.6');
     expect(model.provider).toBeTruthy();
-    expect(model.baseUrl).toBe('https://chatglm.cn');
+    // 2026-06-07: loginUrl updated from 'https://chatglm.cn' to
+    // 'https://chatglm.cn/main/chat/new' so the tab actually lands on
+    // the chat interface instead of /main/alltoolsdetail. The baseUrl
+    // on the Model comes from the preset.loginUrl (see
+    // web-provider-models.ts:67).
+    expect(model.baseUrl).toBe('https://chatglm.cn/main/chat/new');
     expect(model.reasoning).toBe(false);
     expect(model.input).toEqual(['text']);  // MVP: no images
     expect(model.cost).toEqual({ input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });

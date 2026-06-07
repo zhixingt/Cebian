@@ -61,7 +61,17 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     id: 'glm',
     displayNameKey: 'webProviders.presets.glm.name',
     descriptionKey: 'webProviders.presets.glm.description',
-    loginUrl: 'https://chatglm.cn',
+    // 2026-06-07: was 'https://chatglm.cn' (root). After login the root
+    // URL redirects to /main/alltoolsdetail (the tool description page),
+    // NOT the chat interface. The DOM reader on the wrong page finds
+    // a stale .markdown-body describing tools, gets it filtered as
+    // noise by minChunkLength:2, and burns the full 60s maxTotalMs
+    // before timing out. Sidepanel then shows the RotateCcw retry
+    // icon with empty text — looks like "single refresh symbol". Best-
+    // effort fix: open /main/chat/new (the "new conversation" entry
+    // point) so the user lands on a real chat surface. If the path
+    // changes, only this constant needs updating.
+    loginUrl: 'https://chatglm.cn/main/chat/new',
     defaultModelId: 'glm-4.6',
     defaultSupportsToolCalls: true,
     defaultSupportsReasoning: false,

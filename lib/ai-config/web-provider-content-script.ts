@@ -295,6 +295,25 @@ export async function runDomRelayMainWorld(request: DomRelayRequest): Promise<vo
       return !!document.querySelector(request.domStrategy.reader.thinkingIndicatorSelector);
     };
 
+    // 2026-06-07: early-out for known non-chat pages. If the tab is on
+    // chatglm.cn but not on a chat surface (e.g. /main/alltoolsdetail
+    // tool description, /tools, /model-detail), the DOM reader will
+    // never find the right .markdown-body and will burn the full
+    // 60s maxTotalMs. Detect this once at reader start and surface an
+    // actionable WEB_LLM_ERROR with the current URL. We only check
+    // /alltoolsdetail explicitly because that's the page the root
+    // loginUrl redirects to; other non-chat paths are rare for the
+    // GLM web provider flow and fall through to the normal timeout
+    // path.
+    if (/\/alltoolsdetail(\?|$|\/)/.test(location.pathname + location.search + location.hash)) {
+      postToBridge({
+        type: 'WEB_LLM_ERROR',
+        providerId: request.providerId,
+        error: `GLM is on a tool description page (${location.pathname}), not the chat interface. Please open https://chatglm.cn/main/chat/new in this tab and retry.`,
+      });
+      return;
+    }
+
     // eslint-disable-next-line no-constant-condition
     while (true) {
       if (Date.now() - startedAt > maxMs) {
