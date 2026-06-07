@@ -67,6 +67,12 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         navigate('/chat/new', { replace: true });
       }
     }, [navigate]),
+    // 2026-06-07: forward onOpenSettings so the web_provider_needs_relogin
+    // flow (handleWebProviderNeedsRelogin → callbacks.onOpenSettings) can
+    // actually navigate to /settings. Without this the optional-chaining
+    // in useBackgroundAgent.ts:255 silently no-ops, and the user just sees
+    // a toast without any visible navigation.
+    onOpenSettings,
   });
 
   const { messages, isAgentRunning, sessionId: activeSessionId, sessionTitle, lastError } = state;

@@ -40,6 +40,7 @@ import { invalidateBundle as defaultInvalidateBundle } from '@/lib/ai-config/web
 import { getWebProviderRepository } from '@/lib/ai-config/web-provider-store';
 
 const PROBE_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_BROADCAST_DEDUP_MS = 5_000; // 5 seconds
 
 export interface InstallDeps {
   /**
@@ -54,11 +55,29 @@ export interface InstallDeps {
   addCookieListener: (cb: (event: unknown) => void) => void;
   /** addListener injection. Production: chrome.runtime.onMessage.addListener. */
   addMessageListener: (cb: (msg: any) => void) => void;
+  /**
+   * Per-providerId broadcast dedup window in ms. Default 5000. When the
+   * session watcher detects session loss and fires the relogin broadcast,
+   * a second detection within this window for the same providerId is
+   * suppressed. This prevents the sidepanel from showing 2-3 stacked
+   * toasts when a single user action (e.g. deleting 2 session cookies)
+   * fires `chrome.cookies.onChanged` multiple times in quick succession.
+   * Set to 0 to disable dedup (useful in tests).
+   */
+  dedupWindowMs?: number;
+  /**
+   * `Date.now` injection. Defaults to globalThis.Date.now. Tests can pass
+   * a controllable clock to fast-forward time and verify the dedup window
+   * elapses correctly.
+   */
+  now?: () => number;
 }
 
 let _installed = false;
 const _handles = new Map<WebProvider['presetId'], SessionWatcherHandle>();
 let _domainToPresetId = new Map<string, WebProvider['presetId']>();
+/** Last broadcast time per providerId, used for dedup. */
+const _lastBroadcastAt = new Map<WebProvider['presetId'], number>();
 
 /**
  * Install the session watcher. Idempotent — only the first call has
@@ -71,6 +90,8 @@ export function installSessionWatcher(deps: InstallDeps): void {
 
   const presets = deps.presets ?? WEB_PROVIDER_PRESETS;
   const startW = deps.startSessionWatcher;
+  const dedupWindowMs = deps.dedupWindowMs ?? DEFAULT_BROADCAST_DEDUP_MS;
+  const now = deps.now ?? Date.now;
 
   // Build a normalized domain → presetId map so the global cookie
   // listener can dispatch quickly without scanning all presets per
@@ -91,7 +112,7 @@ export function installSessionWatcher(deps: InstallDeps): void {
       try {
         const row = await repo.get(p.id);
         if (row?.loginStatus === 'loggedIn') {
-          _startForPreset(p, startW);
+          _startForPreset(p, startW, dedupWindowMs, now);
         }
       } catch (err) {
         console.warn(`[session-watcher] failed to start for ${p.id}:`, err);
@@ -136,16 +157,22 @@ export function installSessionWatcher(deps: InstallDeps): void {
     if (typeof providerId !== 'string') return;
     const preset = presets.find((p) => p.id === providerId);
     if (!preset) return;
-    _startForPreset(preset, startW);
+    _startForPreset(preset, startW, dedupWindowMs, now);
   });
 }
 
 function _startForPreset(
   preset: WebProviderPreset,
   startW: typeof defaultStartSessionWatcher,
+  dedupWindowMs: number,
+  now: () => number,
 ): void {
   // Stop the old handle if any (idempotent: a no-op if not running).
   _handles.get(preset.id)?.stop();
+  // Also reset the dedup clock for this providerId — a relogin means a
+  // fresh start, so the user should get a fresh broadcast if cookies
+  // are lost again later.
+  _lastBroadcastAt.delete(preset.id);
 
   const handle = startW(preset.id, {
     chromeApi: {
@@ -160,6 +187,21 @@ function _startForPreset(
       },
     },
     broadcast: (msg) => {
+      // Dedup: skip the broadcast if we already broadcast for this
+      // providerId within the dedup window. The 2026-06-07 real-E2E
+      // confirmed 2-3 stacked toasts when a single user action (e.g.
+      // deleting 2 session cookies) fires `chrome.cookies.onChanged`
+      // multiple times in quick succession. After a successful re-login,
+      // _startForPreset() is called again, which deletes the dedup
+      // entry — so the user gets a fresh broadcast if the session is
+      // lost again later.
+      if (dedupWindowMs > 0) {
+        const last = _lastBroadcastAt.get(preset.id);
+        if (last !== undefined && (now() - last) < dedupWindowMs) {
+          return; // within dedup window — skip
+        }
+        _lastBroadcastAt.set(preset.id, now());
+      }
       // The handle's broadcast must be the one that reaches the
       // sidepanel. We delegate to the existing WEB_LLM_NEEDS_RELOGIN
       // re-login flow which already wires the sidepanel port.
