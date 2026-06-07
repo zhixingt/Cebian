@@ -220,6 +220,62 @@ describe('installSessionWatcher — broadcast dedup (Issue 2 followup)', () => {
     };
   });
 
+  it('relogin_success message resets the dedup clock — subsequent session loss within 5s DOES broadcast', async () => {
+    // Critical regression guard: when the user re-logs in, _startForPreset
+    // is called again. The dedup clock for that providerId MUST be reset,
+    // otherwise a session loss that happens within 5s after the re-login
+    // (e.g. user re-logs in then immediately clears cookies again) would
+    // have its toast silently swallowed. The user would see "logged in"
+    // but the next chat attempt would fail with no warning.
+    const sendMessageMock = vi.fn();
+    (global as any).chrome = {
+      cookies: { getAll: vi.fn().mockResolvedValue([]) },
+      runtime: { sendMessage: sendMessageMock },
+    };
+
+    const repo = getWebProviderRepository();
+    await repo.list();
+    await repo.setLoginStatus('glm' as WebProvider['presetId'], 'loggedIn');
+
+    const capturedCookieHandlers: Array<(e: any) => void> = [];
+    let capturedMessageHandler: ((msg: any) => void) | null = null;
+
+    const { startSessionWatcher: realStart } = await import(
+      '@/lib/ai-config/web-provider-session-watcher'
+    );
+    const wrappedStart = ((providerId: string, deps: any) =>
+      realStart(providerId, {
+        ...deps,
+        listCookies: vi.fn().mockResolvedValue({}), // always lost
+      })
+    ) as any;
+
+    const deps = makeDeps({
+      presets: undefined,
+      startSessionWatcher: wrappedStart,
+      addCookieListener: (cb) => { capturedCookieHandlers.push(cb); },
+      addMessageListener: (cb) => { capturedMessageHandler = cb; },
+    });
+    installSessionWatcher(deps);
+    await new Promise(r => setTimeout(r, 10));
+
+    // First session loss: cookie event → 1 broadcast
+    capturedCookieHandlers[0]({ cookie: { domain: 'chatglm.cn', name: 'a' } });
+    await new Promise(r => setTimeout(r, 600));
+    expect(sendMessageMock).toHaveBeenCalledTimes(1);
+
+    // User re-logs in (relay posts relogin_success)
+    capturedMessageHandler!({ type: 'relogin_success', providerId: 'glm' });
+    await new Promise(r => setTimeout(r, 10));
+
+    // Second session loss: cookie event immediately after relogin.
+    // Without the dedup-clock-reset, this would be suppressed (count stays 1).
+    // With the reset (correct behavior), it broadcasts again (count becomes 2).
+    capturedCookieHandlers[0]({ cookie: { domain: 'chatglm.cn', name: 'b' } });
+    await new Promise(r => setTimeout(r, 600));
+    expect(sendMessageMock).toHaveBeenCalledTimes(2);
+  });
+
   it('dedup: 3 cookie changes within 5s broadcast only ONCE (default dedup window)', async () => {
     // The real test for dedup: with default 5s dedup window, firing 3
     // cookie changes in rapid succession should result in exactly 1
