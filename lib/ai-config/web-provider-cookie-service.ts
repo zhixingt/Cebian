@@ -284,9 +284,8 @@ async function pollForSession(
 async function tryCaptureCookieSession(
   preset: ReturnType<typeof resolveEffectiveConfig>,
 ): Promise<{ cookies: Record<string, string>; source: 'cookie' } | null> {
-  const cookies = await chrome.cookies.getAll({ domain: preset.cookieDomain });
-  const cookieMap: Record<string, string> = {};
-  for (const c of cookies) cookieMap[c.name] = c.value;
+  // listCookiesForDomain returns a name→value map directly.
+  const cookieMap = await listCookiesForDomain(preset.cookieDomain);
 
   const matched = preset.sessionIndicators.filter((n: string) => cookieMap[n]);
   if (matched.length === 0) return null;
@@ -405,4 +404,18 @@ async function safeRemoveTab(tabId: number): Promise<void> {
 
 function sleep(ms: number): Promise<void> {
   return new Promise(r => setTimeout(r, ms));
+}
+
+// ====== List cookies for a domain (used by session-watcher) ======
+
+/**
+ * Read all cookies for a domain and return them as a name→value map.
+ * Used by the session watcher to periodically verify the user is
+ * still logged in. Exported for the BG wiring layer.
+ */
+export async function listCookiesForDomain(domain: string): Promise<Record<string, string>> {
+  const cookies = await chrome.cookies.getAll({ domain });
+  const out: Record<string, string> = {};
+  for (const c of cookies) out[c.name] = c.value;
+  return out;
 }

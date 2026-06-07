@@ -11,6 +11,8 @@ import { vfs } from '@/lib/vfs';
 import { registerCookieService } from '@/lib/ai-config/web-provider-cookie-service';
 import { registerWebProviderStream } from '@/lib/ai-config/web-provider-stream';
 import { registerWebProviderReloginHandler, type WebProviderNeedsReloginMessage } from './web-provider-relogin';
+import { installSessionWatcher } from './web-provider-session-watcher-bg';
+import { startSessionWatcher as realStartSessionWatcher } from '@/lib/ai-config/web-provider-session-watcher';
 import { invalidateBundle } from '@/lib/ai-config/web-provider-bundle';
 import { isValidActiveModel } from '@/lib/ai-config/web-provider-active-model-validation';
 import { activeModel as activeModelStorage } from '@/lib/storage';
@@ -66,6 +68,27 @@ export default defineBackground(() => {
       }
     },
     invalidateBundle,
+  });
+
+  // 2026-06-07: Issue 2 (KNOWN_ISSUES.md) — proactive 401 detection.
+  // Starts a per-provider watcher for every logged-in web provider.
+  // Watches chrome.cookies.onChanged + a 5min periodic probe; on
+  // session loss it reuses the existing WEB_LLM_NEEDS_RELOGIN flow
+  // (via registerWebProviderReloginHandler above). Idempotent.
+  installSessionWatcher({
+    // Inject the BG's port broadcast so the watcher's NEEDS_RELOGIN
+    // message reaches the sidepanel directly, bypassing the
+    // sendMessage round-trip the BG module would otherwise use.
+    startSessionWatcher: (providerId, deps) => realStartSessionWatcher(providerId, {
+      ...deps,
+      broadcast: (msg) => {
+        for (const [port] of ports) {
+          safePost(port, msg as any);
+        }
+      },
+    }),
+    addCookieListener: (cb) => chrome.cookies.onChanged.addListener(cb as any),
+    addMessageListener: (cb) => chrome.runtime.onMessage.addListener(cb as any),
   });
 
   // Dev-only: seed a custom provider from .env.local if configured.
