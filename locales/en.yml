@@ -532,8 +532,8 @@ errors:
 
 # ───── Web (Browser Session) providers ─────
 webProviders:
-  sectionTitle: "Web (Browser Session)"
-  sectionDescription: "Reuse your browser's login state. No API key required."
+  sectionTitle: "Web (No API Key)"
+  sectionDescription: ""
   presets:
     glm:
       name: "GLM (Zhipu)"

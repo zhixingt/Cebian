@@ -522,8 +522,8 @@ errors:
 
 # ───── Web (Browser Session) providers ─────
 webProviders:
-  sectionTitle: "网页版（浏览器会话）"
-  sectionDescription: "复用浏览器已登录状态，无需 API Key。"
+  sectionTitle: "网页版（无需API Key）"
+  sectionDescription: ""
   presets:
     glm:
       name: "GLM（智谱）"

@@ -521,8 +521,8 @@ errors:
 
 # ───── Web (Browser Session) providers ─────
 webProviders:
-  sectionTitle: "網頁版（瀏覽器會話）"
-  sectionDescription: "複用瀏覽器已登入狀態，無需 API Key。"
+  sectionTitle: "網頁版（無需API Key）"
+  sectionDescription: ""
   presets:
     glm:
       name: "GLM（智譜）"

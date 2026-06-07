@@ -148,14 +148,12 @@ export function WebProvidersSubSection() {
 
   return (
     <div className="space-y-4">
-      <header>
-        <h3 className="text-lg font-semibold">
-          {t('webProviders.sectionTitle')}
-        </h3>
-        <p className="text-sm text-muted-foreground">
-          {t('webProviders.sectionDescription')}
-        </p>
-      </header>
+      {/* 2026-06-08: title now matches the "AI providers" section
+          header style (text-base font-semibold). The section
+          description was removed per user request. */}
+      <h3 className="text-base font-semibold">
+        {t('webProviders.sectionTitle')}
+      </h3>
 
       <div className="space-y-3">
         {providers.map((provider) => {
