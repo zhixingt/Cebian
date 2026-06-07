@@ -96,6 +96,12 @@ export interface FileWorkspaceProps {
   className?: string;
   /** Optional empty-state content to render when `relativePath` is undefined. */
   emptyState?: ReactNode;
+  /** Forward to the inner FileTree — render a star on every file row. */
+  showFavoriteButton?: boolean;
+  /** Forward to the inner FileTree. */
+  isFavorite?: (fileName: string) => boolean;
+  /** Forward to the inner FileTree. */
+  onToggleFavorite?: (fileName: string, willFavorite: boolean) => void;
 }
 
 export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>(function FileWorkspace({
@@ -112,6 +118,9 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
   compactMode = false,
   className,
   emptyState,
+  showFavoriteButton,
+  isFavorite,
+  onToggleFavorite,
 }, ref) {
   const isDark = useIsDark();
 
@@ -328,6 +337,9 @@ export const FileWorkspace = forwardRef<FileWorkspaceHandle, FileWorkspaceProps>
                 refreshKey={refreshKey}
                 searchTerm={search || undefined}
                 allowNewFolder={allowNewFolder}
+                showFavoriteButton={showFavoriteButton}
+                isFavorite={isFavorite}
+                onToggleFavorite={onToggleFavorite}
               />
             </div>
           </ContextMenuTrigger>
