@@ -529,7 +529,7 @@ webProviders:
       name: "GLM（智谱）"
       description: "智谱 ChatGLM 网页版"
   fields:
-    enabled: "已启用"
+    enabled: "启用"
     modelIdLabel: "模型 ID"
     modelIdHelp: "默认填入推荐模型。了解后再修改。"
     capabilities: "能力"

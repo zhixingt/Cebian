@@ -528,7 +528,7 @@ webProviders:
       name: "GLM（智譜）"
       description: "智譜 ChatGLM 網頁版"
   fields:
-    enabled: "已啟用"
+    enabled: "啟用"
     modelIdLabel: "模型 ID"
     modelIdHelp: "預設填入推薦模型。了解後再修改。"
     capabilities: "能力"

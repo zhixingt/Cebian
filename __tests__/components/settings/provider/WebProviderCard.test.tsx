@@ -101,6 +101,19 @@ describe('WebProviderCard (2026-06-08 UI redesign)', () => {
     expect(onLogin).toHaveBeenCalledTimes(1);
   });
 
+  it('toggling the Enabled switch calls onEnabledChange (re-added 2026-06-08)', () => {
+    const onEnabledChange = vi.fn();
+    renderCard({ onEnabledChange });
+    // 2026-06-08: after the second pass, the card has 2 switches:
+    //   1. Enabled toggle (re-added per user feedback)
+    //   2. Tool calls toggle
+    // The Enabled toggle is the FIRST switch in the actions row.
+    const switches = screen.getAllByRole('switch');
+    expect(switches.length).toBeGreaterThanOrEqual(2);
+    fireEvent.click(switches[0]);
+    expect(onEnabledChange).toHaveBeenCalledWith(false);
+  });
+
   it('clicking Logout calls onLogout', () => {
     const onLogout = vi.fn();
     renderCard({
@@ -128,12 +141,14 @@ describe('WebProviderCard (2026-06-08 UI redesign)', () => {
   it('toggling Tool calls calls onCapabilityChange (Reasoning toggle is GONE)', () => {
     const onCapabilityChange = vi.fn();
     renderCard({ onCapabilityChange });
-    // Only ONE switch in the UI now (Reasoning was removed 2026-06-08).
-    // Both tool-calls and the (removed) reasoning would each have a switch
-    // in the old design.
+    // 2026-06-08 (second pass): 2 switches in the UI:
+    //   1. Enabled toggle (re-added)
+    //   2. Tool calls toggle
+    // Reasoning was removed (no UI element). Only supportsToolCalls
+    // toggle should fire onCapabilityChange.
     const switches = screen.getAllByRole('switch');
-    expect(switches).toHaveLength(1);
-    fireEvent.click(switches[0]);
+    expect(switches).toHaveLength(2);
+    fireEvent.click(switches[1]); // Tool calls is the 2nd switch
     expect(onCapabilityChange).toHaveBeenCalledWith('supportsToolCalls', false);
   });
 

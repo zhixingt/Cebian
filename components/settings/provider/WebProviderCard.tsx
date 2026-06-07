@@ -162,7 +162,22 @@ export function WebProviderCard({
           </p>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          {/* 2026-06-08: re-added Enabled toggle (kept on user request).
+              Renamed from "Enabled" to "启用" to match cebian's zh-CN
+              convention. The toggle hides the provider from the model
+              selector without unlogging — useful when you have the
+              session but don't want this model selectable right now. */}
+          <label className="flex items-center gap-1.5 cursor-pointer">
+            <Switch
+              checked={provider.enabled}
+              onCheckedChange={onEnabledChange}
+              aria-label={t('webProviders.fields.enabled')}
+            />
+            <span className="text-xs text-muted-foreground">
+              {t('webProviders.fields.enabled')}
+            </span>
+          </label>
           <Button
             variant="ghost"
             size="icon"
@@ -308,17 +323,10 @@ export function WebProviderCard({
                 className="h-8 text-sm"
               />
             </FieldRow>
-            <FieldRow
-              label="Use localStorage fallback"
-              source={effective.source.useLocalStorageFallback}
-            >
-              <Switch
-                checked={effective.useLocalStorageFallback}
-                onCheckedChange={(v) =>
-                  onUserOverrideChange('useLocalStorageFallback', v)
-                }
-              />
-            </FieldRow>
+            {/* 2026-06-08: removed "Use localStorage fallback" — was for
+                providers that store tokens in localStorage (Kimi, DeepSeek).
+                Both are removed. GLM uses cookies exclusively. Leaving
+                the toggle would just confuse the user. */}
             <FieldRow label="Refresh URL (GLM only)" source={effective.source.refreshUrl}>
               <Input
                 value={effective.refreshUrl ?? ''}
