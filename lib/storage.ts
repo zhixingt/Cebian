@@ -181,3 +181,18 @@ export const updateNoticeState = storage.defineItem<UpdateNoticeState>(
   'local:updateNoticeState',
   { fallback: { skippedVersion: null, lastPromptedAt: 0 } },
 );
+
+// ─── Favorite prompts (Quick Actions Bar) ───
+
+/**
+ * Ordered list of prompt filenames the user has marked as "favorites".
+ * - Key: filename (e.g. "translate.md"), not the frontmatter `name`. Filenames
+ *   are stable across renames-of-frontmatter and survive frontmatter edits.
+ * - Order: user-controlled, used to render the chat QuickActionsBar in
+ *   display order. Manual drag-to-reorder in settings (Phase 1).
+ * - Empty: the chat QuickActionsBar MUST NOT be rendered (zero height).
+ */
+export const favoritePrompts = storage.defineItem<string[]>(
+  'local:favoritePrompts',
+  { fallback: [] },
+);
