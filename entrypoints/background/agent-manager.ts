@@ -414,6 +414,21 @@ class AgentManager {
         managed.toolCtx.cancelAll();
         const messages = [...agent.state.messages];
         this.broadcast(sessionId, { type: 'agent_end', sessionId, messages });
+        // 2026-06-06: defensive `session_state` broadcast carrying
+        // isRunning:false. The hook (useBackgroundAgent) already flips
+        // isAgentRunning off on `agent_end`, but if anything in the
+        // downstream path drops the message (port closed mid-flight,
+        // React state not committed because the component is mid-mount,
+        // etc.) the sidepanel can stay stuck on the loading spinner.
+        // Belt-and-suspenders: also re-broadcast the canonical state so
+        // the sidepanel recovers its true idle state on the next paint.
+        this.broadcast(sessionId, {
+          type: 'session_state',
+          sessionId,
+          messages,
+          isRunning: false,
+          pendingTools: [],
+        });
         // Persist final state before flushing. Normally the trailing
         // `message_end` already scheduled a write with the same content,
         // but pi-agent-core's `handleRunFailure` (abort/error path) appends
