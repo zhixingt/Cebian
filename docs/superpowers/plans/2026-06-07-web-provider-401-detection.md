@@ -723,26 +723,34 @@ pnpm build
 ```
 ✅ 9.62 MB, 0 high-risk
 
-- [ ] **Step 2: User manual verification**
+- [ ] **Step 2: User manual verification** — **DEFERRED per user instruction (2026-06-07)**
 
-Instructions for the user (deliver with the build):
+> User has explicitly chosen to defer manual E2E. To be handled in a future
+> session, **not blocking** the feature landing on the branch. The
+> auto-tested code paths (28/28 vitest, 0 new TS errors, build clean)
+> give high confidence the feature works; manual verification is
+> "icing" not "cake".
+
+Full instructions preserved here for future use:
+
 1. Reload Cebian in chrome://extensions/
-2. Login to GLM in the extension (Settings → Web Providers → GLM → Login)
-3. Send a message: should work
-4. Open chatglm.cn in a separate tab, log out
-5. In the Cebian sidepanel, send a message again
-6. Expected within 5 minutes OR immediately on the next cookie change:
-   - Destructive toast: "GLM session expired"
+2. Open Service Worker DevTools (chrome://extensions/ → "Service Worker" link) for live logs
+3. Login to GLM in the extension (Settings → Web Providers → GLM → Login)
+4. Send a message: should work (baseline)
+5. Open `https://chatglm.cn` in a **separate** tab, log out (or manually delete `chatglm_token` + `chatglm_refresh_token` via DevTools → Application → Cookies)
+6. In the Cebian sidepanel, send a message again
+7. Expected within 5 minutes OR immediately on the next cookie change:
+   - Destructive toast: `"GLM session expired"`
    - Sidepanel navigates to Settings → Web Providers → GLM card highlighted
-7. Re-login via the GLM card
-8. Expected: sidepanel is usable again, watcher is restarted
+8. Re-login via the GLM card
+9. Expected: sidepanel is usable again, watcher is restarted
 
-- [ ] **Step 3: Commit if any fixups**
+What to report back on completion:
+- ✅ Both triggers (immediate cookie.onChanged + 5min probe) worked
+- 🟡 Only one trigger worked (which one didn't?)
+- ❌ Neither worked (BG console errors? Reload SW and re-test)
 
-```bash
-git add -A
-git commit --no-verify -m "chore: end-to-end session watcher verification"
-```
+- [x] **Step 3: Commit if any fixups** — N/A (no fixups required; all 28 tests green, build clean)
 
 ---
 
@@ -751,14 +759,15 @@ git commit --no-verify -m "chore: end-to-end session watcher verification"
 **Code complete.** Commits:
 - `e721fcf` — `feat(web-provider): add detectSessionLost + shouldFireOnCookieChange + watcher` (18 tests)
 - `6b6dabc` — `feat(web-provider): wire session watcher into BG startup (Issue 2)` (10 tests, BG wiring + listCookiesForDomain refactor)
+- `c5385bc` — `docs(web-provider): mark Issue 2 as fixed; 401-detection plan status` (KNOWN_ISSUES + plan doc)
 
 **Verification evidence**:
-- `pnpm vitest run` — 288/288 (was 260; +28 from this work)
+- `pnpm vitest run` — 288/288 (was 260; +28 from this work). Re-verified 2026-06-07: 28/28 on the two new test files (`web-provider-session-watcher.test.ts` 18 + `session-watcher-bg.test.ts` 10)
 - `pnpm check` — 61 errors (baseline = current; 0 new)
 - `pnpm build` — 9.62 MB, 0 high-risk (1 lower-risk atob is the pre-existing PDF worker, not from this change)
 
 **Outstanding**:
-- User manual E2E (Step 2 above) — needs the user to test in chrome://extensions/
+- ~~User manual E2E (Step 2 above)~~ — **DEFERRED per user instruction 2026-06-07**. Auto-tested code paths (28/28 + 0 TS errors + clean build) give high confidence. Manual E2E preserved in plan doc for future re-verification.
 - Rollback tag: `pre-401-detection-baseline` → `1e5fa6e` (still in place; `git reset --hard pre-401-detection-baseline` to revert)
 
 **Not in scope (deferred)**:
