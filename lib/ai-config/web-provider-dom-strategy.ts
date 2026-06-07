@@ -121,6 +121,20 @@ export interface ReaderStrategy {
    *   - 'innerText': rendered text, respects CSS visibility (recommended)
    */
   textMode?: 'textContent' | 'innerText';
+
+  /**
+   * Minimum text length (trimmed) before the reader emits any chunk.
+   * Filters out noise from the first poll — e.g. a "retry" button's
+   * tooltip text, the assistantMessageSelector picking up a static
+   * .markdown-body from the page chrome (footer, sidebar, etc.) before
+   * the real AI reply renders, or transient placeholder text like
+   * single characters. The reader still calls onDone when the text
+   * stabilizes regardless of length. Default 0 (no filter).
+   *
+   * For providers using `:last-of-type` selectors on a page that has
+   * other .markdown-body elements in the chrome, set to 2 or 3.
+   */
+  minChunkLength?: number;
 }
 
 // ===== Combined strategy =====
@@ -309,6 +323,7 @@ export function startReader(
   const pollMs = strategy.pollIntervalMs ?? 100;
   const stableMs = strategy.stableThresholdMs ?? 800;
   const maxMs = strategy.maxTotalMs ?? 60_000;
+  const minLen = strategy.minChunkLength ?? 0;
 
   let lastText = '';
   let lastChangedAt = now();
@@ -340,8 +355,15 @@ export function startReader(
 
     if (text !== lastText) {
       lastText = text;
-      lastChangedAt = now();
-      callbacks.onChunk(text, text);
+      // minChunkLength gate: only emit if the new text is at least
+      // minLen characters trimmed. Smaller texts are noise (single
+      // character from a stray element, retry button tooltip, etc.)
+      // and we DON'T update lastChangedAt either — we want the stable
+      // check to keep waiting for the real reply.
+      if (text.trim().length >= minLen) {
+        lastChangedAt = now();
+        callbacks.onChunk(text, text);
+      }
     }
 
     // Stable check (text hasn't changed for stableMs)
@@ -397,6 +419,13 @@ export const GLM_DOM_STRATEGY: WebProviderDomStrategy = {
     stableThresholdMs: 600,
     maxTotalMs: 60_000,
     textMode: 'innerText',
+    // 2026-06-06: noise filter. The first poll after sending a message
+    // can match a stale `.markdown-body` (page chrome like a sidebar
+    // tooltip, a "regenerate" button's accessible text, or an
+    // intermediate placeholder) and emit a bogus 1-2 character chunk
+    // before the real AI reply renders. Require at least 2 trimmed
+    // characters before any chunk is emitted.
+    minChunkLength: 2,
   },
 };
 
