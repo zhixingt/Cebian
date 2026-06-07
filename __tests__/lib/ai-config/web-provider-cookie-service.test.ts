@@ -236,4 +236,51 @@ describe('web-provider-cookie-service (login flow + A3 + A5 + A6 + A4)', () => {
       expect(glm?.loginAuditLog[0]?.cookiesCaptured).toBeGreaterThanOrEqual(2);
     }, 15000);
   });
+
+  describe('login tab is NEVER auto-closed (UX fix 2026-06-07)', () => {
+    // 2026-06-07 real-E2E: clicking Login in settings while the user was
+    // already on chatglm.cn in another tab caused the SW to focus that
+    // tab, capture cookies, and then close the tab the user was
+    // actively using. The user complained: "Login tab disappears
+    // before I can finish typing". Fix: never auto-close the tab;
+    // the user owns the tab lifecycle.
+
+    it('successful login does NOT call chrome.tabs.remove', async () => {
+      const repo = getWebProviderRepository();
+      await repo.list();
+      mockCookies = [
+        { name: 'chatglm_refresh_token', value: 'rt' },
+        { name: 'chatglm_token', value: 'ct' },
+      ];
+      const removeSpy = chrome.tabs.remove as any;
+      removeSpy.mockClear();
+
+      const sendResponse = vi.fn();
+      messageHandler({ type: 'WEB_PROVIDER_LOGIN', presetId: 'glm' }, {}, sendResponse);
+      await new Promise(r => setTimeout(r, 5500));
+
+      const response = sendResponse.mock.calls[0][0];
+      expect(response.success).toBe(true);
+      expect(removeSpy).not.toHaveBeenCalled();
+    }, 15000);
+
+    it('login failure (tab closed) does NOT call chrome.tabs.remove', async () => {
+      await getWebProviderRepository().list();
+      mockCookies = [];
+      // Simulate user closing the tab — but the SW should NOT add to it
+      // by also calling remove.
+      (chrome.tabs.get as any) = vi.fn(() => Promise.reject(new Error('Tab not found')));
+
+      const removeSpy = chrome.tabs.remove as any;
+      removeSpy.mockClear();
+
+      const sendResponse = vi.fn();
+      messageHandler({ type: 'WEB_PROVIDER_LOGIN', presetId: 'glm' }, {}, sendResponse);
+      await new Promise(r => setTimeout(r, 5500));
+
+      const response = sendResponse.mock.calls[0][0];
+      expect(response.success).toBe(false);
+      expect(removeSpy).not.toHaveBeenCalled();
+    }, 15000);
+  });
 });

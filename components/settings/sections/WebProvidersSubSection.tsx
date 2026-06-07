@@ -9,7 +9,10 @@ import {
 } from '@/lib/ai-config/web-provider-presets';
 import { getWebProviderRepository } from '@/lib/ai-config/web-provider-store';
 import { invalidateBundle } from '@/lib/ai-config/web-provider-bundle';
-import { shouldClearActiveModel } from '@/lib/ai-config/web-provider-active-model';
+import {
+  shouldClearActiveModel,
+  shouldAutoSelectOnLogin,
+} from '@/lib/ai-config/web-provider-active-model';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { activeModel } from '@/lib/storage';
 import type { WebProvider, WebProviderUserOverrides } from '@/lib/types';
@@ -35,7 +38,32 @@ export function WebProvidersSubSection() {
     checkingId,
     loginLoading,
   } = useWebProviderWebLogin({
-    onSuccess: (id) => update.setLoginStatus(id, 'loggedIn'),
+    onSuccess: async (id) => {
+      await update.setLoginStatus(id, 'loggedIn');
+      // 2026-06-07: after successful login, if no model is currently
+      // selected, auto-pick the provider's default model. This avoids
+      // the "No model selected or model not found" error the user got
+      // on the first chat attempt after Login. We do NOT override a
+      // non-null activeModel — the user may have explicitly chosen a
+      // different provider (e.g. anthropic) and we shouldn't silently
+      // switch their model.
+      try {
+        const current = await activeModel.getValue();
+        if (shouldAutoSelectOnLogin(current)) {
+          const preset = WEB_PROVIDER_PRESETS.find((p) => p.id === id);
+          if (preset) {
+            await activeModel.setValue({
+              provider: 'web',
+              modelId: `web:${preset.id}:${preset.defaultModelId}`,
+            });
+          }
+        }
+      } catch (err) {
+        // Non-fatal: if we can't read/write activeModel, the user can
+        // still pick a model manually in the model selector.
+        console.warn('[web-providers] auto-select on login failed:', err);
+      }
+    },
     onFailure: (id, err) => {
       void update.setLoginStatus(id, 'loggedOut');
       toast.error(t('webProviders.messages.recheckFailed'), {

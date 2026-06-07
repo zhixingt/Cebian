@@ -121,7 +121,10 @@ async function handleLogin(presetId: string): Promise<LoginResponse> {
         result,
         errorMessage: lastError ?? undefined,
       });
-      await safeRemoveTab(tabId);
+      // 2026-06-07: do NOT auto-close the tab on failure. The user
+      // owns the tab lifecycle; auto-closing a tab the user is
+      // actively using (e.g. they navigated to chatglm.cn themselves
+      // and the SW focused their existing tab) is hostile UX.
       chrome.tabs.onActivated.removeListener(onActivated);
       chrome.windows.onFocusChanged.removeListener(onFocusChanged);
       return { success: false, error: lastError ?? 'Login failed', status: 'loggedOut' };
@@ -165,7 +168,8 @@ async function handleLogin(presetId: string): Promise<LoginResponse> {
 
     chrome.tabs.onActivated.removeListener(onActivated);
     chrome.windows.onFocusChanged.removeListener(onFocusChanged);
-    await safeRemoveTab(tabId);
+    // 2026-06-07: do NOT auto-close the tab on success. Same reasoning
+    // as the failure path — the user may be actively using the tab.
 
     return {
       success: true,
@@ -182,7 +186,7 @@ async function handleLogin(presetId: string): Promise<LoginResponse> {
     });
     chrome.tabs.onActivated.removeListener(onActivated);
     chrome.windows.onFocusChanged.removeListener(onFocusChanged);
-    await safeRemoveTab(tabId);
+    // 2026-06-07: do NOT auto-close the tab on exception either.
     return { success: false, error: message, status: 'loggedOut' };
   }
 }

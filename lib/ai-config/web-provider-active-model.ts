@@ -32,3 +32,23 @@ export function shouldClearActiveModel(
   if (activeModel.provider !== 'web') return false;
   return activeModel.modelId.startsWith(`web:${loggedOutProviderId}:`);
 }
+
+/**
+ * Pure helper: should the `activeModel` storage entry be AUTO-SELECTED
+ * when a web provider login succeeds?
+ *
+ * 2026-06-07 real-E2E: after a successful login, the user got
+ * "No model selected or model not found" because `activeModel` was
+ * still null (the previous logout had cleared it; the new login
+ * restored the provider but did NOT re-pick a model).
+ *
+ * Returns `true` ONLY when the user has NO model currently selected.
+ * We do NOT auto-select over a non-null model (e.g. a non-web
+ * provider the user explicitly chose) — that would silently switch
+ * their model on login, which is hostile UX.
+ */
+export function shouldAutoSelectOnLogin(
+  currentActiveModel: { provider: string; modelId: string } | null,
+): boolean {
+  return currentActiveModel === null;
+}
