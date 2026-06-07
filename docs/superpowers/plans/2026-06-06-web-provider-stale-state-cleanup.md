@@ -13,6 +13,33 @@
 
 ---
 
+## Status: COMPLETED 2026-06-06
+
+| Task | Description | Status | Evidence |
+|---|---|---|---|
+| 1 | `WebProviderRepository.list()` startup `bulkDelete` stale rows + warn log | ✅ Done | TDD 2 tests in `__tests__/lib/ai-config/web-provider-store.test.ts`; impl at `lib/ai-config/web-provider-store.ts:20-30` |
+| 2 | `activeModel` migrate hook to clear stale/malformed values | ✅ Done (with divergence) | **Divergence:** WXT `defineItem` has no `migrate` option. Switched to startup-pass via `entrypoints/background/index.ts:36-50` + pure helper `lib/ai-config/web-provider-active-model-validation.ts:isValidActiveModel()`. TDD 15 tests across `__tests__/lib/storage-active-model-migration.test.ts` (9) + `__tests__/entrypoints/background/startup-active-model-cleanup.test.ts` (6) |
+| 3 | `agent-manager.resolveModelObj()` self-heal on `resolveSelectedWebModel` null | ✅ Done | TDD 3 tests in `__tests__/entrypoints/background/agent-manager-self-heal.test.ts`; impl at `entrypoints/background/agent-manager.ts:200-216` |
+| Follow-up | Remove dead `'deepseek'` value from `binaryProtocol` type union + JSDoc | ✅ Done | Commit `a36688e`. Test suite 256/256 still green, no runtime behavior change |
+| 4 | 6-item E2E in Chrome | ⛔ Blocked on user | No autonomous path. Requires physical Chrome UI (login + send + observe console). User confirmed data-layer state via DevTools: Dexie only GLM row, `[web-provider-stale-cleanup]` log fired, `chrome.storage.local.get('local:activeModel')` returns `{}` |
+
+**Commits:** `64ed2ea` (main: drop DeepSeek + Kimi, add stale-state cleanup) → `a36688e` (type union cleanup)
+
+**Branch:** `feat/web-browser-session-provider`
+
+**Verification at completion:**
+- `pnpm tsc --noEmit` clean
+- `pnpm vitest run` 256/256 passed
+- `pnpm build` 9.61 MB, 0 high-risk obfuscation
+- Pre-commit hook (wxt prepare + tsc + lint-i18n) all green
+- Bundle scan: 4 `deepseek` matches — **all** in `node_modules/@earendil-works/pi-ai/...` (API Key provider path, out of scope per user clarification `"我只让你移除网页登陆偷cookie的 deepseek kimi"`)
+- Source scan: 399 `deepseek`/`kimi` matches — **0** in active Web Provider code; 47 in C-class JSDoc (per plan §"Class C: Historical comments retained"); 273 in historical design docs; 78 in tests (required to test stale cleanup)
+- User DevTools verification: Dexie only GLM, cleanup log fires, `activeModel` key cleared
+
+**Key design decision:** WXT's `storage.defineItem` does not support a `migrate` callback. Instead, the startup-pass in `background/index.ts` (line 36-50) calls `isValidActiveModel()` directly on SW boot. The pure helper is kept in its own module so unit tests can import it without pulling in WXT's `defineItem` (which is unavailable in the vitest environment). This gives the same guarantee (stale `activeModel` cleared on every SW boot) without depending on undocumented WXT APIs.
+
+---
+
 ## File Structure
 
 ### Modified files (4)

@@ -6,6 +6,17 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./__tests__/setup.ts'],
+    // Playwright-based E2E specs in e2e/ are excluded — they use
+    // @playwright/test's test.describe which is a different runner.
+    // Run with `pnpm test:e2e`.
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/.output/**',
+      '**/e2e/**',
+      '**/cypress/**',
+      '**/.{idea,git,cache,output,temp}/**',
+    ],
   },
   resolve: {
     alias: {

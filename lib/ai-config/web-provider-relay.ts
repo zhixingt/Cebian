@@ -63,6 +63,9 @@ export class TabRegistry {
    *
    * Lookup order (chromeclaw pattern):
    *   1. In-memory registry (fast path — we already have a tab)
+   *      1a. Verify the cached tab still exists in Chrome. If the user
+   *          closed it (or SW restarted but the in-memory map was
+   *          reconstructed somehow), drop the entry and fall through.
    *   2. Chrome tab query by hostname (cold-start path — user may have the provider open)
    *   3. chrome.tabs.create (last resort)
    *
@@ -75,8 +78,17 @@ export class TabRegistry {
     // 1. Registry hit
     const existing = this.tabs.get(providerId);
     if (existing) {
-      this.markUsed(providerId);
-      return existing.tabId;
+      // 1a. Verify the tab is still alive. chrome.tabs.get throws with
+      //     "No tab with id: N" if the user closed the tab or SW restarted.
+      //     In that case, evict and fall through to the cold-start path.
+      try {
+        await chrome.tabs.get(existing.tabId);
+        this.markUsed(providerId);
+        return existing.tabId;
+      } catch {
+        // Stale tab: evict silently and continue to cold-start.
+        this.evictEntry(providerId);
+      }
     }
 
     // 2. Cold-start: check Chrome for an existing tab at the same hostname
@@ -146,6 +158,18 @@ export class TabRegistry {
       clearTimeout(entry.closeTimerId);
     }
     this.tabs.clear();
+  }
+
+  /**
+   * Remove a registry entry without calling chrome.tabs.remove. Used
+   * when we've discovered a cached tab is dead (user closed it, or SW
+   * restarted with a stale in-memory map).
+   */
+  private evictEntry(providerId: WebProvider['presetId']): void {
+    const entry = this.tabs.get(providerId);
+    if (!entry) return;
+    clearTimeout(entry.closeTimerId);
+    this.tabs.delete(providerId);
   }
 
   private createEntry(providerId: WebProvider['presetId'], tabId: number): TabEntry {
