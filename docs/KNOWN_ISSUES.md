@@ -48,14 +48,20 @@ There IS a partial mitigation: the content script's pre-flight check (in `runDom
 
 In practice, if the user logs out in another tab and the SW's reused tab still has the chat page loaded, the input element is still there → DOM injection proceeds normally → "successful" chat with the now-invalid session.
 
-**Why we won't fix this in MVP**: Properly detecting this requires either:
-- (A) URL monitoring: SW injects a `chrome.webNavigation.onCommitted` listener for the chatglm.cn tab; if the URL changes to `/login` or similar, invalidate the bundle proactively
-- (B) Pre-flight network probe: SW makes a HEAD request to chatglm.cn (with cookies) before each chat; if 401/403, invalidate the bundle first
-- (C) Page-state heartbeat: content script checks input element every N seconds (not just per-message) and emits `WEB_LLM_NEEDS_RELOGIN` proactively
+**Fix (2026-06-07, commits `e721fcf` + `6b6dabc`)**: A new BG-resident **session watcher** now runs on every SW boot. For each preset whose Dexie `loginStatus === 'loggedIn'`, it:
+1. Subscribes to `chrome.cookies.onChanged` for the preset's `cookieDomain` (debounced 500ms; leading-dot domain shape tolerated)
+2. Runs a periodic 5-min probe that re-reads the session-indicator cookies
+3. On either trigger, runs the same `WEB_LLM_NEEDS_RELOGIN` flow that the HTTP-replay 401 path already produces — invalidates the bundle cache and broadcasts to the sidepanel
 
-(A) is the cleanest, ~30 min. Defer.
+**Module-level pieces**:
+- `lib/ai-config/web-provider-session-watcher.ts` — pure predicates (`detectSessionLost`, `shouldFireOnCookieChange`) + dep-injected `startSessionWatcher` lifecycle
+- `entrypoints/background/web-provider-session-watcher-bg.ts` — BG wiring (`installSessionWatcher`); reads Dexie, dispatches cookie changes, handles `relogin_success` (restarts the watcher for that provider)
+- `entrypoints/background/index.ts` — invokes `installSessionWatcher()` once on SW boot, alongside the existing `registerWebProviderReloginHandler`
+- `lib/ai-config/web-provider-cookie-service.ts` — exports the new `listCookiesForDomain` helper
 
-**Workaround for users**: If you log out in the browser, ALSO log out from Cebian's Settings → Providers → Web Providers → Logout. This clears the bundle. Next chat attempt will see "no model selected" (we just added a fix to clear `activeModel` on logout) and you'll know to re-login.
+**Tests**: 18 session-watcher + 10 BG-wiring = 28 new tests, full vitest 288/288. `pnpm check` 0 new errors (61 baseline = 61 current). Build 9.62 MB / 0 high-risk.
+
+**Pending**: User manual E2E — log in to GLM, send a message, log out from chatglm.cn in another tab, send another message, expect destructive toast + Settings navigation within 5 minutes (or immediately on the cookie change event).
 
 **Tracking**: not yet in GitHub issues (working in a personal fork).
 
