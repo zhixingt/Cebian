@@ -32,65 +32,127 @@ const fakePreset: WebProviderPreset = {
   sessionIndicators: ['chatglm_refresh_token', 'chatglm_token'],
   useLocalStorageFallback: false,
   refreshUrl: 'https://chatglm.cn/api/v1/auth/refresh',
-  domStrategy: GLM_DOM_STRATEGY,  // ⑧: required field
+  domStrategy: GLM_DOM_STRATEGY,
 };
 
-describe('WebProviderCard', () => {
-  it('renders without crashing', () => {
-    render(
-      <WebProviderCard
-        provider={fakeProvider}
-        preset={fakePreset}
-        isChecking={false}
-        onEnabledChange={vi.fn()}
-        onModelIdChange={vi.fn()}
-        onCapabilityChange={vi.fn()}
-        onRecheck={vi.fn()}
-      />,
-    );
-    // Should display GLM somewhere
-    expect(screen.getByText(/GLM/i)).toBeInTheDocument();
+function renderCard(overrides: Partial<{
+  provider: WebProvider;
+  preset: WebProviderPreset;
+  onEnabledChange: () => void;
+  onModelIdChange: (v: string) => void;
+  onCapabilityChange: (cap: string, v: boolean) => void;
+  onRecheck: () => void;
+  onLogin: () => void;
+  onLogout: () => void;
+  isLoginLoading: boolean;
+}> = {}) {
+  return render(
+    <WebProviderCard
+      provider={overrides.provider ?? fakeProvider}
+      preset={overrides.preset ?? fakePreset}
+      isChecking={false}
+      onEnabledChange={overrides.onEnabledChange ?? vi.fn()}
+      onModelIdChange={overrides.onModelIdChange ?? vi.fn()}
+      onCapabilityChange={overrides.onCapabilityChange ?? vi.fn()}
+      onRecheck={overrides.onRecheck ?? vi.fn()}
+      onLogin={overrides.onLogin}
+      onLogout={overrides.onLogout}
+      isLoginLoading={overrides.isLoginLoading}
+    />,
+  );
+}
+
+describe('WebProviderCard (2026-06-08 UI redesign)', () => {
+  it('renders without crashing and shows the preset name + description', () => {
+    renderCard();
+    // vitest stub returns the raw i18n key (e.g. "webProviders.presets.glm.name")
+    // so we just verify the key is rendered into the provider-name element.
+    expect(screen.getByTestId('provider-name').textContent).toBe('webProviders.presets.glm.name');
+    expect(screen.getByText(/webProviders\.presets\.glm\.description/)).toBeInTheDocument();
   });
 
-  it('toggling enable calls onEnabledChange', () => {
-    const onEnabledChange = vi.fn();
-    render(
-      <WebProviderCard
-        provider={fakeProvider}
-        preset={fakePreset}
-        isChecking={false}
-        onEnabledChange={onEnabledChange}
-        onModelIdChange={vi.fn()}
-        onCapabilityChange={vi.fn()}
-        onRecheck={vi.fn()}
-      />,
-    );
-    // The enable switch should be the first switch on the page
-    const switches = screen.getAllByRole('switch');
-    fireEvent.click(switches[0]); // toggle enabled
-    expect(onEnabledChange).toHaveBeenCalledWith(false);
+  it('shows the Login button when loginStatus=unknown (not logged in)', () => {
+    renderCard({ onLogin: vi.fn() });
+    expect(screen.getByTestId('login-button')).toBeInTheDocument();
+    expect(screen.queryByTestId('logout-button')).not.toBeInTheDocument();
+  });
+
+  it('shows the Login button when loginStatus=loggedOut', () => {
+    renderCard({
+      provider: { ...fakeProvider, loginStatus: 'loggedOut' as const },
+      onLogin: vi.fn(),
+    });
+    expect(screen.getByTestId('login-button')).toBeInTheDocument();
+  });
+
+  it('shows the Logout button when loginStatus=loggedIn (no Login button)', () => {
+    renderCard({
+      provider: { ...fakeProvider, loginStatus: 'loggedIn' as const },
+      onLogout: vi.fn(),
+    });
+    expect(screen.getByTestId('logout-button')).toBeInTheDocument();
+    expect(screen.queryByTestId('login-button')).not.toBeInTheDocument();
+  });
+
+  it('clicking Login calls onLogin', () => {
+    const onLogin = vi.fn();
+    renderCard({ onLogin });
+    fireEvent.click(screen.getByTestId('login-button'));
+    expect(onLogin).toHaveBeenCalledTimes(1);
+  });
+
+  it('clicking Logout calls onLogout', () => {
+    const onLogout = vi.fn();
+    renderCard({
+      provider: { ...fakeProvider, loginStatus: 'loggedIn' as const },
+      onLogout,
+    });
+    fireEvent.click(screen.getByTestId('logout-button'));
+    expect(onLogout).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables Login button while isLoginLoading=true', () => {
+    renderCard({ onLogin: vi.fn(), isLoginLoading: true });
+    const btn = screen.getByTestId('login-button') as HTMLButtonElement;
+    expect(btn).toBeDisabled();
   });
 
   it('editing modelId calls onModelIdChange', () => {
     const onModelIdChange = vi.fn();
-    render(
-      <WebProviderCard
-        provider={fakeProvider}
-        preset={fakePreset}
-        isChecking={false}
-        onEnabledChange={vi.fn()}
-        onModelIdChange={onModelIdChange}
-        onCapabilityChange={vi.fn()}
-        onRecheck={vi.fn()}
-      />,
-    );
+    renderCard({ onModelIdChange });
     const input = screen.getByDisplayValue('GLM-4.6');
     fireEvent.change(input, { target: { value: 'GLM-5' } });
     expect(onModelIdChange).toHaveBeenCalledWith('GLM-5');
   });
 
-  it('clicking recheck calls onRecheck', () => {
-    const onRecheck = vi.fn();
+  it('toggling Tool calls calls onCapabilityChange (Reasoning toggle is GONE)', () => {
+    const onCapabilityChange = vi.fn();
+    renderCard({ onCapabilityChange });
+    // Only ONE switch in the UI now (Reasoning was removed 2026-06-08).
+    // Both tool-calls and the (removed) reasoning would each have a switch
+    // in the old design.
+    const switches = screen.getAllByRole('switch');
+    expect(switches).toHaveLength(1);
+    fireEvent.click(switches[0]);
+    expect(onCapabilityChange).toHaveBeenCalledWith('supportsToolCalls', false);
+  });
+
+  it('Open website link points at preset.loginUrl and opens in new tab', () => {
+    renderCard();
+    const link = screen.getByRole('link', { name: /open/i });
+    expect(link.getAttribute('href')).toBe('https://chatglm.cn');
+    expect(link.getAttribute('target')).toBe('_blank');
+    expect(link.getAttribute('rel')).toContain('noreferrer');
+  });
+
+  it('shows the advanced collapsible (collapsed by default)', () => {
+    renderCard({ onLogin: vi.fn() });
+    // onUserOverrideChange is NOT provided in the simple render above,
+    // so the advanced section should not render at all.
+    expect(screen.queryByTestId('advanced-section')).not.toBeInTheDocument();
+  });
+
+  it('shows the advanced section when onUserOverrideChange is provided', () => {
     render(
       <WebProviderCard
         provider={fakeProvider}
@@ -99,81 +161,10 @@ describe('WebProviderCard', () => {
         onEnabledChange={vi.fn()}
         onModelIdChange={vi.fn()}
         onCapabilityChange={vi.fn()}
-        onRecheck={onRecheck}
-      />,
-    );
-    const button = screen.getByRole('button', { name: /re-check/i });
-    fireEvent.click(button);
-    expect(onRecheck).toHaveBeenCalled();
-  });
-
-  // ⭐ ⑤.3: Logout button tests
-  it('shows Logout button when loginStatus=loggedIn', () => {
-    const loggedIn = { ...fakeProvider, loginStatus: 'loggedIn' as const };
-    render(
-      <WebProviderCard
-        provider={loggedIn}
-        preset={fakePreset}
-        isChecking={false}
-        onEnabledChange={vi.fn()}
-        onModelIdChange={vi.fn()}
-        onCapabilityChange={vi.fn()}
         onRecheck={vi.fn()}
-        onLogout={vi.fn()}
+        onUserOverrideChange={vi.fn()}
       />,
     );
-    expect(screen.getByTestId('logout-button')).toBeInTheDocument();
-  });
-
-  it('does NOT show Logout button when loginStatus=loggedOut', () => {
-    const loggedOut = { ...fakeProvider, loginStatus: 'loggedOut' as const };
-    render(
-      <WebProviderCard
-        provider={loggedOut}
-        preset={fakePreset}
-        isChecking={false}
-        onEnabledChange={vi.fn()}
-        onModelIdChange={vi.fn()}
-        onCapabilityChange={vi.fn()}
-        onRecheck={vi.fn()}
-        onLogout={vi.fn()}
-      />,
-    );
-    expect(screen.queryByTestId('logout-button')).not.toBeInTheDocument();
-  });
-
-  it('does NOT show Logout button when loginStatus=unknown', () => {
-    render(
-      <WebProviderCard
-        provider={fakeProvider}  // loginStatus='unknown'
-        preset={fakePreset}
-        isChecking={false}
-        onEnabledChange={vi.fn()}
-        onModelIdChange={vi.fn()}
-        onCapabilityChange={vi.fn()}
-        onRecheck={vi.fn()}
-        onLogout={vi.fn()}
-      />,
-    );
-    expect(screen.queryByTestId('logout-button')).not.toBeInTheDocument();
-  });
-
-  it('clicking Logout calls onLogout (parent clears bundle + sets loggedOut)', () => {
-    const onLogout = vi.fn();
-    const loggedIn = { ...fakeProvider, loginStatus: 'loggedIn' as const };
-    render(
-      <WebProviderCard
-        provider={loggedIn}
-        preset={fakePreset}
-        isChecking={false}
-        onEnabledChange={vi.fn()}
-        onModelIdChange={vi.fn()}
-        onCapabilityChange={vi.fn()}
-        onRecheck={vi.fn()}
-        onLogout={onLogout}
-      />,
-    );
-    fireEvent.click(screen.getByTestId('logout-button'));
-    expect(onLogout).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('advanced-section')).toBeInTheDocument();
   });
 });

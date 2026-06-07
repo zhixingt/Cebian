@@ -542,6 +542,11 @@ webProviders:
     loggingIn: "登入中…"
     # ⑤.3: 清除已儲存的 cookie 並將狀態設為未登入
     logout: "登出"
+    # 2026-06-08 UI 改版：3 個新字串
+    captured: "已擷取 $1 個 cookies"
+    lastAttempt: "上次登入"
+    advancedTitle: "進階設定"
+    resetOverrides: "重設為預設值"
   status:
     loggedIn: "已登入"
     loggedOut: "未登入"

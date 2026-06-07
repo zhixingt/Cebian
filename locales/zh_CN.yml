@@ -543,6 +543,11 @@ webProviders:
     loggingIn: "登录中…"
     # ⑤.3: 清除已保存的 cookie 并将状态设为未登录
     logout: "退出登录"
+    # 2026-06-08 UI 改版：3 个新字符串
+    captured: "已捕获 $1 个 cookies"
+    lastAttempt: "上次登录"
+    advancedTitle: "高级设置"
+    resetOverrides: "重置为默认值"
   status:
     loggedIn: "已登录"
     loggedOut: "未登录"

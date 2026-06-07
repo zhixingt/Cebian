@@ -1,3 +1,4 @@
+import { ExternalLink, LogIn, LogOut, RotateCw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,12 +12,32 @@ export interface WebProviderCardProps {
   provider: WebProvider;
   preset: WebProviderPreset;
   isChecking: boolean;
+
+  /**
+   * @deprecated 2026-06-08 UI redesign: Enabled toggle was removed
+   * (no meaningful effect with only 1 built-in provider; login/logout
+   * already controls visibility in the model selector). Prop is kept
+   * so WebProvidersSubSection's wiring doesn't have to change. Re-add
+   * a UI control if/when multiple built-in providers exist.
+   */
   onEnabledChange: (enabled: boolean) => void;
   onModelIdChange: (modelId: string) => void;
+  /**
+   * 2026-06-08: 'supportsReasoning' is no longer exposed in the UI
+   * (GLM doesn't surface reasoning to the user). The prop is still
+   * accepted for forward-compat with future providers that DO expose
+   * reasoning; the implementation is now no-op for glm.
+   */
   onCapabilityChange: (
     capability: 'supportsToolCalls' | 'supportsReasoning',
     value: boolean,
   ) => void;
+  /**
+   * @deprecated 2026-06-08 UI redesign: Recheck button was removed.
+   * The Login button already re-verifies the session as part of its
+   * flow, so a separate recheck control was redundant. Prop is kept
+   * for SubSection wiring compat.
+   */
   onRecheck: () => void;
 
   /** ⭐ ②: Login callback for the new "Login" button (opens tab + polls). */
@@ -47,10 +68,27 @@ export interface WebProviderCardProps {
   onResetOverrides?: () => void;
 }
 
+/**
+ * 2026-06-08: Redesigned to align with cebian's neutral compact style
+ * (see `components/settings/provider/ProviderOAuthItem.tsx`):
+ *   - Removed controls that have no useful effect: Enabled toggle
+ *     (only 1 built-in provider, login/logout already gates model
+ *     selector visibility), Reasoning toggle (GLM doesn't expose
+ *     reasoning to users), Recheck button (Login already verifies
+ *     session as part of its flow).
+ *   - Layout: header row with status badge + actions, then compact
+ *     rows for Model ID / Capabilities / last-attempt footer. Matches
+ *     the `space-y-2` + `flex items-center justify-between` pattern
+ *     used by ProviderOAuthItem.
+ *   - Buttons use lucide icons (LogIn/LogOut/ExternalLink/RotateCw)
+ *     sized at 3.5 to match cebian's icon button convention.
+ *   - All visible strings route through t() — Chinese is now the
+ *     primary language, English is the fallback.
+ */
 export function WebProviderCard({
   provider,
   preset,
-  isChecking,
+  // Kept for SubSection wiring compat but currently unused in the UI:
   onEnabledChange,
   onModelIdChange,
   onCapabilityChange,
@@ -66,10 +104,13 @@ export function WebProviderCard({
   // A2: compute effective config if not provided (for tests that don't pass it)
   const effective = providedEffectiveConfig ?? resolveEffectiveConfig(provider, preset);
 
-  // A1: parse capturedAt as relative time (use Intl.RelativeTimeFormat if available)
-  const captureTimeText = lastCaptureInfo
-    ? new Date(lastCaptureInfo.capturedAt).toLocaleString()
-    : null;
+  // Suppress unused-param lint without breaking the contract.
+  void onEnabledChange;
+  void onRecheck;
+
+  const isLoggedIn = provider.loginStatus === 'loggedIn';
+  const isLoggedOut = provider.loginStatus === 'loggedOut';
+  const isUnknown = provider.loginStatus === 'unknown';
 
   // A4: most recent audit entry
   const latestAudit = provider.loginAuditLog[0];
@@ -77,143 +118,176 @@ export function WebProviderCard({
   return (
     <div
       data-testid={`web-provider-card-${provider.presetId}`}
-      className="rounded-lg border p-4 space-y-4"
+      className="space-y-2"
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {provider.loginStatus === 'loggedIn' && (
-            <Badge variant="default" data-testid="status-logged-in">
-              Logged in
-            </Badge>
-          )}
-          {provider.loginStatus === 'loggedOut' && (
-            <Badge variant="destructive" data-testid="status-logged-out">
-              Not logged in
-            </Badge>
-          )}
-          {provider.loginStatus === 'unknown' && (
-            <Badge variant="secondary" data-testid="status-unknown">
-              Never checked
-            </Badge>
-          )}
-          <span className="font-semibold">
-            {preset.id.toUpperCase()} — {preset.loginUrl}
-          </span>
+      {/* Header row: status badge + name + description / actions */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium" data-testid="provider-name">
+              {/* preset.displayNameKey is dynamic per-preset, so the WXT
+                  i18n literal-type doesn't accept it. Cast is required. */}
+              {t(preset.displayNameKey as any)}
+            </p>
+            {isLoggedIn && (
+              <Badge
+                variant="outline"
+                className="text-success border-success/20 bg-success/5 text-[0.65rem] h-4 px-1.5"
+                data-testid="status-logged-in"
+              >
+                {t('webProviders.status.loggedIn')}
+              </Badge>
+            )}
+            {isLoggedOut && (
+              <Badge
+                variant="outline"
+                className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5"
+                data-testid="status-logged-out"
+              >
+                {t('webProviders.status.loggedOut')}
+              </Badge>
+            )}
+            {isUnknown && (
+              <Badge
+                variant="outline"
+                className="text-muted-foreground border-border text-[0.65rem] h-4 px-1.5"
+                data-testid="status-unknown"
+              >
+                {t('webProviders.status.neverChecked')}
+              </Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t(preset.descriptionKey as any)}
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span>Enabled</span>
-          <Switch
-            checked={provider.enabled}
-            onCheckedChange={onEnabledChange}
-            aria-label={`Enable ${preset.id}`}
-          />
-          <Button variant="link" asChild>
+
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            asChild
+            className="h-7 w-7"
+            aria-label={t('webProviders.fields.openWebsite')}
+          >
             <a href={preset.loginUrl} target="_blank" rel="noreferrer">
-              Open
+              <ExternalLink className="size-3.5" />
             </a>
           </Button>
+          {isLoggedIn ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onLogout}
+              data-testid="logout-button"
+            >
+              <LogOut className="size-3.5" />
+              {t('webProviders.fields.logout')}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              onClick={onLogin}
+              disabled={isLoginLoading}
+              data-testid="login-button"
+            >
+              {isLoginLoading ? (
+                <RotateCw className="size-3.5 animate-spin" />
+              ) : (
+                <LogIn className="size-3.5" />
+              )}
+              {isLoginLoading
+                ? t('webProviders.fields.loggingIn')
+                : t('webProviders.fields.login')}
+            </Button>
+          )}
         </div>
       </div>
 
-      <div>
-        <label htmlFor={`model-${provider.presetId}`} className="text-sm">
-          Model ID
-        </label>
+      {/* Model ID row with reset (only show reset when user has overridden) */}
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor={`model-${provider.presetId}`}
+            className="text-xs font-medium"
+          >
+            {t('webProviders.fields.modelIdLabel')}
+          </label>
+          {provider.modelId !== preset.defaultModelId && onResetOverrides && (
+            <button
+              type="button"
+              onClick={onResetOverrides}
+              className="text-xs text-muted-foreground hover:text-foreground"
+              data-testid="reset-model-button"
+            >
+              {t('webProviders.fields.resetOverrides')}
+            </button>
+          )}
+        </div>
         <Input
           id={`model-${provider.presetId}`}
           value={provider.modelId}
           onChange={(e) => onModelIdChange(e.target.value)}
+          className="h-8 text-sm"
         />
       </div>
 
+      {/* Capabilities row — Tool calls only (Reasoning removed 2026-06-08) */}
       <div className="flex items-center gap-6">
-        <span className="text-sm">Capabilities:</span>
+        <span className="text-xs font-medium">
+          {t('webProviders.fields.capabilities')}
+        </span>
         <label className="flex items-center gap-2">
           <Switch
             checked={provider.supportsToolCalls}
             onCheckedChange={(v) => onCapabilityChange('supportsToolCalls', v)}
-            aria-label="Tool calls"
+            aria-label={t('webProviders.fields.toolCalls')}
           />
-          <span>Tool calls</span>
-        </label>
-        <label className="flex items-center gap-2">
-          <Switch
-            checked={provider.supportsReasoning}
-            onCheckedChange={(v) => onCapabilityChange('supportsReasoning', v)}
-            aria-label="Reasoning"
-          />
-          <span>Reasoning</span>
+          <span className="text-sm">{t('webProviders.fields.toolCalls')}</span>
         </label>
       </div>
 
-      <div className="flex items-center gap-2">
-        {onLogin && (
-          <Button
-            variant="default"
-            size="sm"
-            onClick={onLogin}
-            disabled={isLoginLoading}
-            data-testid="login-button"
-          >
-            {isLoginLoading ? 'Logging in…' : 'Login'}
-          </Button>
-        )}
-        {provider.loginStatus === 'loggedIn' && onLogout && (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onLogout}
-            data-testid="logout-button"
-          >
-            {t('webProviders.fields.logout')}
-          </Button>
-        )}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onRecheck}
-          disabled={isChecking}
-          data-testid="recheck-button"
-        >
-          {isChecking ? 'Checking…' : 'Re-check login status'}
-        </Button>
-      </div>
-
-      {/* A1: Transparency — show what was captured */}
-      {lastCaptureInfo && lastCaptureInfo.cookieNames.length > 0 && (
-        <p className="text-xs text-muted-foreground" data-testid="capture-info">
-          Captured {lastCaptureInfo.cookieNames.length} cookie(s):{' '}
-          {lastCaptureInfo.cookieNames.slice(0, 3).join(', ')}
-          {lastCaptureInfo.cookieNames.length > 3
-            ? `, +${lastCaptureInfo.cookieNames.length - 3} more`
-            : ''}
-          {captureTimeText && ` (${captureTimeText})`}
-        </p>
-      )}
-
-      {/* A4: Audit log — most recent attempt */}
-      {latestAudit && (
-        <p className="text-xs text-muted-foreground" data-testid="audit-info">
-          Last attempt: {new Date(latestAudit.timestamp).toLocaleString()} —{' '}
-          <Badge
-            variant={latestAudit.result === 'success' ? 'default' : 'destructive'}
-          >
-            {latestAudit.result}
-          </Badge>
-        </p>
+      {/* Footer: last attempt + captured (A1) — muted, single line each */}
+      {(latestAudit || lastCaptureInfo) && (
+        <div className="flex flex-col gap-1 text-xs text-muted-foreground pt-1">
+          {latestAudit && (
+            <p data-testid="audit-info" className="flex items-center gap-1.5">
+              <span>{t('webProviders.fields.lastAttempt')}:</span>
+              <span>{new Date(latestAudit.timestamp).toLocaleString()}</span>
+              <Badge
+                variant={latestAudit.result === 'success' ? 'outline' : 'destructive'}
+                className="text-[0.65rem] h-4 px-1.5"
+              >
+                {latestAudit.result}
+              </Badge>
+            </p>
+          )}
+          {lastCaptureInfo && lastCaptureInfo.cookieNames.length > 0 && (
+            <p data-testid="capture-info">
+              {t('webProviders.fields.captured', [
+                String(lastCaptureInfo.cookieNames.length),
+              ])}
+              : {lastCaptureInfo.cookieNames.slice(0, 3).join(', ')}
+              {lastCaptureInfo.cookieNames.length > 3
+                ? `, +${lastCaptureInfo.cookieNames.length - 3} more`
+                : ''}
+            </p>
+          )}
+        </div>
       )}
 
       {/* A2: Advanced collapsible — per-provider config overrides */}
       {onUserOverrideChange && (
-        <details className="text-sm" data-testid="advanced-section">
-          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-            Advanced: session detection config
+        <details className="text-sm pt-1" data-testid="advanced-section">
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground text-xs">
+            {t('webProviders.fields.advancedTitle')}
           </summary>
-          <div className="mt-2 space-y-2 pl-4">
+          <div className="mt-2 space-y-2 pl-3 border-l-2 border-border">
             <FieldRow label="Cookie domain" source={effective.source.cookieDomain}>
               <Input
                 value={effective.cookieDomain}
                 onChange={(e) => onUserOverrideChange('cookieDomain', e.target.value)}
+                className="h-8 text-sm"
               />
             </FieldRow>
             <FieldRow
@@ -231,6 +305,7 @@ export function WebProviderCard({
                       .filter(Boolean),
                   )
                 }
+                className="h-8 text-sm"
               />
             </FieldRow>
             <FieldRow
@@ -250,6 +325,7 @@ export function WebProviderCard({
                 onChange={(e) =>
                   onUserOverrideChange('refreshUrl', e.target.value || undefined)
                 }
+                className="h-8 text-sm"
               />
             </FieldRow>
             {onResetOverrides && (
@@ -259,7 +335,7 @@ export function WebProviderCard({
                 onClick={onResetOverrides}
                 data-testid="reset-overrides-button"
               >
-                Reset to preset default
+                {t('webProviders.fields.resetOverrides')}
               </Button>
             )}
           </div>

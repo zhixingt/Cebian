@@ -553,6 +553,11 @@ webProviders:
     loggingIn: "Logging in…"
     # ⑤.3: clears stored cookies + sets loginStatus=loggedOut
     logout: "Logout"
+    # 2026-06-08 UI redesign: 3 new strings for the compact cebian-aligned layout
+    captured: "Captured $1 cookie(s)"
+    lastAttempt: "Last attempt"
+    advancedTitle: "Advanced"
+    resetOverrides: "Reset to default"
   status:
     loggedIn: "Logged in"
     loggedOut: "Not logged in"
