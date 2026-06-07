@@ -1,0 +1,21 @@
+# E2E harness 排除项（这些是真实 Chrome profile 数据，不应进仓）
+# 用户调试用 userdata
+e2e/.userdata-*/
+# 任何名为 .userdata 开头的子目录都排除
+**/.userdata-*/
+
+# Playwright 报告 + 测试结果（调试用，每次跑都重新生成）
+e2e/.e2e/
+e2e/test-results/
+**/test-results/
+**/playwright-report/
+
+# 诊断探针生成的 .cjs 临时文件（可选保留 README 注释）
+e2e/*.cjs.bak
+
+# 保留这些是 spec 源码
+!e2e/specs/
+!e2e/helpers/
+!e2e/playwright.config.ts
+!e2e/README.md
+!e2e/E2E-REPORT.md
