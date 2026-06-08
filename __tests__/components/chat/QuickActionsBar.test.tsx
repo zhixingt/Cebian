@@ -49,6 +49,7 @@ describe('QuickActionsBar', () => {
     const onTrigger = vi.fn();
     render(<QuickActionsBar onTrigger={onTrigger} />);
     const btn = await screen.findByRole('button', { name: /missing\.md/ });
-    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('aria-disabled', 'true');
+    expect(btn).toHaveClass('opacity-60');
   });
 });

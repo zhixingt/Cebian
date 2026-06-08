@@ -39,11 +39,14 @@ export function QuickActionsBar({ onTrigger }: QuickActionsBarProps) {
             <button
               key={r.fileName}
               type="button"
-              disabled
+              aria-disabled="true"
               aria-label={r.fileName}
               title={t('chat.quickActions.broken')}
               className="shrink-0 inline-flex items-center gap-1 px-2 h-7 rounded-full border border-border text-xs text-muted-foreground opacity-60 cursor-not-allowed"
-              onClick={() => toast.warning(t('chat.quickActions.brokenClick'))}
+              onClick={(e) => {
+                e.preventDefault();
+                toast.warning(t('chat.quickActions.brokenClick'));
+              }}
             >
               <HelpCircle className="size-3" />
               <span className="max-w-32 truncate">{r.fileName}</span>

@@ -626,7 +626,7 @@ In `components/editor/FileTree.tsx`:
 
 4. In the row render block (find the existing row's right-side action area, alongside context-menu button), add the star button:
    ```tsx
-   {showFavoriteButton && !node.data.isDir && onToggleFavorite && (
+   {showFavoriteButton && !node.isInternal && (
      <button
        type="button"
        aria-label={isFavorite?.(node.data.name) ? 'unfavorite' : 'favorite'}
@@ -635,7 +635,7 @@ In `components/editor/FileTree.tsx`:
        onClick={(e) => {
          e.stopPropagation();
          const currentlyFav = isFavorite?.(node.data.name) ?? false;
-         onToggleFavorite(node.data.name, !currentlyFav);
+         onToggleFavorite?.(node.data.name, !currentlyFav);
        }}
      >
        <Star
@@ -645,6 +645,8 @@ In `components/editor/FileTree.tsx`:
      </button>
    )}
    ```
+
+   Use `node.isInternal` (react-arborist built-in: `true` for folders, `false` for files) rather than a custom `isDir` field on `TreeNodeData`. The custom field would be required everywhere `buildTreeData()` runs and is easy to forget; `node.isInternal` is already correct.
 
 - [ ] **Step 4: Run test to verify it passes**
 

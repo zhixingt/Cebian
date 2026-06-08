@@ -209,7 +209,7 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
       {showFavoriteButton && !node.isInternal && (
         <button
           type="button"
-          aria-label={isFavorite?.(node.data.name) ? 'unfavorite' : 'favorite'}
+          aria-label={isFavorite?.(node.data.name) ? '取消收藏' : '添加收藏'}
           title={isFavorite?.(node.data.name) ? '取消快捷指令' : '添加为快捷指令'}
           className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-yellow-400"
           onClick={(e) => {

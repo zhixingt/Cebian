@@ -47,7 +47,7 @@ describe('FileTree favorite button', () => {
         isFavorite={(f) => f === 'b.md'}
       />,
     );
-    const stars = screen.getAllByRole('button', { name: /favorite|unfavorite|star/i });
+    const stars = screen.getAllByRole('button', { name: /添加收藏/i });
     fireEvent.click(stars[0]);
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onToggle).toHaveBeenCalledWith('a.md', true);
