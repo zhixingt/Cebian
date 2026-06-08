@@ -15,10 +15,7 @@ import { getModel } from '@earendil-works/pi-ai';
 import { isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { startElementPicker, cancelElementPicker } from '@/lib/element-picker';
 import { scanPrompts, type PromptMeta } from '@/lib/ai-config/scanner';
-import { replaceTemplateVars, gatherTemplateVars } from '@/lib/ai-config/template';
-import { vfs } from '@/lib/vfs';
-import { parseFrontmatter } from '@/lib/frontmatter';
-import { CEBIAN_PROMPTS_DIR } from '@/lib/constants';
+import { makeTriggerSlashPrompt } from '@/lib/chat/trigger-slash-prompt';
 import {
   MAX_ATTACHMENT_COUNT, MAX_IMAGE_SIZE, MAX_TEXT_FILE_SIZE,
   RECORDING_MIME,
@@ -430,22 +427,33 @@ const { providers: webProvidersList } = useWebProviders();
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedPromptIndex, isSlashMenuVisible]);
 
-  // Handle prompt selection from slash menu
+  // Build a stable trigger instance once per mount. `toast` is the
+  // module-scope sonner import; `setValue` / `setShowSlash` / the
+  // textarea ref are stable for the component's lifetime — the closure
+  // captures them once and reuses the same vfs / template chain for
+  // every prompt the user picks.
+  const triggerSlashPrompt = useMemo(
+    () =>
+      makeTriggerSlashPrompt({
+        toast,
+        onLoaded: (text) => {
+          setValue(text);
+          setShowSlash(false);
+          textareaRef.current?.focus();
+        },
+      }),
+    [],
+  );
+
+  // Handle prompt selection from slash menu. The factory does the heavy
+  // lifting (vfs read → parseFrontmatter → gatherTemplateVars →
+  // replaceTemplateVars); we keep the dispatching-guard around it so
+  // concurrent handleSend / handlePromptSelect calls don't double-write
+  // the textarea.
   const handlePromptSelect = async (prompt: PromptMeta) => {
     if (isDispatchingRef.current) return;
-    try {
-      const raw = await vfs.readFile(`${CEBIAN_PROMPTS_DIR}/${prompt.fileName}`, 'utf8');
-      const content = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as Uint8Array);
-      const { body } = parseFrontmatter(content);
-      const vars = await gatherTemplateVars();
-      const replaced = replaceTemplateVars(body.trim(), vars);
-      if (isDispatchingRef.current) return;
-      setValue(replaced);
-      setShowSlash(false);
-      textareaRef.current?.focus();
-    } catch {
-      toast.error(t('chat.composer.readPromptFailed'));
-    }
+    await triggerSlashPrompt(prompt);
+    if (isDispatchingRef.current) return;
   };
 
   const handlePickElement = async () => {
