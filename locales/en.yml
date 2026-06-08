@@ -111,6 +111,10 @@ settings:
   prompts:
     title: "Prompts"
     newBody: "(Write your prompt here)"
+    # Quick Actions Bar — section heading for the favorites row.
+    favoritesTitle: "Quick actions"
+    favoriteAdded: "Added to quick actions"
+    favoriteRemoved: "Removed from quick actions"
     # $1 = trigger character ("/")
     hint: "Reusable prompt templates. Trigger them with $1 in the chat input."
     placeholders:

@@ -107,6 +107,10 @@ settings:
   prompts:
     title: "提示詞"
     newBody: "（在此處撰寫你的提示詞）"
+    # 快捷指令列（Quick Actions Bar）區塊標題。
+    favoritesTitle: "快捷指令"
+    favoriteAdded: "已加入快捷指令"
+    favoriteRemoved: "已移除快捷指令"
     # $1 = 觸發字元（「/」）
     hint: "可重複使用的提示詞模板，透過 $1 命令在聊天輸入中觸發。"
     placeholders:

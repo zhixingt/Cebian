@@ -107,7 +107,11 @@ settings:
   prompts:
     title: "提示词"
     newBody: "（在此处编写你的提示词）"
-    # $1 = 触发字符（“/”）
+    # 快捷指令栏（Quick Actions Bar）区块标题。
+    favoritesTitle: "快捷指令"
+    favoriteAdded: "已添加到快捷指令"
+    favoriteRemoved: "已移除快捷指令"
+    # $1 = 触发字符（"/"）
     hint: "可复用的提示模板，通过 $1 命令在聊天输入中触发。"
     placeholders:
       selectedText: "页面选中文本"
