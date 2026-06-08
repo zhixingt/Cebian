@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QuickActionsBar } from '@/components/chat/QuickActionsBar';
 import { useStorageItem } from '@/hooks/useStorageItem';
+import { toast } from 'sonner';
+
+vi.mock('sonner', () => ({
+  toast: { warning: vi.fn(), info: vi.fn(), error: vi.fn(), success: vi.fn() },
+}));
 
 vi.mock('@/hooks/useStorageItem');
 vi.mock('@/lib/ai-config/scanner', () => ({ scanPrompts: vi.fn() }));
@@ -51,5 +56,9 @@ describe('QuickActionsBar', () => {
     const btn = await screen.findByRole('button', { name: /missing\.md/ });
     expect(btn).toHaveAttribute('aria-disabled', 'true');
     expect(btn).toHaveClass('opacity-60');
+
+    // Click the disabled placeholder — toast.warning must fire.
+    fireEvent.click(btn);
+    expect(toast.warning).toHaveBeenCalled();
   });
 });
