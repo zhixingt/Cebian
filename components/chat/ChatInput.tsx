@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback, type KeyboardEvent } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback, useImperativeHandle, forwardRef, type KeyboardEvent } from 'react';
 import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film } from 'lucide-react';
 import { showDialog } from '@/lib/dialog';
 import { toast } from 'sonner';
@@ -46,7 +46,24 @@ interface ChatInputProps {
   sessionId?: string | null;
 }
 
-export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId }: ChatInputProps) {
+/**
+ * Imperative handle exposed via `forwardRef`. The chat page uses this to
+ * trigger a prompt from the QuickActionsBar without re-mounting the composer
+ * or mirroring `value` state in the parent.
+ */
+export interface ChatInputHandle {
+  /**
+   * Resolve the prompt at the given filename via the same `triggerSlashPrompt`
+   * factory the slash menu uses, and write the resolved text into the
+   * composer. Returns when the text is in the textarea.
+   */
+  handleQuickAction: (fileName: string) => Promise<void>;
+}
+
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
+  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId },
+  ref,
+) {
   const [value, setValue] = useState('');
   const [showSlash, setShowSlash] = useState(false);
   const [prompts, setPrompts] = useState<PromptMeta[]>([]);
@@ -455,6 +472,23 @@ const { providers: webProvidersList } = useWebProviders();
     await triggerSlashPrompt(prompt);
     if (isDispatchingRef.current) return;
   };
+
+  // Quick Actions Bar trigger — called by the parent via ref. Looks up the
+  // prompt by filename and runs it through the same factory the slash menu
+  // uses, so behavior is identical regardless of how the user picked the
+  // prompt. Re-uses the dispatching guard for symmetry with the slash path.
+  const handleQuickAction = useCallback(
+    async (fileName: string) => {
+      if (isDispatchingRef.current) return;
+      const all = await scanPrompts();
+      const prompt = all.find((p) => p.fileName === fileName);
+      if (!prompt) return;
+      await triggerSlashPrompt(prompt);
+    },
+    [triggerSlashPrompt],
+  );
+
+  useImperativeHandle(ref, () => ({ handleQuickAction }), [handleQuickAction]);
 
   const handlePickElement = async () => {
     if (isDispatchingRef.current) return;
@@ -917,4 +951,4 @@ const { providers: webProvidersList } = useWebProviders();
       </div>
     </footer>
   );
-}
+});

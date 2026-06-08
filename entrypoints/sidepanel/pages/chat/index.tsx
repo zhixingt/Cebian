@@ -8,7 +8,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { ChatInput } from '@/components/chat/ChatInput';
+import { ChatInput, type ChatInputHandle } from '@/components/chat/ChatInput';
+import { QuickActionsBar } from '@/components/chat/QuickActionsBar';
 import {
   UserMessageBubble,
   AgentMessage,
@@ -159,6 +160,11 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
   // Session loading state: any route/state mismatch means the current
   // message array belongs to a different chat and must not be rendered.
   const sessionLoading = !isNewChat && routeSessionId !== activeSessionId;
+
+  // Ref into ChatInput so QuickActionsBar can drive the same composer state
+  // (value, focus, slash-menu close) without mirroring it up here. Forwarded
+  // by ChatInput via `forwardRef<ChatInputHandle>`.
+  const chatInputRef = useRef<ChatInputHandle>(null);
 
   return (
     <>
@@ -446,7 +452,11 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
         )}
       </div>
 
+      <QuickActionsBar
+        onTrigger={(prompt) => chatInputRef.current?.handleQuickAction(prompt.fileName)}
+      />
       <ChatInput
+        ref={chatInputRef}
         onSend={handleSend}
         onCancel={cancel}
         isAgentRunning={effectiveRunning}

@@ -45,10 +45,18 @@ vi.mock('@/hooks/useStickToBottom', () => ({
   useStickToBottom: () => ({ scrollRef: { current: null }, isAtBottom: true, scrollToBottom: vi.fn() }),
 }));
 vi.mock('@/hooks/useStorageItem', () => ({
-  useStorageItem: () => [null],
+  // Return each item's declared fallback so the newly-mounted
+  // <QuickActionsBar /> gets `[]` for `favoritePrompts` (its fallback) and
+  // doesn't crash in `resolveFavorites(favorites).length` checking.
+  useStorageItem: (_item: unknown, fallback: unknown) => [fallback, () => Promise.resolve()],
 }));
 vi.mock('@/lib/storage', () => ({
   activeModel: { getValue: vi.fn().mockResolvedValue(null), setValue: vi.fn() },
+  // The page now mounts <QuickActionsBar />, which reads `favoritePrompts`.
+  // The mock needs to expose it so the import doesn't throw, but its value
+  // doesn't matter for these tests (we assert about captured useBackgroundAgent
+  // callbacks, not the bar itself).
+  favoritePrompts: { getValue: vi.fn().mockResolvedValue([]), setValue: vi.fn() },
 }));
 vi.mock('@/lib/i18n', () => ({
   t: (s: string) => s,
