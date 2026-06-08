@@ -298,6 +298,9 @@ chat:
     errorServerUnavailable: "该 MCP server 已不可用，请到设置里重新启用该服务。"
     # $1 = 后台的原始错误描述
     errorFetchFailed: "加载交互视图失败：$1"
+  quickActions:
+    broken: "原文件已丢失"
+    brokenClick: "原文件已丢失，请到设置页面处理"
   message:
     # $1 = 输入 token 数（已格式化，如 "1.2k"），$2 = 输出 token 数（已格式化）
     tokensInOut: "↑$1 ↓$2"

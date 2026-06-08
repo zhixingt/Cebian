@@ -305,6 +305,9 @@ chat:
     errorServerUnavailable: "This MCP server is no longer available. Re-enable it in settings to view this diagram."
     # $1 = raw failure detail from the BG (e.g. "connect ECONNREFUSED ...")
     errorFetchFailed: "Couldn't load the interactive view: $1"
+  quickActions:
+    broken: "Original file is missing"
+    brokenClick: "Original file is missing. Please handle it in Settings."
   message:
     # $1 = input tokens (formatted, e.g. "1.2k"), $2 = output tokens (formatted)
     tokensInOut: "↑$1 ↓$2"
