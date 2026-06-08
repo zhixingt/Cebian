@@ -8,3 +8,8 @@ ds-pow.wasm
 .DS_Store
 .wxt/
 
+# Site (Astro) build output
+site/.astro/
+site/dist/
+site/package-lock.json
+

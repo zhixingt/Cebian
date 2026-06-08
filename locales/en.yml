@@ -5,7 +5,7 @@
 # ─── Manifest (flat top-level keys, see skill "Manifest localization") ───
 extName: "CebianX | Browser AI Agent Workspace"
 extDescription: "Side panel AI agent. BYO key (OpenAI/Anthropic/Google), no account. Element picker, MCP tools, skills. AGPL-3.0, local-first."
-actionTitle: "Open Cebian sidebar"
+actionTitle: "Open CebianX sidebar"
 
 # ─── Common (reused across the UI) ───
 common:

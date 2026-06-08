@@ -6,7 +6,7 @@ import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
 import { useUpdateCheck, getInstallGuideUrl } from '@/hooks/useUpdateCheck';
 
-type SocialKey = 'wechat' | 'bilibili' | 'xiaohongshu' | 'x';
+type SocialKey = 'wechat' | 'bilibili' | 'xiaohongshu';
 
 interface SocialLink {
   key: SocialKey;
@@ -36,12 +36,6 @@ const SOCIAL_LINKS: SocialLink[] = [
     color: '#FF2442',
     Icon: XiaohongshuIcon,
   },
-  {
-    key: 'x',
-    href: 'https://x.com/maotoumao0_0',
-    color: 'currentColor',
-    Icon: XIcon,
-  },
 ];
 
 const INSTALL_GUIDE_URL = getInstallGuideUrl();
@@ -54,7 +48,7 @@ export function AboutSection() {
       <h2 className="text-base font-semibold">{t('settings.about.title')}</h2>
 
       <div className="space-y-1">
-        <p className="text-sm font-medium">Cebian v{current}</p>
+        <p className="text-sm font-medium">CebianX v{current}</p>
         <p className="text-xs text-muted-foreground">{t('settings.about.tagline')}</p>
         <div className="flex gap-2 pt-2 text-xs text-muted-foreground">
           <a
@@ -89,6 +83,43 @@ export function AboutSection() {
       <UpdateCheckRow status={status} onRecheck={recheck} />
 
       <FollowAuthorSection />
+
+      {/* Fork attribution — AGPL-3.0 § 5(a) */
+      }
+      <ProjectSourceBlock />
+    </div>
+  );
+}
+
+function ProjectSourceBlock() {
+  return (
+    <div className="space-y-2.5 rounded-lg border border-border bg-card/50 px-4 py-3.5 text-xs text-muted-foreground">
+      <p className="text-sm font-medium text-foreground">项目来源</p>
+      <p>
+        本项目是基于{' '}
+        <a
+          href="https://github.com/maotoumao/Cebian"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          maotoumao/Cebian
+        </a>{' '}
+        的修改分支（fork）。
+      </p>
+      <p>
+        上游作者：maotoumao · 本分支贡献者：肖泽林（
+        <a
+          href="https://github.com/zhixingt"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="underline underline-offset-2 hover:text-foreground"
+        >
+          @zhixingt
+        </a>
+        ）
+      </p>
+      <p>协议：AGPL-3.0（继承自上游，保持不变）。</p>
     </div>
   );
 }

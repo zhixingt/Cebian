@@ -1,10 +1,12 @@
 <div align="center">
 
-<img src="./public/icon/128.png" alt="Cebian" width="96" height="96" />
+<img src="./public/icon/128.png" alt="CebianX" width="96" height="96" />
 
-# Cebian
+# CebianX
 
 **AI 驱动的浏览器侧边栏助手**
+
+> *[maotoumao/Cebian](https://github.com/maotoumao/Cebian) 的修改分支，由 [@zhixingt](https://github.com/zhixingt) 维护*
 
 **[English](./README.md)** | 简体中文
 

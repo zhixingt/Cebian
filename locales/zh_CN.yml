@@ -4,7 +4,7 @@
 # ─── Manifest（扁平顶层 key，见规范"Manifest localization"）───
 extName: "CebianX | 浏览器 AI 智能体工作台"
 extDescription: "浏览器侧边栏里的 AI 智能体，用你自己的 OpenAI / Anthropic / Google API Key，免订阅、无账号。读网页、拾取元素、装 MCP 工具、跑 Skill 工作流，数据全部本地存储。AGPL-3.0 开源。"
-actionTitle: "打开 Cebian 侧边栏"
+actionTitle: "打开 CebianX 侧边栏"
 
 # ─── 通用（UI 中复用）───
 common:

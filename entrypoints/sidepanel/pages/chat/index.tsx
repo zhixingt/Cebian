@@ -427,7 +427,14 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               {!currentModel ? (
                 <p className="text-sm text-muted-foreground">{t('chat.composer.needModel')}</p>
               ) : (
-                <p className="text-sm text-muted-foreground">{t('chat.session.welcomeReady')}</p>
+                <div className="space-y-1">
+                  <p className="text-2xl font-serif text-foreground/80 leading-relaxed">
+                    思之所至，行之所达
+                  </p>
+                  <p className="text-lg font-serif text-muted-foreground">
+                    Think it, build it
+                  </p>
+                </div>
               )}
             </div>
           )}
