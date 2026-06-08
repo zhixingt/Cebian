@@ -20,7 +20,7 @@ interface SocialLink {
 const SOCIAL_LINKS: SocialLink[] = [
   {
     key: 'wechat',
-    href: browser.runtime.getURL('/sponsor/wechat_channel.jpg' as never),
+    href: undefined,
     color: '#07C160',
     Icon: WeChatIcon,
   },

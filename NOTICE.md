@@ -33,7 +33,7 @@ The following categories of changes have been made on top of upstream. For an ex
 
 - README.md / README.zh-CN.md — rewritten to use the `CebianX` brand, prominently mark the work as a modified fork, and preserve upstream attribution per the upstream's stated attribution request.
 - NOTICE.md (this file) — added for AGPL-3.0 § 5(a) compliance.
-- public/icon/{16,32,48,96,128}.png — replaced with the new CebianX brand mark.
+- public/icon/{16,32,48,96,128}.png — to be replaced with the new CebianX brand mark.
 - package.json `name` — updated to `CebianX` for npm-side consistency.
 - wxt.config.ts `manifest.name` and `description` (via `__MSG_extName__` / `__MSG_extDescription__`) — pointed at the new brand via locales.
 - locales/{en,zh_CN,zh_TW}.yml — `extName` and update-check description strings updated to the new brand.
