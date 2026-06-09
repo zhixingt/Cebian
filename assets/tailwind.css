@@ -164,7 +164,16 @@
   }
 }
 
-/* Scrollbar styling */
+/* Scrollbar-none utility — hides scrollbar while keeping scroll functionality */
+.scrollbar-none {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Scrollbar styling (default — used when .scrollbar-none is NOT applied) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
