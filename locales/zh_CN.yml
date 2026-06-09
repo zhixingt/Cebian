@@ -284,6 +284,11 @@ chat:
       low: "低"
       medium: "中"
       high: "高"
+  thinkingBlock:
+    # 模型仍在流式输出思考内容时的标签
+    live: "思考中…"
+    # 流式输出结束后的标签；默认折叠
+    label: "思考过程"
   tool:
     args: "参数"
     result: "结果"

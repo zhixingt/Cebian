@@ -288,6 +288,11 @@ chat:
       low: "Low"
       medium: "Medium"
       high: "High"
+  thinkingBlock:
+    # Label shown while the model is still streaming thinking tokens.
+    live: "Thinking…"
+    # Label shown after streaming finishes; block is collapsed by default.
+    label: "Thinking Process"
   tool:
     args: "Arguments"
     result: "Result"

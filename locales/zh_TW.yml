@@ -284,6 +284,11 @@ chat:
       low: "低"
       medium: "中"
       high: "高"
+  thinkingBlock:
+    # 模型仍在串流思考內容時的標籤
+    live: "思考中…"
+    # 串流結束後的標籤；預設摺疊
+    label: "思考過程"
   tool:
     args: "參數"
     result: "結果"

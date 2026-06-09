@@ -157,7 +157,7 @@ export function ThinkingBlock({ content, isLive }: { content: string; isLive?: b
           className={`size-2.5 transition-transform duration-200 ${isOpen ? 'rotate-90' : ''}`}
         />
         <Lightbulb className="size-3 text-primary" />
-        {isLive ? 'Thinking...' : 'Thinking Process'}
+        {isLive ? t('chat.thinkingBlock.live') : t('chat.thinkingBlock.label')}
       </button>
       <div
         className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${

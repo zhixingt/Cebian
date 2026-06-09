@@ -429,10 +429,10 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
               ) : (
                 <div className="space-y-1">
                   <p className="text-2xl font-serif text-foreground/80 leading-relaxed">
-                    思之所至，行之所达
+                    思之所至，行之所达。
                   </p>
-                  <p className="text-lg font-serif text-muted-foreground">
-                    Think it, build it
+                  <p className="text-sm font-sans text-muted-foreground tracking-wide">
+                    As Thought Reaches, So Action Arrives.
                   </p>
                 </div>
               )}
