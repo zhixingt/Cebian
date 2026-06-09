@@ -134,7 +134,7 @@ function ProjectSourceSection() {
       <SectionHeader title="项目来源" />
       <div className="rounded-md border border-border bg-card/50 px-4 py-3 text-xs text-muted-foreground">
         <p className="text-justify">
-          本项目是基于{' '}
+          Forked from:{' '}
           <a
             href="https://github.com/maotoumao/Cebian"
             target="_blank"
@@ -142,8 +142,9 @@ function ProjectSourceSection() {
             className="underline underline-offset-2 hover:text-foreground"
           >
             maotoumao/Cebian
-          </a>{' '}
-          的修改分支（fork），上游作者：maotoumao；本分支贡献者：肖泽林（
+          </a>
+          <br />
+          Maintainer: 肖泽林 (
           <a
             href="https://github.com/zhixingt"
             target="_blank"
@@ -152,7 +153,9 @@ function ProjectSourceSection() {
           >
             @zhixingt
           </a>
-          ）；协议：AGPL-3.0（继承自上游，保持不变）。
+          )
+          <br />
+          License: AGPL-3.0 (Inherited from upstream)
         </p>
       </div>
     </div>

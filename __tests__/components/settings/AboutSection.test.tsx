@@ -99,13 +99,17 @@ describe('AboutSection — project source UI matches the author section', () => 
     expect(para!.textContent).toContain('AGPL-3.0');
   });
 
-  it('uses the original wording with Chinese semicolons between attribution facts', () => {
+  it('uses the English Forked-from / Maintainer / License copy', () => {
     const { container } = render(<AboutSection />);
     const para = container.querySelector('p.text-justify');
     expect(para).not.toBeNull();
-    // The copy was rolled back to the original wording that uses `；`
-    // between upstream author / contributor / license facts.
-    expect(para!.textContent).toContain('；');
+    const text = para!.textContent ?? '';
+    // Three labelled English lines: Forked from / Maintainer / License.
+    expect(text).toContain('Forked from:');
+    expect(text).toContain('Maintainer:');
+    expect(text).toContain('License:');
+    // License note clarifies the inheritance from upstream.
+    expect(text).toContain('Inherited from upstream');
   });
 });
 
