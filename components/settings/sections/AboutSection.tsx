@@ -10,9 +10,7 @@ type SocialKey = 'wechat' | 'bilibili' | 'xiaohongshu';
 
 interface SocialLink {
   key: SocialKey;
-  /** Omitted for entries that should render as plain text (e.g. WeChat OA). */
-  href?: string;
-  /** Brand accent color (hex). Used as a CSS variable on the card. */
+  /** Brand accent color (hex). Used as a CSS variable on the row. */
   color: string;
   Icon: (props: SVGProps<SVGSVGElement>) => ReactElement;
 }
@@ -20,19 +18,16 @@ interface SocialLink {
 const SOCIAL_LINKS: SocialLink[] = [
   {
     key: 'wechat',
-    href: undefined,
     color: '#07C160',
     Icon: WeChatIcon,
   },
   {
     key: 'bilibili',
-    href: 'https://space.bilibili.com/12866223',
     color: '#00AEEC',
     Icon: BilibiliIcon,
   },
   {
     key: 'xiaohongshu',
-    href: 'https://www.xiaohongshu.com/user/profile/5ce6085200000000050213a6',
     color: '#FF2442',
     Icon: XiaohongshuIcon,
   },
@@ -41,7 +36,7 @@ const SOCIAL_LINKS: SocialLink[] = [
 const INSTALL_GUIDE_URL = getInstallGuideUrl();
 
 export function AboutSection() {
-  const { status, current, recheck } = useUpdateCheck();
+  const { status, current } = useUpdateCheck();
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -80,7 +75,7 @@ export function AboutSection() {
         </div>
       </div>
 
-      <UpdateCheckRow status={status} onRecheck={recheck} />
+      <UpdateCheckRow status={status} />
 
       <FollowAuthorSection />
 
@@ -95,7 +90,7 @@ function ProjectSourceBlock() {
   return (
     <div className="space-y-2.5 rounded-lg border border-border bg-card/50 px-4 py-3.5 text-xs text-muted-foreground">
       <p className="text-sm font-medium text-foreground">项目来源</p>
-      <p>
+      <p className="text-justify indent-[2em] leading-relaxed">
         本项目是基于{' '}
         <a
           href="https://github.com/maotoumao/Cebian"
@@ -105,10 +100,7 @@ function ProjectSourceBlock() {
         >
           maotoumao/Cebian
         </a>{' '}
-        的修改分支（fork）。
-      </p>
-      <p>
-        上游作者：maotoumao · 本分支贡献者：肖泽林（
+        的修改分支（fork），上游作者：maotoumao；本分支贡献者：肖泽林（
         <a
           href="https://github.com/zhixingt"
           target="_blank"
@@ -117,9 +109,8 @@ function ProjectSourceBlock() {
         >
           @zhixingt
         </a>
-        ）
+        ）；协议：AGPL-3.0（继承自上游，保持不变）。
       </p>
-      <p>协议：AGPL-3.0（继承自上游，保持不变）。</p>
     </div>
   );
 }
@@ -131,81 +122,54 @@ function FollowAuthorSection() {
         <p className="text-sm font-medium">{t('settings.about.followAuthor')}</p>
         <div className="h-px flex-1 bg-gradient-to-r from-border to-transparent" />
       </div>
-      <div className="grid grid-cols-2 gap-2">
+      <ul className="space-y-2 list-none p-0 m-0">
         {SOCIAL_LINKS.map((link) => (
-          <SocialCard key={link.key} link={link} />
+          <SocialRow key={link.key} link={link} />
         ))}
-      </div>
+      </ul>
     </div>
   );
 }
 
-function SocialCard({ link }: { link: SocialLink }) {
-  const { Icon, color, key, href } = link;
+function SocialRow({ link }: { link: SocialLink }) {
+  const { Icon, color, key } = link;
   const label = t(`settings.about.socials.${key}` as `settings.about.socials.${SocialKey}`);
-  const subtitle = t(
+  const handle = t(
     `settings.about.socials.${key}Handle` as `settings.about.socials.${SocialKey}Handle`,
   );
 
-  const cardClass = `
-    group relative flex items-center gap-3 rounded-lg border border-border bg-card/50 px-4 py-3
-    transition-all duration-200
-  `;
-  const hoverClass = `
-    hover:-translate-y-0.5 hover:border-[var(--social-color)] hover:shadow-sm
-    hover:bg-[color-mix(in_oklab,var(--social-color)_6%,transparent)]
-  `;
   const style = { ['--social-color' as string]: color } as React.CSSProperties;
 
-  const content = (
-    <>
+  return (
+    <li
+      style={style}
+      className="flex items-center gap-3 rounded-md border border-border bg-card/50 px-3 py-2"
+    >
       <span
-        className="
-          flex h-10 w-10 shrink-0 items-center justify-center rounded-md
-          bg-[color-mix(in_oklab,var(--social-color)_12%,transparent)]
-          text-(--social-color)
-          transition-transform duration-200 group-hover:scale-105
-        "
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-[color-mix(in_oklab,var(--social-color)_12%,transparent)] text-(--social-color)"
         aria-hidden="true"
       >
-        <Icon width={20} height={20} />
+        <Icon width={18} height={18} />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium text-foreground">{label}</span>
-        <span className="block truncate text-xs text-muted-foreground">{subtitle}</span>
+        <span className="block truncate text-xs text-muted-foreground">{handle}</span>
       </span>
-    </>
-  );
-
-  if (!href) {
-    return (
-      <div className={cardClass} style={style}>
-        {content}
-      </div>
-    );
-  }
-
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer noopener"
-      style={style}
-      className={`${cardClass} ${hoverClass}`}
-    >
-      {content}
-    </a>
+    </li>
   );
 }
 
 interface UpdateCheckRowProps {
   status: ReturnType<typeof useUpdateCheck>['status'];
-  onRecheck: () => void;
 }
 
-function UpdateCheckRow({ status, onRecheck }: UpdateCheckRowProps) {
-  const isBusy = status.kind === 'checking';
-
+/**
+ * The "检查更新" button is currently disabled by design — the
+ * user can only learn about new versions through release feeds, not via this
+ * surface. The status text (up-to-date / checking / error) is kept for
+ * informational value but the action is intentionally not exposed.
+ */
+function UpdateCheckRow({ status }: UpdateCheckRowProps) {
   let statusNode: ReactNode = null;
   if (status.kind === 'checking') {
     statusNode = <span className="text-xs text-muted-foreground">{t('settings.about.checking')}</span>;
@@ -218,7 +182,7 @@ function UpdateCheckRow({ status, onRecheck }: UpdateCheckRowProps) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" onClick={onRecheck} disabled={isBusy} aria-busy={isBusy}>
+        <Button variant="outline" size="sm" disabled aria-disabled="true" title={t('settings.about.checkUpdate')}>
           {t('settings.about.checkUpdate')}
         </Button>
         <span role="status" aria-live="polite">
@@ -277,14 +241,6 @@ function XiaohongshuIcon(props: SVGProps<SVGSVGElement>) {
       >
         {'\u7ea2'}
       </text>
-    </svg>
-  );
-}
-
-function XIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" {...props}>
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231 5.45-6.231zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77z" />
     </svg>
   );
 }
