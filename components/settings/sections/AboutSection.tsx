@@ -129,15 +129,12 @@ function UpdateCheckSection() {
 }
 
 function ProjectSourceSection() {
-  // The copy is crafted to avoid `；` and to never start or end the
-  // paragraph with a CJK punctuation glyph, so the justified text doesn't
-  // show stray marks at line edges.
   return (
     <div className="space-y-3">
-      <SectionHeader title="项目来源：" />
+      <SectionHeader title="项目来源" />
       <div className="rounded-md border border-border bg-card/50 px-4 py-3 text-xs text-muted-foreground">
         <p className="text-justify">
-          本项目基于{' '}
+          本项目是基于{' '}
           <a
             href="https://github.com/maotoumao/Cebian"
             target="_blank"
@@ -146,7 +143,7 @@ function ProjectSourceSection() {
           >
             maotoumao/Cebian
           </a>{' '}
-          修改而成，遵循 AGPL-3.0 协议（继承自上游，保持不变）。上游作者 maotoumao，本分支由肖泽林（
+          的修改分支（fork），上游作者：maotoumao；本分支贡献者：肖泽林（
           <a
             href="https://github.com/zhixingt"
             target="_blank"
@@ -155,7 +152,7 @@ function ProjectSourceSection() {
           >
             @zhixingt
           </a>
-          ）维护
+          ）；协议：AGPL-3.0（继承自上游，保持不变）。
         </p>
       </div>
     </div>

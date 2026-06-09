@@ -73,6 +73,14 @@ describe('AboutSection — project source UI matches the author section', () => 
     expect(dividers.length).toBeGreaterThanOrEqual(2);
   });
 
+  it('renders the title without a trailing colon (项目来源, not 项目来源：)', () => {
+    const { container } = render(<AboutSection />);
+    // Walk every text node looking for the literal "项目来源". We assert
+    // presence (the title exists) and absence of the colon variant.
+    expect(container.textContent).toContain('项目来源');
+    expect(container.textContent).not.toContain('项目来源：');
+  });
+
   it('renders the attribution as a single <p> with text-justify', () => {
     const { container } = render(<AboutSection />);
     const justified = container.querySelectorAll('p.text-justify');
@@ -91,28 +99,13 @@ describe('AboutSection — project source UI matches the author section', () => 
     expect(para!.textContent).toContain('AGPL-3.0');
   });
 
-  it('uses no Chinese semicolon (；) in the project-source paragraph', () => {
+  it('uses the original wording with Chinese semicolons between attribution facts', () => {
     const { container } = render(<AboutSection />);
     const para = container.querySelector('p.text-justify');
     expect(para).not.toBeNull();
-    // The original wording used `；` between attribution facts; the new
-    // copy uses commas + period only, so the semicolon is gone.
-    expect(para!.textContent).not.toContain('；');
-  });
-
-  it('does not begin or end the paragraph with a CJK punctuation glyph', () => {
-    const { container } = render(<AboutSection />);
-    const para = container.querySelector('p.text-justify');
-    expect(para).not.toBeNull();
-    const text = para!.textContent ?? '';
-    // Trim the leading 简体中文 counter just in case, but we want the *visible*
-    // first / last char here.
-    const first = text.trimStart().charAt(0);
-    const last = text.trimEnd().slice(-1);
-    // CJK punctuation set that must not appear at either edge.
-    const cjkPunct = '，。；：、！？（）【】《》「」『』…—';
-    expect(cjkPunct).not.toContain(first);
-    expect(cjkPunct).not.toContain(last);
+    // The copy was rolled back to the original wording that uses `；`
+    // between upstream author / contributor / license facts.
+    expect(para!.textContent).toContain('；');
   });
 });
 
