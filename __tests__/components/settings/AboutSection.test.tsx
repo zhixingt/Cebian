@@ -5,51 +5,34 @@
  *  1. **Author section** — the "关注作者" / "Follow the author" list renders as
  *     a vertical list of plain rows (no `<a>` wrappers, no cards). Each row
  *     still shows the platform label and handle text.
- *  2. **Project source** — the "项目来源" / "Project source" block is a single
- *     `<p>` with `text-justify` and still contains the upstream/AGPL/fork
- *     attribution text + working links to maotoumao/Cebian and @zhixingt.
- *  3. **Update check button** — the "检查更新" / "Check for updates" button is
- *     rendered as `<button disabled>` regardless of `useUpdateCheck` state.
- *     It must NOT call `recheck` on click. The status text (up to date,
- *     checking, error) still shows next to it as informational text.
+ *  2. **Project source** — the "项目来源：" / "Project source" block matches the
+ *     author section's UI pattern (title + horizontal divider + card body),
+ *     contains a single `text-justify` paragraph, preserves the upstream
+ *     and contributor links, and uses no `；` (Chinese semicolon) and no
+ *     stray line-leading/trailing punctuation.
+ *  3. **Update check** — the "检查更新" / "Check for updates" button is
+ *     rendered as `<button disabled>`. The AboutSection MUST NOT call
+ *     `useUpdateCheck` at all (the feature is currently disabled by design),
+ *     so no status text is rendered next to the button.
  *
  * Note: tests rely on the vitest i18n stub at `vitest-stubs/i18n.ts` which
  * returns the **full key path** (e.g. `settings.about.checkUpdate`) for
  * any `t()` call. Locator assertions below match that shape.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AboutSection } from '@/components/settings/sections/AboutSection';
 import * as useUpdateCheckModule from '@/hooks/useUpdateCheck';
 
 vi.mock('@/hooks/useUpdateCheck', () => ({
-  useUpdateCheck: vi.fn(() => ({
-    status: { kind: 'upToDate' as const, current: '0.0.0', latest: '0.0.0' },
-    current: '0.0.0',
-    recheck: vi.fn(),
-  })),
+  useUpdateCheck: vi.fn(),
   getInstallGuideUrl: () => 'https://cebian.catcat.work/en/install-guide',
 }));
-
-beforeEach(() => {
-  // Reset to a known status before every test.
-  vi.mocked(useUpdateCheckModule.useUpdateCheck).mockReturnValue({
-    status: { kind: 'upToDate' as const, current: '0.0.0', latest: '0.0.0' },
-    current: '0.0.0',
-    recheck: vi.fn(),
-  });
-});
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe('AboutSection — author list is vertical, no links', () => {
   it('renders each social row as a <li> without an anchor wrapper', () => {
     const { container } = render(<AboutSection />);
-    // The container should hold a <ul> with three <li> children for the
-    // wechat / bilibili / xiaohongshu entries.
     const list = container.querySelector('ul');
     expect(list).not.toBeNull();
     const items = list!.querySelectorAll('li');
@@ -58,7 +41,6 @@ describe('AboutSection — author list is vertical, no links', () => {
 
   it('renders the platform labels and handles as plain text inside <li>', () => {
     render(<AboutSection />);
-    // i18n stub returns the full key, so we look for the localized key.
     expect(screen.getByText('settings.about.socials.wechat')).toBeInTheDocument();
     expect(screen.getByText('settings.about.socials.bilibili')).toBeInTheDocument();
     expect(screen.getByText('settings.about.socials.xiaohongshu')).toBeInTheDocument();
@@ -69,7 +51,6 @@ describe('AboutSection — author list is vertical, no links', () => {
 
   it('does not render any anchor pointing at bilibili or xiaohongshu', () => {
     render(<AboutSection />);
-    // Defensive: external handles must not be exposed as clickable links.
     const anchors = document.querySelectorAll('a[href*="bilibili.com"], a[href*="xiaohongshu.com"]');
     expect(anchors.length).toBe(0);
   });
@@ -81,8 +62,18 @@ describe('AboutSection — author list is vertical, no links', () => {
   });
 });
 
-describe('AboutSection — project source is one justified paragraph', () => {
-  it('renders the project-source attribution as a single <p> with text-justify', () => {
+describe('AboutSection — project source UI matches the author section', () => {
+  it('shows a section title with a horizontal divider (same shape as FollowAuthorSection)', () => {
+    const { container } = render(<AboutSection />);
+    // Both section titles are <p class="text-sm font-medium">. The author
+    // section additionally has a `h-px flex-1 bg-gradient-to-r from-border`
+    // divider. The project-source block should follow the same shape.
+    const dividers = container.querySelectorAll('div.h-px.flex-1.bg-gradient-to-r');
+    // One for the author section; the project source should add another.
+    expect(dividers.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('renders the attribution as a single <p> with text-justify', () => {
     const { container } = render(<AboutSection />);
     const justified = container.querySelectorAll('p.text-justify');
     expect(justified.length).toBe(1);
@@ -96,40 +87,65 @@ describe('AboutSection — project source is one justified paragraph', () => {
     expect(upstream).not.toBeNull();
     const contrib = para!.querySelector('a[href*="github.com/zhixingt"]');
     expect(contrib).not.toBeNull();
-    // The 肖泽林 contributor name appears once.
     expect(para!.textContent).toContain('肖泽林');
-    // AGPL license is mentioned.
     expect(para!.textContent).toContain('AGPL-3.0');
+  });
+
+  it('uses no Chinese semicolon (；) in the project-source paragraph', () => {
+    const { container } = render(<AboutSection />);
+    const para = container.querySelector('p.text-justify');
+    expect(para).not.toBeNull();
+    // The original wording used `；` between attribution facts; the new
+    // copy uses commas + period only, so the semicolon is gone.
+    expect(para!.textContent).not.toContain('；');
+  });
+
+  it('does not begin or end the paragraph with a CJK punctuation glyph', () => {
+    const { container } = render(<AboutSection />);
+    const para = container.querySelector('p.text-justify');
+    expect(para).not.toBeNull();
+    const text = para!.textContent ?? '';
+    // Trim the leading 简体中文 counter just in case, but we want the *visible*
+    // first / last char here.
+    const first = text.trimStart().charAt(0);
+    const last = text.trimEnd().slice(-1);
+    // CJK punctuation set that must not appear at either edge.
+    const cjkPunct = '，。；：、！？（）【】《》「」『』…—';
+    expect(cjkPunct).not.toContain(first);
+    expect(cjkPunct).not.toContain(last);
   });
 });
 
-describe('AboutSection — check-update button is permanently disabled', () => {
-  it('renders the button as a disabled element', () => {
+describe('AboutSection — update check is fully disabled', () => {
+  it('does not call useUpdateCheck at all', () => {
+    vi.mocked(useUpdateCheckModule.useUpdateCheck).mockClear();
+    render(<AboutSection />);
+    // The feature is disabled by design — the section must not import or
+    // invoke the hook. The mock is therefore never called.
+    expect(useUpdateCheckModule.useUpdateCheck).not.toHaveBeenCalled();
+  });
+
+  it('renders the check-update button as a disabled element', () => {
     render(<AboutSection />);
     const btn = screen.getByRole('button', { name: 'settings.about.checkUpdate' });
     expect(btn).toBeDisabled();
   });
 
-  it('does not invoke recheck when clicked', () => {
-    // Re-mock with a fresh spy for this case.
-    const recheckSpy = vi.fn();
-    vi.spyOn(useUpdateCheckModule, 'useUpdateCheck').mockReturnValue({
-      status: { kind: 'idle' },
-      current: '0.0.0',
-      recheck: recheckSpy,
-    } as ReturnType<typeof useUpdateCheckModule.useUpdateCheck>);
+  it('does not render any status text next to the button', () => {
     render(<AboutSection />);
-    const btn = screen.getByRole('button', { name: 'settings.about.checkUpdate' });
-    // jsdom's fireEvent on a disabled button does NOT fire a click event.
-    // This combines with the toBeDisabled() check above to prove the action
-    // is not exposed.
-    fireEvent.click(btn);
-    expect(recheckSpy).not.toHaveBeenCalled();
+    // No "checking", "up to date", "check failed" labels — the check feature
+    // is disabled, so the section is silent.
+    expect(screen.queryByText('settings.about.checking')).toBeNull();
+    expect(screen.queryByText('settings.about.upToDate')).toBeNull();
+    expect(screen.queryByText('settings.about.checkFailed')).toBeNull();
   });
 
-  it('still surfaces the current status text next to the button', () => {
+  it('does not invoke recheck when the disabled button is clicked', () => {
     render(<AboutSection />);
-    // The mock returns upToDate status, so the localized key appears.
-    expect(screen.getByText('settings.about.upToDate')).toBeInTheDocument();
+    const btn = screen.getByRole('button', { name: 'settings.about.checkUpdate' });
+    // jsdom blocks click events on disabled buttons, so this is a smoke
+    // test that the action has no effect.
+    fireEvent.click(btn);
+    expect(useUpdateCheckModule.useUpdateCheck).not.toHaveBeenCalled();
   });
 });

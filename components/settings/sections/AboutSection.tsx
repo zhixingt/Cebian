@@ -1,10 +1,16 @@
 /**
- * AboutSection — version, update check, project links, and social media.
+ * AboutSection — version, project links, and social media.
+ *
+ * The "检查更新" feature is intentionally disabled at the surface level:
+ * we keep the button (greyed out) so users see the affordance exists, but
+ * we do NOT call `useUpdateCheck` from this component. That hook fetches
+ * the GitHub releases atom feed; if we called it, the user would see
+ * "检查中…" → "检查更新失败" on every About-page mount, which is misleading
+ * because the action is not actually exposed.
  */
-import type { ReactElement, ReactNode, SVGProps } from 'react';
+import type { ReactElement, SVGProps } from 'react';
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
-import { useUpdateCheck, getInstallGuideUrl } from '@/hooks/useUpdateCheck';
 
 type SocialKey = 'wechat' | 'bilibili' | 'xiaohongshu';
 
@@ -33,17 +39,20 @@ const SOCIAL_LINKS: SocialLink[] = [
   },
 ];
 
-const INSTALL_GUIDE_URL = getInstallGuideUrl();
-
 export function AboutSection() {
-  const { status, current } = useUpdateCheck();
+  // Read the manifest version directly so we don't have to call
+  // `useUpdateCheck` (which would trigger a network call we don't want).
+  const currentVersion =
+    typeof chrome !== 'undefined' && chrome?.runtime?.getManifest
+      ? chrome.runtime.getManifest().version
+      : '';
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
       <h2 className="text-base font-semibold">{t('settings.about.title')}</h2>
 
       <div className="space-y-1">
-        <p className="text-sm font-medium">CebianX v{current}</p>
+        <p className="text-sm font-medium">CebianX v{currentVersion}</p>
         <p className="text-xs text-muted-foreground">{t('settings.about.tagline')}</p>
         <div className="flex gap-2 pt-2 text-xs text-muted-foreground">
           <a
@@ -75,42 +84,80 @@ export function AboutSection() {
         </div>
       </div>
 
-      <UpdateCheckRow status={status} />
+      <UpdateCheckSection />
 
       <FollowAuthorSection />
 
-      {/* Fork attribution — AGPL-3.0 § 5(a) */
-      }
-      <ProjectSourceBlock />
+      <ProjectSourceSection />
     </div>
   );
 }
 
-function ProjectSourceBlock() {
+/**
+ * Renders a section header (title + horizontal divider) followed by
+ * a card-styled body. Shared between "关注作者" and "项目来源：" so both
+ * sections share the exact same visual shape.
+ */
+function SectionHeader({ title }: { title: string }) {
   return (
-    <div className="space-y-2.5 rounded-lg border border-border bg-card/50 px-4 py-3.5 text-xs text-muted-foreground">
-      <p className="text-sm font-medium text-foreground">项目来源</p>
-      <p className="text-justify indent-[2em] leading-relaxed">
-        本项目是基于{' '}
-        <a
-          href="https://github.com/maotoumao/Cebian"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="underline underline-offset-2 hover:text-foreground"
+    <div className="flex items-center gap-3">
+      <p className="text-sm font-medium">{title}</p>
+      <div className="h-px flex-1 bg-gradient-to-r from-border to-transparent" />
+    </div>
+  );
+}
+
+function UpdateCheckSection() {
+  // Disabled by design — the action is not exposed. The button is kept as
+  // a visual affordance so users can see the feature exists.
+  return (
+    <div className="space-y-3">
+      <SectionHeader title={t('settings.about.checkUpdate')} />
+      <div className="flex items-center gap-3 rounded-md border border-border bg-card/50 px-4 py-3">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled
+          aria-disabled="true"
+          title={t('settings.about.checkUpdate')}
         >
-          maotoumao/Cebian
-        </a>{' '}
-        的修改分支（fork），上游作者：maotoumao；本分支贡献者：肖泽林（
-        <a
-          href="https://github.com/zhixingt"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="underline underline-offset-2 hover:text-foreground"
-        >
-          @zhixingt
-        </a>
-        ）；协议：AGPL-3.0（继承自上游，保持不变）。
-      </p>
+          {t('settings.about.checkUpdate')}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ProjectSourceSection() {
+  // The copy is crafted to avoid `；` and to never start or end the
+  // paragraph with a CJK punctuation glyph, so the justified text doesn't
+  // show stray marks at line edges.
+  return (
+    <div className="space-y-3">
+      <SectionHeader title="项目来源：" />
+      <div className="rounded-md border border-border bg-card/50 px-4 py-3 text-xs text-muted-foreground">
+        <p className="text-justify">
+          本项目基于{' '}
+          <a
+            href="https://github.com/maotoumao/Cebian"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            maotoumao/Cebian
+          </a>{' '}
+          修改而成，遵循 AGPL-3.0 协议（继承自上游，保持不变）。上游作者 maotoumao，本分支由肖泽林（
+          <a
+            href="https://github.com/zhixingt"
+            target="_blank"
+            rel="noreferrer noopener"
+            className="underline underline-offset-2 hover:text-foreground"
+          >
+            @zhixingt
+          </a>
+          ）维护
+        </p>
+      </div>
     </div>
   );
 }
@@ -118,10 +165,7 @@ function ProjectSourceBlock() {
 function FollowAuthorSection() {
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <p className="text-sm font-medium">{t('settings.about.followAuthor')}</p>
-        <div className="h-px flex-1 bg-gradient-to-r from-border to-transparent" />
-      </div>
+      <SectionHeader title={t('settings.about.followAuthor')} />
       <ul className="space-y-2 list-none p-0 m-0">
         {SOCIAL_LINKS.map((link) => (
           <SocialRow key={link.key} link={link} />
@@ -156,54 +200,6 @@ function SocialRow({ link }: { link: SocialLink }) {
         <span className="block truncate text-xs text-muted-foreground">{handle}</span>
       </span>
     </li>
-  );
-}
-
-interface UpdateCheckRowProps {
-  status: ReturnType<typeof useUpdateCheck>['status'];
-}
-
-/**
- * The "检查更新" button is currently disabled by design — the
- * user can only learn about new versions through release feeds, not via this
- * surface. The status text (up-to-date / checking / error) is kept for
- * informational value but the action is intentionally not exposed.
- */
-function UpdateCheckRow({ status }: UpdateCheckRowProps) {
-  let statusNode: ReactNode = null;
-  if (status.kind === 'checking') {
-    statusNode = <span className="text-xs text-muted-foreground">{t('settings.about.checking')}</span>;
-  } else if (status.kind === 'upToDate') {
-    statusNode = <span className="text-xs text-muted-foreground">{t('settings.about.upToDate')}</span>;
-  } else if (status.kind === 'error') {
-    statusNode = <span className="text-xs text-destructive">{t('settings.about.checkFailed')}</span>;
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" disabled aria-disabled="true" title={t('settings.about.checkUpdate')}>
-          {t('settings.about.checkUpdate')}
-        </Button>
-        <span role="status" aria-live="polite">
-          {statusNode}
-        </span>
-      </div>
-      {status.kind === 'updateAvailable' && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="rounded-md border border-border bg-accent/40 p-3 space-y-2"
-        >
-          <p className="text-xs">{t('settings.about.updateAvailable', [status.latest])}</p>
-          <Button asChild size="sm">
-            <a href={INSTALL_GUIDE_URL} target="_blank" rel="noreferrer noopener">
-              {t('settings.about.viewInstallGuide')}
-            </a>
-          </Button>
-        </div>
-      )}
-    </div>
   );
 }
 
