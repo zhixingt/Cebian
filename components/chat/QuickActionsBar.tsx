@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { favoritePrompts } from '@/lib/storage';
@@ -29,15 +29,28 @@ export function QuickActionsBar({ onTrigger }: QuickActionsBarProps) {
   /**
    * Redirect vertical mouse-wheel events to horizontal scroll so the user
    * can browse the pill bar without a visible scrollbar.
+   *
+   * We use a native `addEventListener` with `{ passive: false }` instead of
+   * React's `onWheel` because React registers wheel listeners as passive
+   * by default, which makes `preventDefault()` a no-op and logs a console
+   * warning ("Unable to preventDefault inside passive event listener").
    */
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+  const handleWheel = useCallback((e: WheelEvent) => {
     const el = scrollRef.current;
     if (!el) return;
-    // Only intercept when there is horizontal overflow to scroll.
     if (el.scrollWidth <= el.clientWidth) return;
     e.preventDefault();
     el.scrollBy({ left: e.deltaY, behavior: 'auto' });
-  };
+  }, []);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleWheel]);
 
   if (resolved.length === 0) return null;
 
@@ -45,7 +58,6 @@ export function QuickActionsBar({ onTrigger }: QuickActionsBarProps) {
     <div
       ref={scrollRef}
       data-testid="quick-actions-bar"
-      onWheel={handleWheel}
       className="px-4 pt-2 pb-1 flex gap-1.5 overflow-x-auto scrollbar-none border-t border-border bg-background"
     >
       {resolved.map((r) => {

@@ -109,6 +109,7 @@ settings:
     newBody: "（在此处编写你的提示词）"
     # 快捷指令栏（Quick Actions Bar）区块标题。
     favoritesTitle: "快捷指令"
+    favoriteRemove: "移除快捷指令"
     favoriteAdded: "已添加到快捷指令"
     favoriteRemoved: "已移除快捷指令"
     # $1 = 触发字符（"/"）

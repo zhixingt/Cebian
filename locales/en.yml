@@ -113,6 +113,7 @@ settings:
     newBody: "(Write your prompt here)"
     # Quick Actions Bar — section heading for the favorites row.
     favoritesTitle: "Quick actions"
+    favoriteRemove: "Remove from quick actions"
     favoriteAdded: "Added to quick actions"
     favoriteRemoved: "Removed from quick actions"
     # $1 = trigger character ("/")

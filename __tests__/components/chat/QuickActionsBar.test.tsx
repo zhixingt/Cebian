@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { QuickActionsBar } from '@/components/chat/QuickActionsBar';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { toast } from 'sonner';
@@ -82,14 +82,16 @@ describe('QuickActionsBar', () => {
   it('redirects vertical wheel events to horizontal scroll on overflow', async () => {
     vi.mocked(useStorageItem).mockReturnValue([['a.md'], vi.fn()]);
     vi.spyOn(scanner, 'scanPrompts').mockResolvedValue([makePrompt('a.md', 'alpha')]);
-    const { container } = render(<QuickActionsBar onTrigger={vi.fn()} />);
+    render(<QuickActionsBar onTrigger={vi.fn()} />);
     const bar = await screen.findByTestId('quick-actions-bar');
     // Simulate overflow and spy on the instance method.
     vi.spyOn(bar, 'scrollWidth', 'get').mockReturnValue(1000);
     vi.spyOn(bar, 'clientWidth', 'get').mockReturnValue(200);
     const scrollBySpy = vi.fn();
     bar.scrollBy = scrollBySpy;
-    fireEvent.wheel(bar, { deltaY: 120 });
+    // Flush pending effects so the native wheel listener is registered.
+    await act(() => Promise.resolve());
+    bar.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true }));
     expect(scrollBySpy).toHaveBeenCalledWith({ left: 120, behavior: 'auto' });
   });
 
@@ -98,13 +100,12 @@ describe('QuickActionsBar', () => {
     vi.spyOn(scanner, 'scanPrompts').mockResolvedValue([makePrompt('a.md', 'alpha')]);
     render(<QuickActionsBar onTrigger={vi.fn()} />);
     const bar = await screen.findByTestId('quick-actions-bar');
-    // No overflow: scrollWidth === clientWidth
     vi.spyOn(bar, 'scrollWidth', 'get').mockReturnValue(200);
     vi.spyOn(bar, 'clientWidth', 'get').mockReturnValue(200);
     const scrollBySpy = vi.fn();
     bar.scrollBy = scrollBySpy;
-    fireEvent.wheel(bar, { deltaY: 120 });
-    // scrollBy should NOT be called — no overflow, handler returns early.
+    await act(() => Promise.resolve());
+    bar.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true }));
     expect(scrollBySpy).not.toHaveBeenCalled();
   });
 });
