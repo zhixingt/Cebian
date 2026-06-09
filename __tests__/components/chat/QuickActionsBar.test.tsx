@@ -61,4 +61,50 @@ describe('QuickActionsBar', () => {
     fireEvent.click(btn);
     expect(toast.warning).toHaveBeenCalled();
   });
+
+  it('renders pills without SVG icons', async () => {
+    vi.mocked(useStorageItem).mockReturnValue([['a.md'], vi.fn()]);
+    vi.spyOn(scanner, 'scanPrompts').mockResolvedValue([makePrompt('a.md', 'alpha')]);
+    const { container } = render(<QuickActionsBar onTrigger={vi.fn()} />);
+    await screen.findByRole('button', { name: /alpha/ });
+    // No <svg> element inside any pill button — icons were removed.
+    expect(container.querySelectorAll('svg')).toHaveLength(0);
+  });
+
+  it('uses scrollbar-none class to hide the scrollbar', async () => {
+    vi.mocked(useStorageItem).mockReturnValue([['a.md'], vi.fn()]);
+    vi.spyOn(scanner, 'scanPrompts').mockResolvedValue([makePrompt('a.md', 'alpha')]);
+    render(<QuickActionsBar onTrigger={vi.fn()} />);
+    const bar = await screen.findByTestId('quick-actions-bar');
+    expect(bar).toHaveClass('scrollbar-none');
+  });
+
+  it('redirects vertical wheel events to horizontal scroll on overflow', async () => {
+    vi.mocked(useStorageItem).mockReturnValue([['a.md'], vi.fn()]);
+    vi.spyOn(scanner, 'scanPrompts').mockResolvedValue([makePrompt('a.md', 'alpha')]);
+    const { container } = render(<QuickActionsBar onTrigger={vi.fn()} />);
+    const bar = await screen.findByTestId('quick-actions-bar');
+    // Simulate overflow and spy on the instance method.
+    vi.spyOn(bar, 'scrollWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(bar, 'clientWidth', 'get').mockReturnValue(200);
+    const scrollBySpy = vi.fn();
+    bar.scrollBy = scrollBySpy;
+    fireEvent.wheel(bar, { deltaY: 120 });
+    expect(scrollBySpy).toHaveBeenCalledWith({ left: 120, behavior: 'auto' });
+  });
+
+  it('does not intercept wheel events when there is no overflow', async () => {
+    vi.mocked(useStorageItem).mockReturnValue([['a.md'], vi.fn()]);
+    vi.spyOn(scanner, 'scanPrompts').mockResolvedValue([makePrompt('a.md', 'alpha')]);
+    render(<QuickActionsBar onTrigger={vi.fn()} />);
+    const bar = await screen.findByTestId('quick-actions-bar');
+    // No overflow: scrollWidth === clientWidth
+    vi.spyOn(bar, 'scrollWidth', 'get').mockReturnValue(200);
+    vi.spyOn(bar, 'clientWidth', 'get').mockReturnValue(200);
+    const scrollBySpy = vi.fn();
+    bar.scrollBy = scrollBySpy;
+    fireEvent.wheel(bar, { deltaY: 120 });
+    // scrollBy should NOT be called — no overflow, handler returns early.
+    expect(scrollBySpy).not.toHaveBeenCalled();
+  });
 });
