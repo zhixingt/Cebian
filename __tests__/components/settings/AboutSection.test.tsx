@@ -73,42 +73,40 @@ describe('AboutSection — project source UI matches the author section', () => 
     expect(dividers.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('renders the title without a trailing colon (项目来源, not 项目来源：)', () => {
+  it('renders the title as 项目说明 (no colon)', () => {
     const { container } = render(<AboutSection />);
-    // Walk every text node looking for the literal "项目来源". We assert
-    // presence (the title exists) and absence of the colon variant.
-    expect(container.textContent).toContain('项目来源');
-    expect(container.textContent).not.toContain('项目来源：');
+    expect(container.textContent).toContain('项目说明');
   });
 
-  it('renders the attribution as a single <p> with text-justify', () => {
+  it('renders three separate <p> lines in the project description card', () => {
     const { container } = render(<AboutSection />);
-    const justified = container.querySelectorAll('p.text-justify');
-    expect(justified.length).toBe(1);
+    // The card body is a div with space-y-2.5 containing three <p> elements.
+    const card = container.querySelector('.space-y-2\\.5');
+    expect(card).not.toBeNull();
+    const paragraphs = card!.querySelectorAll('p');
+    expect(paragraphs.length).toBe(3);
   });
 
-  it('keeps the upstream + contributor links inside the single paragraph', () => {
+  it('keeps the upstream + contributor links in the card body', () => {
     const { container } = render(<AboutSection />);
-    const para = container.querySelector('p.text-justify');
-    expect(para).not.toBeNull();
-    const upstream = para!.querySelector('a[href*="maotoumao/Cebian"]');
+    const card = container.querySelector('.space-y-2\\.5');
+    expect(card).not.toBeNull();
+    const upstream = card!.querySelector('a[href*="maotoumao/Cebian"]');
     expect(upstream).not.toBeNull();
-    const contrib = para!.querySelector('a[href*="github.com/zhixingt"]');
+    const contrib = card!.querySelector('a[href*="github.com/zhixingt"]');
     expect(contrib).not.toBeNull();
-    expect(para!.textContent).toContain('肖泽林');
-    expect(para!.textContent).toContain('AGPL-3.0');
+    expect(card!.textContent).toContain('肖泽林');
+    expect(card!.textContent).toContain('AGPL-3.0');
   });
 
   it('uses the English Forked-from / Maintainer / License copy', () => {
     const { container } = render(<AboutSection />);
-    const para = container.querySelector('p.text-justify');
-    expect(para).not.toBeNull();
-    const text = para!.textContent ?? '';
-    // Three labelled English lines: Forked from / Maintainer / License.
+    const card = container.querySelector('.space-y-2\\.5');
+    expect(card).not.toBeNull();
+    const text = card!.textContent ?? '';
     expect(text).toContain('Forked from:');
     expect(text).toContain('Maintainer:');
     expect(text).toContain('License:');
-    // License note clarifies the inheritance from upstream.
     expect(text).toContain('Inherited from upstream');
   });
 });

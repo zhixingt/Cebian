@@ -131,9 +131,9 @@ function UpdateCheckSection() {
 function ProjectSourceSection() {
   return (
     <div className="space-y-3">
-      <SectionHeader title="项目来源" />
-      <div className="rounded-md border border-border bg-card/50 px-4 py-3 text-xs text-muted-foreground">
-        <p className="text-justify">
+      <SectionHeader title="项目说明" />
+      <div className="rounded-md border border-border bg-card/50 px-4 py-3 text-xs text-muted-foreground space-y-2.5">
+        <p>
           Forked from:{' '}
           <a
             href="https://github.com/maotoumao/Cebian"
@@ -143,7 +143,8 @@ function ProjectSourceSection() {
           >
             maotoumao/Cebian
           </a>
-          <br />
+        </p>
+        <p>
           Maintainer: 肖泽林 (
           <a
             href="https://github.com/zhixingt"
@@ -154,9 +155,8 @@ function ProjectSourceSection() {
             @zhixingt
           </a>
           )
-          <br />
-          License: AGPL-3.0 (Inherited from upstream)
         </p>
+        <p>License: AGPL-3.0 (Inherited from upstream)</p>
       </div>
     </div>
   );
