@@ -55,11 +55,11 @@ export function QuickActionsBar({ onTrigger }: QuickActionsBarProps) {
             key={r.fileName}
             type="button"
             onClick={() => onTrigger(r.meta!)}
-            title={`/${r.meta!.name}`}
+            title={r.meta!.name}
             className="shrink-0 inline-flex items-center gap-1 px-2 h-7 rounded-full border border-border bg-card hover:bg-accent text-xs"
           >
             <FileType className="size-3 text-muted-foreground" />
-            <span className="max-w-32 truncate">/{r.meta!.name}</span>
+            <span className="max-w-32 truncate">{r.meta!.name}</span>
           </button>
         );
       })}
