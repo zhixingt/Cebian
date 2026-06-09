@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { FileType, HelpCircle } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { favoritePrompts } from '@/lib/storage';
@@ -15,6 +14,7 @@ interface QuickActionsBarProps {
 export function QuickActionsBar({ onTrigger }: QuickActionsBarProps) {
   const [favorites] = useStorageItem(favoritePrompts, []);
   const [resolved, setResolved] = useState<ResolvedFavorite[]>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -26,11 +26,26 @@ export function QuickActionsBar({ onTrigger }: QuickActionsBarProps) {
     };
   }, [favorites]);
 
+  /**
+   * Redirect vertical mouse-wheel events to horizontal scroll so the user
+   * can browse the pill bar without a visible scrollbar.
+   */
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Only intercept when there is horizontal overflow to scroll.
+    if (el.scrollWidth <= el.clientWidth) return;
+    e.preventDefault();
+    el.scrollBy({ left: e.deltaY, behavior: 'auto' });
+  };
+
   if (resolved.length === 0) return null;
 
   return (
     <div
+      ref={scrollRef}
       data-testid="quick-actions-bar"
+      onWheel={handleWheel}
       className="px-4 pt-2 pb-1 flex gap-1.5 overflow-x-auto scrollbar-none border-t border-border bg-background"
     >
       {resolved.map((r) => {
@@ -42,10 +57,9 @@ export function QuickActionsBar({ onTrigger }: QuickActionsBarProps) {
               aria-disabled="true"
               aria-label={r.fileName}
               title={t('chat.quickActions.broken')}
-              className="shrink-0 inline-flex items-center gap-1 px-2 h-7 rounded-full border border-border text-xs text-muted-foreground opacity-60 cursor-not-allowed"
+              className="shrink-0 inline-flex items-center px-2 h-7 rounded-full border border-border text-xs text-muted-foreground opacity-60 cursor-not-allowed"
               onClick={() => toast.warning(t('chat.quickActions.brokenClick'))}
             >
-              <HelpCircle className="size-3" />
               <span className="max-w-32 truncate">{r.fileName}</span>
             </button>
           );
@@ -56,9 +70,8 @@ export function QuickActionsBar({ onTrigger }: QuickActionsBarProps) {
             type="button"
             onClick={() => onTrigger(r.meta!)}
             title={r.meta!.name}
-            className="shrink-0 inline-flex items-center gap-1 px-2 h-7 rounded-full border border-border bg-card hover:bg-accent text-xs"
+            className="shrink-0 inline-flex items-center px-2 h-7 rounded-full border border-border bg-card hover:bg-accent text-xs"
           >
-            <FileType className="size-3 text-muted-foreground" />
             <span className="max-w-32 truncate">{r.meta!.name}</span>
           </button>
         );
