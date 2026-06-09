@@ -428,11 +428,11 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                 <p className="text-sm text-muted-foreground">{t('chat.composer.needModel')}</p>
               ) : (
                 <div className="space-y-1">
-                  <p className="text-2xl font-serif text-foreground/80 leading-relaxed">
-                    思之所至，行之所达。
+                  <p className="text-2xl text-foreground/80 leading-relaxed" style={{ fontFamily: "'KaiTi', 'STKaiti', '楷体', serif" }}>
+                    思之所至<span style={{ fontFamily: "var(--font-serif)" }}>，</span>行之所达<span style={{ fontFamily: "var(--font-serif)" }}>。</span>
                   </p>
                   <p className="text-sm font-sans text-muted-foreground tracking-wide">
-                    As Thought Reaches, So Action Arrives.
+                    As Thought Reaches<span style={{ fontFamily: "var(--font-serif)" }}>,</span> So Action Arrives<span style={{ fontFamily: "var(--font-serif)" }}>.</span>
                   </p>
                 </div>
               )}
