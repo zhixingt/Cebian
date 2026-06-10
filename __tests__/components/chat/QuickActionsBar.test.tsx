@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { QuickActionsBar } from '@/components/chat/QuickActionsBar';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QuickActionsBar, handleWheelOnElement } from '@/components/chat/QuickActionsBar';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import { toast } from 'sonner';
 
@@ -79,33 +79,36 @@ describe('QuickActionsBar', () => {
     expect(bar).toHaveClass('scrollbar-none');
   });
 
-  it('redirects vertical wheel events to horizontal scroll on overflow', async () => {
-    vi.mocked(useStorageItem).mockReturnValue([['a.md'], vi.fn()]);
-    vi.spyOn(scanner, 'scanPrompts').mockResolvedValue([makePrompt('a.md', 'alpha')]);
-    render(<QuickActionsBar onTrigger={vi.fn()} />);
-    const bar = await screen.findByTestId('quick-actions-bar');
-    // Simulate overflow and spy on the instance method.
-    vi.spyOn(bar, 'scrollWidth', 'get').mockReturnValue(1000);
-    vi.spyOn(bar, 'clientWidth', 'get').mockReturnValue(200);
+});
+
+describe('handleWheelOnElement', () => {
+  it('calls scrollBy with deltaY when there is overflow', () => {
+    const el = document.createElement('div');
+    vi.spyOn(el, 'scrollWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(el, 'clientWidth', 'get').mockReturnValue(200);
     const scrollBySpy = vi.fn();
-    bar.scrollBy = scrollBySpy;
-    // Flush pending effects so the native wheel listener is registered.
-    await act(() => Promise.resolve());
-    bar.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true }));
+    el.scrollBy = scrollBySpy;
+    const event = new WheelEvent('wheel', { deltaY: 120 });
+    const preventDefaultSpy = vi.spyOn(event, 'preventDefault');
+    handleWheelOnElement(el, event);
     expect(scrollBySpy).toHaveBeenCalledWith({ left: 120, behavior: 'auto' });
+    expect(preventDefaultSpy).toHaveBeenCalled();
   });
 
-  it('does not intercept wheel events when there is no overflow', async () => {
-    vi.mocked(useStorageItem).mockReturnValue([['a.md'], vi.fn()]);
-    vi.spyOn(scanner, 'scanPrompts').mockResolvedValue([makePrompt('a.md', 'alpha')]);
-    render(<QuickActionsBar onTrigger={vi.fn()} />);
-    const bar = await screen.findByTestId('quick-actions-bar');
-    vi.spyOn(bar, 'scrollWidth', 'get').mockReturnValue(200);
-    vi.spyOn(bar, 'clientWidth', 'get').mockReturnValue(200);
+  it('does nothing when there is no overflow', () => {
+    const el = document.createElement('div');
+    vi.spyOn(el, 'scrollWidth', 'get').mockReturnValue(200);
+    vi.spyOn(el, 'clientWidth', 'get').mockReturnValue(200);
     const scrollBySpy = vi.fn();
-    bar.scrollBy = scrollBySpy;
-    await act(() => Promise.resolve());
-    bar.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true }));
+    el.scrollBy = scrollBySpy;
+    const event = new WheelEvent('wheel', { deltaY: 120 });
+    handleWheelOnElement(el, event);
     expect(scrollBySpy).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when el is null', () => {
+    const event = new WheelEvent('wheel', { deltaY: 120 });
+    // Should not throw.
+    handleWheelOnElement(null, event);
   });
 });

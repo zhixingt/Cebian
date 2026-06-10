@@ -162,9 +162,10 @@ interface FileTreeProps {
 - 点击：立即切换 + Toast（"已添加到快捷指令" / "已移除快捷指令"）
 
 **实现**：
-- 用 `useStorageItem(favoritePrompts, [])` 拿到当前列表
-- `isFavorite(filename) = list.includes(filename)`
-- `toggleFavorite(filename) = setValue(list.includes(f) ? list.filter(x => x !== f) : [...list, f])`
+- FileTree 接收三个可选 prop：`showFavoriteButton?: boolean`（控制是否渲染星形按钮）、`isFavorite?: (fileName: string) => boolean`（判断当前收藏状态）、`onToggleFavorite?: (fileName: string, willFavorite: boolean) => void`（父级处理状态变更 + toast）。FileTree 自身**不调用** `useStorageItem`，保持纯展示组件。
+- PromptsSection 拥有 `useStorageItem(favoritePrompts, [])` 的读写权，并透传 `isFavorite` / `onToggleFavorite` 回调给 FileWorkspace → FileTree。
+- `isFavorite(filename) = favorites.includes(filename)`
+- `toggleFavorite(filename, willFavorite)`: 若 willFavorite → `setFavorites([...favorites, filename])` + toast.success；否则 `setFavorites(favorites.filter(...))` + toast.info
 
 ### 5.3 聊天栏 — QuickActionsBar (新组件)
 

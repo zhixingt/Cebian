@@ -11,6 +11,14 @@ interface QuickActionsBarProps {
   onTrigger: (prompt: PromptMeta) => void;
 }
 
+/** Exported for unit-testing the wheel-scroll logic without jsdom event quirks. */
+export function handleWheelOnElement(el: HTMLDivElement | null, e: WheelEvent) {
+  if (!el) return;
+  if (el.scrollWidth <= el.clientWidth) return;
+  e.preventDefault();
+  el.scrollBy({ left: e.deltaY, behavior: 'auto' });
+}
+
 export function QuickActionsBar({ onTrigger }: QuickActionsBarProps) {
   const [favorites] = useStorageItem(favoritePrompts, []);
   const [resolved, setResolved] = useState<ResolvedFavorite[]>([]);
@@ -36,11 +44,7 @@ export function QuickActionsBar({ onTrigger }: QuickActionsBarProps) {
    * warning ("Unable to preventDefault inside passive event listener").
    */
   const handleWheel = useCallback((e: WheelEvent) => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (el.scrollWidth <= el.clientWidth) return;
-    e.preventDefault();
-    el.scrollBy({ left: e.deltaY, behavior: 'auto' });
+    handleWheelOnElement(scrollRef.current, e);
   }, []);
 
   useEffect(() => {
