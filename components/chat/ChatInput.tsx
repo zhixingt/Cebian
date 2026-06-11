@@ -701,7 +701,7 @@ const { providers: webProvidersList } = useWebProviders();
   };
 
   return (
-    <footer className="px-4 py-4 border-t border-border bg-background relative">
+    <footer className="px-4 py-4 bg-background relative">
       {/* Slash menu — dynamic VFS prompts */}
       {isSlashMenuVisible && (
         <div

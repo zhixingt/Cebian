@@ -9,7 +9,7 @@ const fakeProvider: WebProvider = {
   presetId: 'glm',
   enabled: true,
   loginStatus: 'unknown',
-  modelId: 'GLM-4.6',
+  modelId: 'glm-5.1',
   supportsToolCalls: true,
   supportsReasoning: false,
   lastCheckedAt: null,
@@ -25,9 +25,11 @@ const fakePreset: WebProviderPreset = {
   displayNameKey: 'webProviders.presets.glm.name',
   descriptionKey: 'webProviders.presets.glm.description',
   loginUrl: 'https://chatglm.cn',
-  defaultModelId: 'GLM-4.6',
-  defaultSupportsToolCalls: true,
-  defaultSupportsReasoning: false,
+  models: [
+    { id: 'glm-5.1', label: 'GLM-5.1', assistantId: '000000000000000000000000', supportsToolCalls: true, supportsReasoning: false },
+    { id: 'glm-4.6', label: 'GLM-4.6', assistantId: '65940acff94777010aa6b796', supportsToolCalls: true, supportsReasoning: false },
+  ],
+  defaultModelId: 'glm-5.1',
   cookieDomain: 'chatglm.cn',
   sessionIndicators: ['chatglm_refresh_token', 'chatglm_token'],
   useLocalStorageFallback: false,
@@ -130,12 +132,12 @@ describe('WebProviderCard (2026-06-08 UI redesign)', () => {
     expect(btn).toBeDisabled();
   });
 
-  it('editing modelId calls onModelIdChange', () => {
+  it('selecting model calls onModelIdChange (⑨.4: Model ID Input → Select dropdown)', () => {
     const onModelIdChange = vi.fn();
     renderCard({ onModelIdChange });
-    const input = screen.getByDisplayValue('GLM-4.6');
-    fireEvent.change(input, { target: { value: 'GLM-5' } });
-    expect(onModelIdChange).toHaveBeenCalledWith('GLM-5');
+    const select = screen.getByTestId('model-select-glm') as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: 'glm-4.6' } });
+    expect(onModelIdChange).toHaveBeenCalledWith('glm-4.6');
   });
 
   it('toggling Tool calls calls onCapabilityChange (Reasoning toggle is GONE)', () => {

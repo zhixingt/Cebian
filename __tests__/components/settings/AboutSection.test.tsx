@@ -2,15 +2,12 @@
  * Regression locks for `AboutSection` (in `components/settings/sections/AboutSection.tsx`).
  *
  * Contract under test:
- *  1. **Author section** — the "关注作者" / "Follow the author" list renders as
- *     a vertical list of plain rows (no `<a>` wrappers, no cards). Each row
- *     still shows the platform label and handle text.
- *  2. **Project source** — the "项目来源：" / "Project source" block matches the
- *     author section's UI pattern (title + horizontal divider + card body),
- *     contains a single `text-justify` paragraph, preserves the upstream
- *     and contributor links, and uses no `；` (Chinese semicolon) and no
- *     stray line-leading/trailing punctuation.
- *  3. **Update check** — the "检查更新" / "Check for updates" button is
+ *  1. **Project source** — the "项目说明" block follows the same
+ *     `SectionHeader + card body` shape as the "检查更新" block: title row
+ *     with a horizontal divider, then a card containing 4 paragraphs
+ *     (Forked from / 关注作者 / Maintainer / License) with the upstream
+ *     and contributor links preserved.
+ *  2. **Update check** — the "检查更新" / "Check for updates" button is
  *     rendered as `<button disabled>`. The AboutSection MUST NOT call
  *     `useUpdateCheck` at all (the feature is currently disabled by design),
  *     so no status text is rendered next to the button.
@@ -30,46 +27,12 @@ vi.mock('@/hooks/useUpdateCheck', () => ({
   getInstallGuideUrl: () => 'https://cebian.catcat.work/en/install-guide',
 }));
 
-describe('AboutSection — author list is vertical, no links', () => {
-  it('renders each social row as a <li> without an anchor wrapper', () => {
+describe('AboutSection — project source UI matches the check-update section', () => {
+  it('shows a section title with a horizontal divider for both check-update and project source', () => {
     const { container } = render(<AboutSection />);
-    const list = container.querySelector('ul');
-    expect(list).not.toBeNull();
-    const items = list!.querySelectorAll('li');
-    expect(items.length).toBe(3);
-  });
-
-  it('renders the platform labels and handles as plain text inside <li>', () => {
-    render(<AboutSection />);
-    expect(screen.getByText('settings.about.socials.wechat')).toBeInTheDocument();
-    expect(screen.getByText('settings.about.socials.bilibili')).toBeInTheDocument();
-    expect(screen.getByText('settings.about.socials.xiaohongshu')).toBeInTheDocument();
-    expect(screen.getByText('settings.about.socials.wechatHandle')).toBeInTheDocument();
-    expect(screen.getByText('settings.about.socials.bilibiliHandle')).toBeInTheDocument();
-    expect(screen.getByText('settings.about.socials.xiaohongshuHandle')).toBeInTheDocument();
-  });
-
-  it('does not render any anchor pointing at bilibili or xiaohongshu', () => {
-    render(<AboutSection />);
-    const anchors = document.querySelectorAll('a[href*="bilibili.com"], a[href*="xiaohongshu.com"]');
-    expect(anchors.length).toBe(0);
-  });
-
-  it('does not use a 2-col grid for the author rows', () => {
-    const { container } = render(<AboutSection />);
-    const authorGrid = container.querySelector('.grid.grid-cols-2');
-    expect(authorGrid).toBeNull();
-  });
-});
-
-describe('AboutSection — project source UI matches the author section', () => {
-  it('shows a section title with a horizontal divider (same shape as FollowAuthorSection)', () => {
-    const { container } = render(<AboutSection />);
-    // Both section titles are <p class="text-sm font-medium">. The author
-    // section additionally has a `h-px flex-1 bg-gradient-to-r from-border`
-    // divider. The project-source block should follow the same shape.
+    // Each section using SectionHeader contributes one `h-px flex-1 bg-gradient-to-r`
+    // divider. We expect: 1 for 检查更新 + 1 for 项目说明 = 2.
     const dividers = container.querySelectorAll('div.h-px.flex-1.bg-gradient-to-r');
-    // One for the author section; the project source should add another.
     expect(dividers.length).toBeGreaterThanOrEqual(2);
   });
 
@@ -78,13 +41,17 @@ describe('AboutSection — project source UI matches the author section', () => 
     expect(container.textContent).toContain('项目说明');
   });
 
-  it('renders three separate <p> lines in the project description card', () => {
+  it('renders four separate <p> lines in the project description card', () => {
     const { container } = render(<AboutSection />);
-    // The card body is a div with space-y-2.5 containing three <p> elements.
+    // The card body is a div with space-y-2.5 containing four <p> elements:
+    //   1. Forked from: maotoumao/Cebian
+    //   2. 关注作者：微信公众号（一只猫头猫）、小红书（一只猫头猫）
+    //   3. Maintainer: 肖泽林 (@zhixingt)
+    //   4. License: AGPL-3.0 (Inherited from upstream)
     const card = container.querySelector('.space-y-2\\.5');
     expect(card).not.toBeNull();
     const paragraphs = card!.querySelectorAll('p');
-    expect(paragraphs.length).toBe(3);
+    expect(paragraphs.length).toBe(4);
   });
 
   it('keeps the upstream + contributor links in the card body', () => {
@@ -97,6 +64,24 @@ describe('AboutSection — project source UI matches the author section', () => 
     expect(contrib).not.toBeNull();
     expect(card!.textContent).toContain('肖泽林');
     expect(card!.textContent).toContain('AGPL-3.0');
+  });
+
+  it('renders the author follow line directly under Forked from', () => {
+    const { container } = render(<AboutSection />);
+    const card = container.querySelector('.space-y-2\\.5');
+    expect(card).not.toBeNull();
+    const paragraphs = Array.from(card!.querySelectorAll('p'));
+    // 关注作者 line must come immediately after the Forked from line.
+    const forkedIdx = paragraphs.findIndex(
+      (p) => p.textContent?.startsWith('Forked from:') ?? false,
+    );
+    const followIdx = paragraphs.findIndex(
+      (p) => p.textContent?.startsWith('关注作者：') ?? false,
+    );
+    expect(forkedIdx).toBeGreaterThanOrEqual(0);
+    expect(followIdx).toBe(forkedIdx + 1);
+    expect(paragraphs[followIdx]!.textContent).toContain('微信公众号（一只猫头猫）');
+    expect(paragraphs[followIdx]!.textContent).not.toContain('小红书');
   });
 
   it('uses the English Forked-from / Maintainer / License copy', () => {

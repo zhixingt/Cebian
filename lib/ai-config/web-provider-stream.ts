@@ -57,6 +57,8 @@ import { glmMainWorldFetch } from './web-provider-content-fetch-glm';
 import type { ContentFetchRequest } from './web-provider-content-fetch-main';
 import type { WebProvider } from '../types';
 import type { DomRelayRequest } from './web-provider-content-script';
+// ⑨.4: Model resolver — replaces hardcoded assistant_id in GLM adapter.
+import { findModel } from './web-provider-model-resolver';
 
 /** pi-ai sourceId for our custom provider. Used by unregisterApiProviders(). */
 export const WEB_SESSION_SOURCE_ID = 'cebian-web-provider';
@@ -298,6 +300,14 @@ async function orchestrateStream(
     const fetchRequest: ContentFetchRequest | null = useContentFetch
       ? await buildContentFetchRequest(preset, modelId, context, deps)
       : null;
+
+    // ⑬ DIAG: unconditional log so we can verify the request in production
+    console.log('[WS-DIAG] ContentFetchRequest:', {
+      providerId: preset.id,
+      modelId,
+      body: fetchRequest?.init?.body,
+      authHeader: fetchRequest?.authHeader ? 'present' : 'absent',
+    });
 
     // 6. Listen for messages BEFORE injecting (so we don't miss the RELAY_READY)
     let accumulatedText = '';
@@ -570,6 +580,12 @@ export async function buildContentFetchRequest(
     }
   }
 
+  // ⑨.4: Resolve the model's provider-specific assistant_id so the adapter
+  // can use it instead of a hardcoded constant. Falls back to the first
+  // model in the preset if modelId doesn't match any known model.
+  const resolvedModel = findModel(preset, modelId) ?? preset.models[0];
+  const assistantId = resolvedModel?.assistantId ?? '';
+
   return {
     type: 'WEB_LLM_FETCH',
     requestId: crypto.randomUUID(),
@@ -580,6 +596,7 @@ export async function buildContentFetchRequest(
       body: JSON.stringify({
         prompt: messageText,
         chatId,
+        assistantId,          // ⑨.4: resolved from preset.models
         ...(parentMessageId !== undefined ? { parentMessageId } : {}),
       }),
     },

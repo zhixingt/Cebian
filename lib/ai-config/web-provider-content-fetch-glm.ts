@@ -71,7 +71,6 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
       const GLM_DEVICE_ID_KEY = '__cebGlmDeviceId__';
       const GLM_REFRESH_URL_SUFFIX = '/chatglm/user-api/user/refresh';
       const GLM_STREAM_URL_SUFFIX = '/chatglm/backend-api/assistant/stream';
-      const GLM_ASSISTANT_ID = '65940acff94777010aa6b796';
     
       // MD5 K constants (64 × floor(2^32 * abs(sin(i+1))))
       const MD5_K = [
@@ -226,10 +225,14 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     
       let glmPrompt = '';
       let existingChatId = '';
+      let assistantId = '65940acff94777010aa6b796'; // ⑨.4: fallback to GLM-4.6
       try {
         const bodyObj = JSON.parse(typeof init.body === 'string' ? init.body : '{}') as Record<string, string>;
         glmPrompt = bodyObj.prompt ?? '';
         existingChatId = bodyObj.chatId ?? '';
+        // ⑨.4: assistantId is now resolved from preset.models by the SW
+        // and passed through the request body. Falls back to GLM-4.6.
+        if (bodyObj.assistantId) assistantId = bodyObj.assistantId;
       } catch { /* defaults */ }
     
       let authToken = readCookie('chatglm_token');
@@ -273,7 +276,7 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
       };
     
       const glmBody = JSON.stringify({
-        assistant_id: GLM_ASSISTANT_ID,
+        assistant_id: assistantId,
         conversation_id: existingChatId,
         project_id: '',
         chat_type: 'user_chat',
@@ -291,12 +294,20 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
         messages: [{ role: 'user', content: [{ type: 'text', text: glmPrompt }] }],
       });
     
+      // ⑬ DIAG: log the full request so we can see exactly what's sent
+      console.log('[GLM-DIAG] request body:', glmBody);
+      console.log('[GLM-DIAG] assistantId:', assistantId);
+      console.log('[GLM-DIAG] modelId from request:', request.modelId);
+
       const glmResponse = await fetch(`${origin}${GLM_STREAM_URL_SUFFIX}`, {
         method: 'POST',
         headers: glmHeaders,
         body: glmBody,
         credentials: 'include',
       });
+
+      // ⑬ DIAG: log response status immediately
+      console.log('[GLM-DIAG] response status:', glmResponse.status, glmResponse.statusText);
     
       if (!glmResponse.ok) {
         let errorBody = '';
@@ -304,6 +315,7 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
           errorBody = await glmResponse.text();
           if (errorBody.length > 500) errorBody = errorBody.slice(0, 500);
         } catch { /* ignore */ }
+        console.error('[GLM-DIAG] HTTP error body:', errorBody);
         const authHint = glmResponse.status === 401 || glmResponse.status === 403
           ? ' Please visit chatglm.cn to verify your account.' : '';
         postToBridge(
@@ -344,6 +356,11 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
       let prevText = '';
       let prevThink = '';
       let prevLogicId = '';
+      // ⑬: locally track whether the stream produced any text so the
+      // empty-response guard at the end of the function has a real
+      // variable to read. The chunks themselves are sent straight to
+      // the bridge; this is just a "did we get anything" flag.
+      let accumulatedText = '';
       // ⑨.2: GLM's first response carries the new conversation_id at the
       // top level of the JSON. Capture it once and tell the SW to persist
       // it so the next turn can echo it back as conversation_id.
@@ -380,11 +397,22 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
           const err = parsed.error as Record<string, unknown>;
           throw new Error((err.message as string | undefined) ?? 'GLM error');
         }
+        // ⑬: GLM-5.1 may return error payloads that don't use the `error`
+        // key — e.g. `{status:'error', message:'...'}`. Treat any object
+        // without `parts` (and not `[DONE]`) as a potential error so the
+        // user sees a message instead of an empty retry icon.
         const parts = parsed.parts as Array<{
           logic_id?: string;
           content?: Array<{ type?: string; text?: string; think?: string }>;
         }> | undefined;
-        if (!parts || parts.length === 0) return '';
+        if (!parts || parts.length === 0) {
+          const altErr =
+            (parsed.message as string | undefined) ??
+            (parsed.detail as string | undefined) ??
+            (parsed.msg as string | undefined);
+          if (altErr) throw new Error(altErr);
+          return '';
+        }
         const logicId = parts[0]?.logic_id;
         if (logicId && logicId !== prevLogicId) {
           prevLogicId = logicId; prevText = ''; prevThink = '';
@@ -423,6 +451,7 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
                 return;
               }
               if (out) {
+                accumulatedText += out;
                 postToBridge(
                   { type: 'WEB_LLM_CHUNK', requestId, chunk: out },
                   origin,
@@ -452,11 +481,25 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
             return;
           }
           if (out) {
+            accumulatedText += out;
             postToBridge(
               { type: 'WEB_LLM_CHUNK', requestId, chunk: out },
               origin,
             );
           }
+        }
+        // ⑬: if the entire stream produced zero text, surface it as an
+        // error so the user sees a message instead of an empty retry icon.
+        if (!accumulatedText) {
+          postToBridge(
+            {
+              type: 'WEB_LLM_ERROR',
+              requestId,
+              error: `GLM returned empty response (modelId=${request.modelId}, assistantId=${assistantId}). The server accepted the request but produced no content.`,
+            },
+            origin,
+          );
+          return;
         }
         postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
       } catch (err) {

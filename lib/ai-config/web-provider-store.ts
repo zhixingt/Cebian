@@ -148,13 +148,15 @@ export class WebProviderRepository {
 
   private createFromPreset(preset: typeof WEB_PROVIDER_PRESETS[number]): WebProvider {
     const now = new Date().toISOString();
+    // ⑨.4: derive default capabilities from the default model entry.
+    const defaultModel = preset.models.find(m => m.id === preset.defaultModelId) ?? preset.models[0];
     return {
       presetId: preset.id,
       enabled: true,
       loginStatus: 'unknown',
       modelId: preset.defaultModelId,
-      supportsToolCalls: preset.defaultSupportsToolCalls,
-      supportsReasoning: preset.defaultSupportsReasoning,
+      supportsToolCalls: defaultModel?.supportsToolCalls ?? false,
+      supportsReasoning: defaultModel?.supportsReasoning ?? false,
       lastCheckedAt: null,
       encryptedCookieBundle: null,
       userOverrides: null,        // ⭐ ② A2: no user overrides initially

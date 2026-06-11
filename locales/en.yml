@@ -3,7 +3,7 @@
 # See .agents/skills/i18n-naming/SKILL.md.
 
 # ─── Manifest (flat top-level keys, see skill "Manifest localization") ───
-extName: "CebianX | Browser AI Agent Workspace"
+extName: "CebianX · Academic Assistant"
 extDescription: "Side panel AI agent. BYO key (OpenAI/Anthropic/Google), no account. Element picker, MCP tools, skills. AGPL-3.0, local-first."
 actionTitle: "Open CebianX sidebar"
 
@@ -88,16 +88,6 @@ settings:
     updateAvailable: "New version v$1 available"
     viewInstallGuide: "View install guide"
     checkFailed: "Update check failed"
-    followAuthor: "Follow the author"
-    socials:
-      wechat: "WeChat Official Account"
-      wechatHandle: "一只猫头猫"
-      bilibili: "Bilibili"
-      bilibiliHandle: "不想睡觉猫头猫"
-      xiaohongshu: "Xiaohongshu"
-      xiaohongshuHandle: "一只猫头猫"
-      x: "X"
-      xHandle: "@maotoumao0_0"
   advanced:
     title: "Advanced"
     maxRounds:
@@ -553,8 +543,8 @@ webProviders:
       description: "ChatGLM web version"
   fields:
     enabled: "Enabled"
-    modelIdLabel: "Model ID"
-    modelIdHelp: "Default is the recommended model. Edit only if you know what you're doing."
+    modelIdLabel: "Model"
+    modelIdHelp: "Select the GLM model to use for chat."
     capabilities: "Capabilities"
     toolCalls: "Tool calls"
     reasoning: "Reasoning"

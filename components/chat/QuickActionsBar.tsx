@@ -62,7 +62,7 @@ export function QuickActionsBar({ onTrigger }: QuickActionsBarProps) {
     <div
       ref={scrollRef}
       data-testid="quick-actions-bar"
-      className="px-4 pt-2 pb-1 flex gap-1.5 overflow-x-auto scrollbar-none border-t border-border bg-background"
+      className="px-4 pt-2 pb-1 flex gap-1.5 overflow-x-auto scrollbar-none bg-background"
     >
       {resolved.map((r) => {
         if (r.broken || !r.meta) {

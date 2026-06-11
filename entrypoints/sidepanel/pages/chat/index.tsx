@@ -431,8 +431,8 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                   <p className="text-2xl text-foreground/80 leading-relaxed" style={{ fontFamily: "'KaiTi', 'STKaiti', '楷体', serif" }}>
                     思之所至<span style={{ fontFamily: "var(--font-serif)" }}>，</span>行之所达<span style={{ fontFamily: "var(--font-serif)" }}>。</span>
                   </p>
-                  <p className="text-sm font-sans text-muted-foreground tracking-wide">
-                    As Thought Reaches<span style={{ fontFamily: "var(--font-serif)" }}>,</span> So Action Arrives<span style={{ fontFamily: "var(--font-serif)" }}>.</span>
+                  <p className="text-sm text-muted-foreground tracking-wide" style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}>
+                    As Thought Reaches<span style={{ fontFamily: "'SimSun', '宋体', 'Songti SC', serif" }}>,</span> So Action Arrives<span style={{ fontFamily: "'SimSun', '宋体', 'Songti SC', serif" }}>.</span>
                   </p>
                 </div>
               )}

@@ -57,6 +57,8 @@ export function resolveWebModel(
   if (!preset) {
     throw new Error(`Unknown web provider: ${providerId}`);
   }
+  // ⑨.4: look up the selected model for per-model capability flags.
+  const model = preset.models.find(m => m.id === modelId) ?? preset.models[0];
   return {
     id: `web:${providerId}:${modelId}`,
     name: `${preset.displayNameKey} ${modelId}`,
@@ -65,7 +67,7 @@ export function resolveWebModel(
     // ⑧: baseUrl is the provider's login page (informational only; actual
     // chat goes through the DOM in the tab, not via HTTP to this URL).
     baseUrl: preset.loginUrl,
-    reasoning: preset.defaultSupportsReasoning,
+    reasoning: model?.supportsReasoning ?? false,
     input: ['text'],  // MVP: no images (text-only for web session)
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },  // free (user's own session)
     contextWindow: DEFAULT_CONTEXT_WINDOW,

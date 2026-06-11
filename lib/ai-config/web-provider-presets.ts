@@ -15,6 +15,23 @@ import {
 export type { WebProviderDomStrategy } from './web-provider-dom-strategy';
 
 /**
+ * Per-model configuration within a preset.
+ * Each model maps to a provider-specific internal ID (e.g. GLM's assistant_id).
+ */
+export interface WebProviderModel {
+  /** Display name shown in the model selector (e.g. "GLM-5.1") */
+  label: string;
+  /** Stable ID used as the activeModel key (e.g. "glm-5.1") */
+  id: string;
+  /** Provider-specific internal model identifier (e.g. GLM assistant_id) */
+  assistantId: string;
+  /** Whether this model supports tool/function calling */
+  supportsToolCalls: boolean;
+  /** Whether this model exposes a reasoning / thinking process */
+  supportsReasoning: boolean;
+}
+
+/**
  * Built-in web AI provider presets.
  * Adding a new preset = append an entry here + add 3 i18n keys.
  * User-defined presets are a future feature; not supported in MVP.
@@ -26,18 +43,17 @@ export interface WebProviderPreset {
   /** Display name (i18n key, resolved at render time) */
   displayNameKey: string;
 
-  /** Short description (i18n key) */
-  descriptionKey: string;
+  /** Short description (i18n key). Omit to render no description line. */
+  descriptionKey?: string;
 
   /** Official website URL (target of the "Open" button) */
   loginUrl: string;
 
-  /** Default Model ID */
-  defaultModelId: string;
+  /** Available models for this provider. Ordered by recommended first. */
+  models: readonly WebProviderModel[];
 
-  /** Recommended capability flags; user can override */
-  defaultSupportsToolCalls: boolean;
-  defaultSupportsReasoning: boolean;
+  /** Default model id when the user has no preference. */
+  defaultModelId: string;
 
   /** ⭐ ②: cookie domain for `chrome.cookies.getAll({ domain })` */
   cookieDomain: string;
@@ -60,7 +76,9 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
   {
     id: 'glm',
     displayNameKey: 'webProviders.presets.glm.name',
-    descriptionKey: 'webProviders.presets.glm.description',
+    // 2026-06-11: removed descriptionKey — was empty and triggered
+    // `[i18n] Message not found` warnings on every settings render.
+    // The card now renders without a description line.
     // 2026-06-07: was 'https://chatglm.cn' (root). After login the root
     // URL redirects to /main/alltoolsdetail (the tool description page),
     // NOT the chat interface. The DOM reader on the wrong page finds
@@ -72,9 +90,26 @@ export const WEB_PROVIDER_PRESETS: readonly WebProviderPreset[] = [
     // point) so the user lands on a real chat surface. If the path
     // changes, only this constant needs updating.
     loginUrl: 'https://chatglm.cn/main/chat/new',
-    defaultModelId: 'glm-4.6',
-    defaultSupportsToolCalls: true,
-    defaultSupportsReasoning: false,
+    models: [
+      {
+        id: 'glm-5.1',
+        label: 'GLM-5.1',
+        // 2026-06-10: captured from chatglm.cn DevTools — GLM-5.1 reuses the same
+        // assistant_id as GLM-4.6. Model differentiation is server-side; the client
+        // only needs to pass a valid assistant_id. Both models use 65940acff94777010aa6b796.
+        assistantId: '65940acff94777010aa6b796',
+        supportsToolCalls: true,
+        supportsReasoning: false,
+      },
+      {
+        id: 'glm-4.6',
+        label: 'GLM-4.6',
+        assistantId: '65940acff94777010aa6b796',
+        supportsToolCalls: true,
+        supportsReasoning: false,
+      },
+    ],
+    defaultModelId: 'glm-5.1',
     cookieDomain: 'chatglm.cn',
     sessionIndicators: ['chatglm_refresh_token', 'chatglm_token'],
     useLocalStorageFallback: false,

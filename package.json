@@ -1,6 +1,6 @@
 {
   "name": "CebianX",
-  "description": "CebianX — browser-side AI agent workspace. Modified fork of maotoumao/Cebian (AGPL-3.0).",
+  "description": "CebianX · 教务智能助手 — 浏览器侧边栏 AI 智能体。Forked from maotoumao/Cebian (AGPL-3.0)。",
   "private": true,
   "version": "1.3.1",
   "license": "AGPL-3.0-only",

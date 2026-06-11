@@ -2,7 +2,7 @@
 # 修改时请同步 locales/en.yml 与 locales/zh_TW.yml。规范见 .agents/skills/i18n-naming/SKILL.md。
 
 # ─── Manifest（扁平顶层 key，见规范"Manifest localization"）───
-extName: "CebianX | 浏览器 AI 智能体工作台"
+extName: "CebianX · 教务智能助手"
 extDescription: "浏览器侧边栏里的 AI 智能体，用你自己的 OpenAI / Anthropic / Google API Key，免订阅、无账号。读网页、拾取元素、装 MCP 工具、跑 Skill 工作流，数据全部本地存储。AGPL-3.0 开源。"
 actionTitle: "打开 CebianX 侧边栏"
 
@@ -84,16 +84,6 @@ settings:
     updateAvailable: "发现新版本 v$1"
     viewInstallGuide: "查看安装指南"
     checkFailed: "检查更新失败"
-    followAuthor: "关注作者"
-    socials:
-      wechat: "微信公众号"
-      wechatHandle: "一只猫头猫"
-      bilibili: "哔哩哔哩"
-      bilibiliHandle: "不想睡觉猫头猫"
-      xiaohongshu: "小红书"
-      xiaohongshuHandle: "一只猫头猫"
-      x: "X"
-      xHandle: "@maotoumao0_0"
   advanced:
     title: "高级"
     maxRounds:
@@ -367,8 +357,8 @@ provider:
     modelsAvailable: "$1 · $2 个模型可用"
   form:
     name: "名称"
-    namePlaceholder: "例如：My Ollama"
-    baseUrl: "Base URL"
+    namePlaceholder: "例如：我的 Ollama"
+    baseUrl: "基础地址"
     baseUrlPlaceholder: "例如：http://localhost:11434/v1"
     apiKeyOptional: "API Key（可选）"
     apiKeyPlaceholder: "留空则不传认证"
@@ -376,7 +366,7 @@ provider:
     autoFetch: "自动获取"
     reasoning: "推理"
     image: "多模态"
-    manualModelPlaceholder: "手动输入 Model ID"
+    manualModelPlaceholder: "手动输入模型 ID"
     addCustom: "添加自定义提供商"
     fetchFailed: "无法获取模型列表，请手动添加"
 
@@ -539,12 +529,12 @@ webProviders:
   sectionDescription: ""
   presets:
     glm:
-      name: "GLM（智谱）"
-      description: "智谱 ChatGLM 网页版"
+      name: "GLM"
+      description: ""
   fields:
     enabled: "启用"
-    modelIdLabel: "模型 ID"
-    modelIdHelp: "默认填入推荐模型。了解后再修改。"
+    modelIdLabel: "模型"
+    modelIdHelp: "选择 GLM 模型进行对话。"
     capabilities: "能力"
     toolCalls: "工具调用"
     reasoning: "推理"

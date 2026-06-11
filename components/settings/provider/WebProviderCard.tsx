@@ -157,9 +157,11 @@ export function WebProviderCard({
               </Badge>
             )}
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {t(preset.descriptionKey as any)}
-          </p>
+          {preset.descriptionKey ? (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {t(preset.descriptionKey as any)}
+            </p>
+          ) : null}
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -219,7 +221,7 @@ export function WebProviderCard({
         </div>
       </div>
 
-      {/* Model ID row with reset (only show reset when user has overridden) */}
+      {/* Model selector row with reset (only show reset when user has overridden) */}
       <div className="space-y-1">
         <div className="flex items-center justify-between">
           <label
@@ -239,12 +241,19 @@ export function WebProviderCard({
             </button>
           )}
         </div>
-        <Input
+        <select
           id={`model-${provider.presetId}`}
           value={provider.modelId}
           onChange={(e) => onModelIdChange(e.target.value)}
-          className="h-8 text-sm"
-        />
+          className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          data-testid={`model-select-${provider.presetId}`}
+        >
+          {preset.models.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* Capabilities row — Tool calls only (Reasoning removed 2026-06-08) */}

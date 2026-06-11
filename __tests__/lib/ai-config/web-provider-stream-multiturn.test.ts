@@ -33,6 +33,11 @@ describe('9.2 multi-turn: buildContentFetchRequest + listener integration', () =
       label: 'GLM',
       loginUrl: 'https://chatglm.cn/',
       domStrategy: { selector: 'textarea', setInput: 'setInput', send: 'send', pollReply: 'poll' },
+      models: [
+        { id: 'glm-5.1', label: 'GLM-5.1', assistantId: 'id-51', supportsToolCalls: true, supportsReasoning: false },
+        { id: 'glm-4.6', label: 'GLM-4.6', assistantId: '65940acff94777010aa6b796', supportsToolCalls: true, supportsReasoning: false },
+      ],
+      defaultModelId: 'glm-5.1',
     };
     const deps = {
       getAuthHeaders: async () => null,
@@ -67,7 +72,12 @@ describe('9.2 multi-turn: buildContentFetchRequest + listener integration', () =
       id: 'glm' as const,
       label: 'GLM',
       loginUrl: 'https://chatglm.cn/',
-      domStrategy: { selector: 'textarea' },
+      domStrategy: { selector: 'textarea', setInput: 'setInput', send: 'send', pollReply: 'poll' },
+      models: [
+        { id: 'glm-5.1', label: 'GLM-5.1', assistantId: 'id-51', supportsToolCalls: true, supportsReasoning: false },
+        { id: 'glm-4.6', label: 'GLM-4.6', assistantId: '65940acff94777010aa6b796', supportsToolCalls: true, supportsReasoning: false },
+      ],
+      defaultModelId: 'glm-5.1',
     };
     const deps = {
       getAuthHeaders: async () => null,
@@ -80,7 +90,7 @@ describe('9.2 multi-turn: buildContentFetchRequest + listener integration', () =
     const req = await buildContentFetchRequest(
       preset as any,
       'glm-4.6',
-      makeContextWithUserText('follow-up') as any,
+      makeContextWithUserText('hello') as any,
       deps as any,
     );
     const body = JSON.parse(req.init.body as string);
@@ -101,6 +111,10 @@ describe('9.2 multi-turn: buildContentFetchRequest + listener integration', () =
       label: 'DeepSeek',
       loginUrl: 'https://chat.deepseek.com/',
       domStrategy: { selector: 'textarea' },
+      models: [
+        { id: 'deepseek-chat', label: 'DeepSeek-Chat', assistantId: 'ds-chat', supportsToolCalls: true, supportsReasoning: false },
+      ],
+      defaultModelId: 'deepseek-chat',
     };
     const deps = {
       getAuthHeaders: async () => null,
@@ -144,7 +158,7 @@ describe('9.2 multi-turn: buildContentFetchRequest + listener integration', () =
     });
     await clearConversation('glm', 'glm-4.6');
     const { buildContentFetchRequest } = await import('@/lib/ai-config/web-provider-stream');
-    const preset = { id: 'glm' as const, domStrategy: { selector: 'textarea' } };
+    const preset = { id: 'glm' as const, domStrategy: { selector: 'textarea' }, models: [{ id: 'glm-4.6', label: 'GLM-4.6', assistantId: '65940acff94777010aa6b796', supportsToolCalls: true, supportsReasoning: false }], defaultModelId: 'glm-4.6' };
     const deps = {
       getAuthHeaders: async () => null,
       openTab: async () => 0,
@@ -172,6 +186,8 @@ describe('9.2 multi-turn: buildContentFetchRequest + listener integration', () =
       label: 'DeepSeek',
       loginUrl: 'https://chat.deepseek.com/',
       domStrategy: { selector: 'textarea' },
+      models: [{ id: 'deepseek-chat', label: 'DeepSeek-Chat', assistantId: 'ds-chat', supportsToolCalls: true, supportsReasoning: false }],
+      defaultModelId: 'deepseek-chat',
     };
     const deps = {
       getAuthHeaders: async () => null,
@@ -216,7 +232,7 @@ describe('9.2 multi-turn: buildContentFetchRequest + listener integration', () =
       lastUpdated: Date.now(),
     });
     const { buildContentFetchRequest } = await import('@/lib/ai-config/web-provider-stream');
-    const preset = { id: 'glm' as const, domStrategy: { selector: 'textarea' } };
+    const preset = { id: 'glm' as const, domStrategy: { selector: 'textarea' }, models: [{ id: 'glm-4.6', label: 'GLM-4.6', assistantId: '65940acff94777010aa6b796', supportsToolCalls: true, supportsReasoning: false }], defaultModelId: 'glm-4.6' };
     const deps = {
       getAuthHeaders: async () => null,
       openTab: async () => 0,

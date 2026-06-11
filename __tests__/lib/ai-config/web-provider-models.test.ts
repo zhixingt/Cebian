@@ -12,7 +12,7 @@ import type { WebProvider } from '@/lib/types';
 
 describe('getModelIdForProvider (T5: ③+④ model lookup)', () => {
   it('returns the preset defaultModelId for GLM (sole built-in provider)', () => {
-    expect(getModelIdForProvider('glm')).toBe('glm-4.6');
+    expect(getModelIdForProvider('glm')).toBe('glm-5.1');
   });
 
   it('returns null for unknown presetId', () => {
