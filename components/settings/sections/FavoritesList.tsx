@@ -69,6 +69,7 @@ function Row({ favorite, onRemove }: RowProps) {
         size="icon-xs"
         aria-label={t('settings.prompts.favoriteRemove')}
         onClick={onRemove}
+        className="text-muted-foreground/60 hover:text-destructive"
       >
         <X className="size-3" />
       </Button>

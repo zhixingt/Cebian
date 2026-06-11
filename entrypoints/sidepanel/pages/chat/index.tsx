@@ -414,7 +414,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
 
           {/* Error display */}
           {lastError && !isAgentRunning && (
-            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-lg px-3 py-2">
+            <div className="text-sm text-destructive bg-destructive/15 border border-destructive/30 rounded-lg px-3 py-2">
               {lastError}
             </div>
           )}
@@ -428,11 +428,11 @@ export function ChatPage({ onOpenSettings, onTitleChange }: { onOpenSettings?: (
                 <p className="text-sm text-muted-foreground">{t('chat.composer.needModel')}</p>
               ) : (
                 <div className="space-y-1">
-                  <p className="text-2xl text-foreground/80 leading-relaxed" style={{ fontFamily: "'KaiTi', 'STKaiti', '楷体', serif" }}>
-                    思之所至<span style={{ fontFamily: "var(--font-serif)" }}>，</span>行之所达<span style={{ fontFamily: "var(--font-serif)" }}>。</span>
+                  <p className="text-2xl text-foreground/80 leading-relaxed" style={{ fontFamily: "var(--font-serif)" }}>
+                    思之所至，行之所达。
                   </p>
-                  <p className="text-sm text-muted-foreground tracking-wide" style={{ fontFamily: "'Georgia', 'Times New Roman', serif" }}>
-                    As Thought Reaches<span style={{ fontFamily: "'SimSun', '宋体', 'Songti SC', serif" }}>,</span> So Action Arrives<span style={{ fontFamily: "'SimSun', '宋体', 'Songti SC', serif" }}>.</span>
+                  <p className="text-sm text-muted-foreground tracking-wide" style={{ fontFamily: "var(--font-serif)" }}>
+                    As Thought Reaches, So Action Arrives.
                   </p>
                 </div>
               )}

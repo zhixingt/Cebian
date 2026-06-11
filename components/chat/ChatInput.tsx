@@ -740,9 +740,9 @@ const { providers: webProvidersList } = useWebProviders();
         </div>
       )}
 
-      <div className="border border-border rounded-xl bg-card focus-within:border-border/80 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+      <div className="border border-border rounded-xl bg-card focus-within:border-border/80 focus-within:ring-2 focus-within:ring-primary/25 focus-within:ring-offset-1 focus-within:ring-offset-background transition-all">
         {/* Top row: tools + attachments */}
-        <div className="flex items-center gap-1 px-2 pt-2 pb-2">
+        <div className="flex items-center gap-1 px-2 pt-2 pb-2 border-b border-border/40">
           {/* Tool icons */}
           <Button
             variant="ghost"

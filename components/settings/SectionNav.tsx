@@ -123,12 +123,12 @@ export function SectionNav({ basePath, variant = 'labels' }: SectionNavProps) {
               to={`${basePath}/${path}`}
               replace
               className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                  isActive
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-                )
+                  cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors border-l-2 border-transparent',
+                    isActive
+                      ? 'bg-accent text-foreground font-medium border-l-primary'
+                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                  )
               }
             >
               <Icon className="size-4" />

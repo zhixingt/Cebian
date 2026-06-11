@@ -116,7 +116,7 @@ export function AgentMessage({
         {isStreaming && (
           <span
             aria-hidden
-            className="inline-block w-1.5 h-4 bg-primary animate-pulse rounded-sm align-text-bottom ml-0.5"
+            className="inline-block w-2 h-4.5 bg-primary animate-pulse rounded-sm align-text-bottom ml-0.5"
           />
         )}
       </div>
@@ -164,7 +164,7 @@ export function ThinkingBlock({ content, isLive }: { content: string; isLive?: b
           isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         }`}
       >
-        <div className="overflow-hidden">
+        <div className={`overflow-hidden transition-opacity duration-200 ease-in-out ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
           <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono text-[0.75rem] leading-relaxed bg-card/50">
             <MarkdownRenderer content={content} />
           </div>
@@ -205,7 +205,7 @@ export function AskUserBlock({
   };
 
   return (
-    <div className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answered ? 'opacity-60' : ''}`}>
+    <div className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answered ? 'opacity-60 pointer-events-none' : ''}`}>
       <div className="flex items-center gap-2 text-primary font-medium text-[0.85rem] mb-1.5">
         <CircleHelp className="size-4.5 shrink-0" />
         {question}
