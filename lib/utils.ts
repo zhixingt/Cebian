@@ -5,6 +5,17 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Runtime safety net for cross-chunk ReferenceError:
+// When Rolldown code-splitting separates this module into its own chunk
+// (utils-*.js), consumer chunks (e.g. MarkdownRenderer) that call cn()
+// may lose the ES module import during optimization while the call site
+// remains — causing "ReferenceError: cn is not defined".
+// By registering on globalThis here AND in sidepanel-error-boundary.js,
+// we guarantee cn() is always available regardless of chunk loading order.
+if (typeof globalThis !== 'undefined') {
+  (globalThis as any).__cebCn ??= cn;
+}
+
 /** Compact character-count formatter for UI tooltips: `999`, `1.2K`, `3.4M`.
  *  Drops trailing `.0` so `1000 → 1K`, not `1.0K`. Negatives are clamped to 0. */
 export function formatCharCount(n: number): string {

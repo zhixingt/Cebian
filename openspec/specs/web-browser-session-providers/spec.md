@@ -1,7 +1,8 @@
 # web-browser-session-providers Specification
 
 ## Purpose
-TBD - created by archiving change web-browser-session-provider-mvp. Update Purpose after archive.
+
+定义 Cebian 扩展中 "Web (Browser Session)" 这一全新 provider 类别的行为契约。该类别允许用户复用其已在浏览器中登录的 Web AI 服务（GLM、Kimi、DeepSeek）的会话状态，无需配置 API Key 即可在侧边栏中使用对应模型。本文档覆盖 Settings UI 展示、持久化存储、模拟登录检测、国际化及 Dexie 迁移等全部 MVP 范围的功能需求。
 ## Requirements
 ### Requirement: Settings UI displays three built-in web provider presets
 

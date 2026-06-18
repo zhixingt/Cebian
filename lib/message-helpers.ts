@@ -141,3 +141,56 @@ export function truncateForRetry<M extends { role: string }>(messages: M[]): M[]
   }
   return null;
 }
+
+/** Build a Map from toolCallId → ToolResultMessage for O(1) lookup */
+export function buildToolResultIndex(messages: Message[]): Map<string, ToolResultMessage> {
+  const map = new Map<string, ToolResultMessage>();
+  for (const m of messages) {
+    if ('role' in m && m.role === 'toolResult') {
+      const tr = m as ToolResultMessage;
+      if (tr.toolCallId) map.set(tr.toolCallId, tr);
+    }
+  }
+  return map;
+}
+
+export interface TurnMeta {
+  modelLabel?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+}
+
+/** Pre-compute turn-level token aggregation for each assistant message.
+ *  Walks backward from each assistant msg to the nearest user msg, summing usage. */
+export function buildTurnMetaMap(messages: Message[]): Map<number, TurnMeta> {
+  const map = new Map<number, TurnMeta>();
+  for (let idx = 0; idx < messages.length; idx++) {
+    const msg = messages[idx];
+    if (!('role' in msg) || msg.role !== 'assistant') continue;
+    const am = msg as AssistantMessage;
+    if (am.stopReason === 'toolUse') continue;
+    let inputTokens = 0, outputTokens = 0, cacheReadTokens = 0, cacheWriteTokens = 0;
+    for (let i = idx; i >= 0; i--) {
+      const m = messages[i];
+      if (!('role' in m)) continue;
+      if (m.role === 'user') break;
+      if (m.role === 'assistant') {
+        const a = m as AssistantMessage;
+        inputTokens += a.usage?.input ?? 0;
+        outputTokens += a.usage?.output ?? 0;
+        cacheReadTokens += a.usage?.cacheRead ?? 0;
+        cacheWriteTokens += a.usage?.cacheWrite ?? 0;
+      }
+    }
+    map.set(idx, {
+      modelLabel: am.model,
+      inputTokens: inputTokens || undefined,
+      outputTokens: outputTokens || undefined,
+      cacheReadTokens: cacheReadTokens || undefined,
+      cacheWriteTokens: cacheWriteTokens || undefined,
+    });
+  }
+  return map;
+}

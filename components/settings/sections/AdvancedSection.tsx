@@ -1,7 +1,8 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { maxRounds as maxRoundsStorage } from '@/lib/storage';
+import { maxRounds as maxRoundsStorage, sidebarCollapsedHide } from '@/lib/storage';
 import { t } from '@/lib/i18n';
 
 /**
@@ -10,6 +11,7 @@ import { t } from '@/lib/i18n';
  */
 export function AdvancedSection() {
   const [currentMaxRounds, setCurrentMaxRounds] = useStorageItem(maxRoundsStorage, 200);
+  const [collapseHide, setCollapseHide] = useStorageItem(sidebarCollapsedHide, false);
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
@@ -24,7 +26,7 @@ export function AdvancedSection() {
           value={currentMaxRounds}
           onChange={(e) => {
             const raw = e.target.value;
-            if (raw === '') return; // allow clear-to-retype without clobbering state
+            if (raw === '') return;
             const parsed = parseInt(raw, 10);
             if (Number.isNaN(parsed)) return;
             setCurrentMaxRounds(Math.min(1000, Math.max(1, parsed)));
@@ -32,6 +34,19 @@ export function AdvancedSection() {
           min={1}
           max={1000}
           className="w-28 h-8 text-sm"
+        />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="space-y-0.5">
+          <Label htmlFor="collapse-hide" className="text-sm">{t('settings.advanced.collapseHide.label')}</Label>
+          <p className="text-xs text-muted-foreground">{t('settings.advanced.collapseHide.hint')}</p>
+        </div>
+        <Switch
+          id="collapse-hide"
+          size="sm"
+          checked={collapseHide}
+          onCheckedChange={(checked: boolean) => setCollapseHide(checked)}
         />
       </div>
     </div>

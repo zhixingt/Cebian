@@ -31,7 +31,7 @@ describe('ToolCard — default-collapsed behavior', () => {
     render(<ToolCard label="shell" status="done" args={ARGS} result={RESULT} />);
     const chevron = document.querySelector('svg.lucide-chevron-right');
     expect(chevron).not.toBeNull();
-    expect(chevron?.className.baseVal ?? chevron?.getAttribute('class') ?? '').not.toMatch(/rotate-90/);
+    expect((chevron?.className as any)?.baseVal ?? chevron?.getAttribute('class') ?? '').not.toMatch(/rotate-90/);
   });
 
   it('clicking the header reveals args and result', () => {

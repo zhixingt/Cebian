@@ -196,3 +196,29 @@ export const favoritePrompts = storage.defineItem<string[]>(
   'local:favoritePrompts',
   { fallback: [] },
 );
+
+/** 上次活跃的聊天会话 ID，用于重新打开 sidepanel 时自动恢复。 */
+export const lastSessionId = storage.defineItem<string | null>(
+  'local:lastSessionId',
+  { fallback: null },
+);
+
+/** 侧边栏是否处于折叠状态（sidepanel 已关闭，页面显示展开按钮）。 */
+export const sidebarCollapsedFlag = storage.defineItem<boolean>(
+  'local:sidebarCollapsedFlag',
+  { fallback: false },
+);
+
+/** 折叠时是否完全隐藏侧边栏（极客模式）。 */
+export const sidebarCollapsedHide = storage.defineItem<boolean>(
+  'local:sidebarCollapsedHide',
+  { fallback: false },
+);
+
+// ─── API Discovery ───
+
+/** API Discovery 功能是否已启用（默认关闭，用户知情同意后开启） */
+export const apiDiscoveryEnabled = storage.defineItem<boolean>(
+  'local:apiDiscoveryEnabled',
+  { fallback: false },
+);

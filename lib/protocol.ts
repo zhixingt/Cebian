@@ -23,10 +23,11 @@ export type ClientMessage =
    *  recent user message. No-op if no user message exists, or if the agent
    *  is currently running. */
   | { type: 'retry'; sessionId: string }
-  | { type: 'resolve_tool'; sessionId: string; toolName: string; response: any }
+  | { type: 'resolve_tool'; sessionId: string; toolName: string; response: unknown }
   | { type: 'cancel_tool'; sessionId: string; toolName: string }
   | { type: 'session_list' }
   | { type: 'session_delete'; sessionId: string }
+  | { type: 'delete_message'; sessionId: string; messageIndex: number }
   | { type: 'recorder_start' }
   | { type: 'recorder_stop' }
   /** Sent by a sidepanel right after it opens a port, declaring a unique
@@ -61,14 +62,14 @@ export type ServerMessage =
       title?: string;
       messages: AgentMessage[];
       isRunning: boolean;
-      pendingTools?: { toolName: string; toolCallId: string; args: any }[];
+      pendingTools?: { toolName: string; toolCallId: string; args: unknown }[];
     }
   | { type: 'agent_start'; sessionId: string }
   | { type: 'message_update'; sessionId: string; message: AgentMessage }
   | { type: 'message_end'; sessionId: string; messages: AgentMessage[] }
   | { type: 'agent_end'; sessionId: string; messages: AgentMessage[] }
   | { type: 'error'; sessionId: string | null; error: string }
-  | { type: 'tool_pending'; sessionId: string; toolName: string; toolCallId: string; args: any }
+  | { type: 'tool_pending'; sessionId: string; toolName: string; toolCallId: string; args: unknown }
   | { type: 'tool_resolved'; sessionId: string; toolName: string }
   | { type: 'session_loaded'; sessionId: string; session: SessionRecord | null }
   | { type: 'session_list_result'; sessions: SessionMeta[] }

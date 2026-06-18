@@ -73,6 +73,7 @@ export function parseMatchPattern(input: string): MatchPattern {
   }
   if (!pathRaw.startsWith('/')) {
     // 兜底：上面正则已经保证 pathRaw 以 `/` 开头，这条主要给未来重构留警示。
+    /* v8 ignore next */
     throw new Error(`invalid path "${pathRaw}" in pattern "${input}" — must start with "/"`);
   }
 

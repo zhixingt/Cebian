@@ -39,7 +39,7 @@ export async function executeInTab<T>(
     ? { tabId, frameIds: [frameId] }
     : { tabId };
 
-  const results = await chrome.scripting.executeScript({ target, func } as any);
+  const results = await chrome.scripting.executeScript<[], T>({ target, func });
   return results?.[0]?.result as T;
 }
 
@@ -56,7 +56,7 @@ export async function executeInTabWithArgs<TArgs extends any[], T>(
     ? { tabId, frameIds: [frameId] }
     : { tabId };
 
-  const results = await chrome.scripting.executeScript({ target, func, args } as any);
+  const results = await chrome.scripting.executeScript<TArgs, T>({ target, func, args });
   return results?.[0]?.result as T;
 }
 
@@ -70,8 +70,9 @@ export async function executeViaDebugger(tabId: number, code: string): Promise<s
   const target = { tabId };
   try {
     await chrome.debugger.attach(target, '1.3');
-  } catch (e: any) {
-    if (!e.message?.includes('Already attached')) throw e;
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes('Already attached')) throw e;
   }
 
   try {
@@ -80,7 +81,7 @@ export async function executeViaDebugger(tabId: number, code: string): Promise<s
       expression,
       awaitPromise: true,
       returnByValue: true,
-    }) as any;
+    }) as { result?: { value?: unknown }; exceptionDetails?: { text?: string; exception?: { description?: string } } };
 
     if (result.exceptionDetails) {
       const errMsg = result.exceptionDetails.exception?.description
@@ -106,7 +107,7 @@ export async function executeViaDebugger(tabId: number, code: string): Promise<s
 export function waitForNavigation(tabId: number, timeout: number): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     let settled = false;
-    const settle = (fn: (v: any) => void, value: any) => {
+    const settle = <T>(fn: (v: T) => void, value: T) => {
       if (settled) return;
       settled = true;
       chrome.tabs.onUpdated.removeListener(listener);

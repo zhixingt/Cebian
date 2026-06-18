@@ -13,3 +13,17 @@ site/.astro/
 site/dist/
 site/package-lock.json
 
+
+# Build artifacts
+coverage/
+e2e/.userdata/
+e2e/e2e/report/
+e2e/e2e/test-results/
+e2e/automation/dist/
+*.zip
+
+# Debug files
+debug-*.md
+
+# Agents skills (local)
+.agents/

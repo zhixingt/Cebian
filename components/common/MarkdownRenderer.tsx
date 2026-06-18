@@ -390,16 +390,20 @@ const components: Components = {
   // Paragraph — detect image-only paragraphs for gallery layout
   p: ({ children, node, ...props }) => {
     const nonWs = node?.children?.filter(
-      (c) => c.type !== 'text' || (c as any).value?.trim(),
+      (c) => c.type !== 'text' || (c as HastText).value?.trim(),
     );
-    if (nonWs && nonWs.length > 1 && nonWs.every((c) => c.type === 'element' && (c as any).tagName === 'img')) {
+    if (nonWs && nonWs.length > 1 && nonWs.every((c) => c.type === 'element' && (c as HastElement).tagName === 'img')) {
       return (
         <div className="flex flex-wrap gap-2 my-2 [&>img]:my-0 [&>img]:max-w-[calc(50%-0.25rem)]" {...props}>
           {children}
         </div>
       );
     }
-    return <p className="my-1.5" {...props}>{children}</p>;
+    return (
+      <p className="my-1.5 text-justify" style={{ textAlignLast: 'left' }} {...props}>
+        {children}
+      </p>
+    );
   },
 
   // Unordered list

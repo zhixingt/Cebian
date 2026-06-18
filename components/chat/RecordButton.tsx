@@ -56,6 +56,7 @@ export function RecordButton({ disabled }: RecordButtonProps) {
         variant="ghost"
         size="icon-xs"
         title={t('chat.recorder.stop')}
+        aria-label={t('chat.recorder.stop')}
         onClick={() => { void stop(); }}
         // Always allow stopping, even while the agent is running — losing
         // the recording because of an unrelated agent run is worse than
@@ -75,6 +76,7 @@ export function RecordButton({ disabled }: RecordButtonProps) {
       variant="ghost"
       size="icon-xs"
       title={t('chat.recorder.start')}
+      aria-label={t('chat.recorder.start')}
       onClick={start}
       disabled={disabled}
     >

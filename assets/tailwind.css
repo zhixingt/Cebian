@@ -196,3 +196,13 @@
 .animate-spin-slow {
   animation: spin 1s linear infinite;
 }
+
+/* Sidepanel: hide native scrollbars on html/body — our app handles scrolling internally */
+html, body {
+  overflow: hidden;
+  scrollbar-width: none;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
+}

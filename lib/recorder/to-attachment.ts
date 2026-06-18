@@ -118,6 +118,7 @@ export function recordingToAttachment(session: RecordedSession): RecordingAttach
     // at least one event off if the floor didn't shrink.
     const ratio = MAX_RECORDING_SIZE / sizeBytes;
     let newCount = Math.floor(events.length * ratio);
+    /* v8 ignore next 3 */
     if (newCount >= events.length) newCount = events.length - 1;
     events = events.slice(0, newCount);
     json = JSON.stringify(buildWire(session, events));

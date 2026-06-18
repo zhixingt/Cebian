@@ -63,6 +63,13 @@ const FavoritePropsContext = createContext<{
   onToggleFavorite?: (fileName: string, willFavorite: boolean) => void;
 }>({ showFavoriteButton: false });
 
+// ─── Custom props passed through react-arborist's Tree → tree.props ───
+interface FileTreeCustomProps {
+  allowNewFolder?: boolean;
+  onCreateFile?: (parentId: string) => void;
+  onCreateFolder?: (parentId: string) => void;
+}
+
 // ─── VFS → tree data builder ───
 
 async function buildTreeData(dirPath: string): Promise<TreeNodeData[]> {
@@ -115,7 +122,7 @@ function FileIcon({ name, className }: { name: string; className?: string }) {
 // ─── Custom node renderer ───
 
 function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeNodeData>) {
-  const allowNewFolder = (tree.props as any)?.allowNewFolder ?? true;
+  const allowNewFolder = (tree.props as FileTreeCustomProps | undefined)?.allowNewFolder ?? true;
   const { showFavoriteButton, isFavorite, onToggleFavorite } = useContext(FavoritePropsContext);
   const editStartRef = useRef<number>(0);
 
@@ -209,8 +216,8 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
       {showFavoriteButton && !node.isInternal && (
         <button
           type="button"
-          aria-label={isFavorite?.(node.data.name) ? '取消收藏' : '添加收藏'}
-          title={isFavorite?.(node.data.name) ? '取消快捷指令' : '添加为快捷指令'}
+          aria-label={isFavorite?.(node.data.name) ? t('chat.fileTree.unfavorite') : t('chat.fileTree.favorite')}
+          title={isFavorite?.(node.data.name) ? t('chat.fileTree.unfavoriteShortcut') : t('chat.fileTree.favoriteShortcut')}
           className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-yellow-400"
           onClick={(e) => {
             e.stopPropagation();
@@ -233,11 +240,11 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
   if (node.isInternal) {
     menuItems = (
       <>
-        <ContextMenuItem onClick={() => (tree.props as any)?.onCreateFile?.(node.id)}>
+        <ContextMenuItem onClick={() => (tree.props as FileTreeCustomProps | undefined)?.onCreateFile?.(node.id)}>
           <FilePlus className="size-3.5 mr-2" /> {t('common.newFile')}
         </ContextMenuItem>
         {allowNewFolder && (
-          <ContextMenuItem onClick={() => (tree.props as any)?.onCreateFolder?.(node.id)}>
+          <ContextMenuItem onClick={() => (tree.props as FileTreeCustomProps | undefined)?.onCreateFolder?.(node.id)}>
             <FolderPlus className="size-3.5 mr-2" /> {t('common.newFolder')}
           </ContextMenuItem>
         )}
@@ -508,7 +515,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
           paddingTop={6}
           paddingBottom={6}
           // Pass through custom props for NodeRenderer to read
-          {...{ allowNewFolder, onCreateFile: doCreateFile, onCreateFolder: doCreateFolder } as any}
+          {...{ allowNewFolder, onCreateFile: doCreateFile, onCreateFolder: doCreateFolder } as FileTreeCustomProps}
         >
           {NodeRenderer}
         </Tree>

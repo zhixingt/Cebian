@@ -83,7 +83,7 @@ describe('ChatInput slash menu via new trigger path', () => {
   });
 
   it('typing "/" then Enter on the first item puts resolved text in the textarea', async () => {
-    vi.spyOn(vfs.vfs, 'readFile').mockResolvedValue('---\nname: alpha\n---\nHi {{name}}!');
+    vi.spyOn(vfs.vfs, 'readFile').mockResolvedValue(new TextEncoder().encode('---\nname: alpha\n---\nHi {{name}}!'));
     vi.spyOn(template, 'gatherTemplateVars').mockResolvedValue({ name: 'world' });
     vi.spyOn(template, 'replaceTemplateVars').mockImplementation((text, vars) =>
       text.replace(/\{\{(\w+)\}\}/g, (_m, k) => String((vars as any)[k] ?? '')),

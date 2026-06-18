@@ -14,11 +14,9 @@ export interface WebProviderCardProps {
   isChecking: boolean;
 
   /**
-   * @deprecated 2026-06-08 UI redesign: Enabled toggle was removed
-   * (no meaningful effect with only 1 built-in provider; login/logout
-   * already controls visibility in the model selector). Prop is kept
-   * so WebProvidersSubSection's wiring doesn't have to change. Re-add
-   * a UI control if/when multiple built-in providers exist.
+   * 2026-06-08: Enabled toggle was temporarily removed, then re-added
+   * on user request. The toggle hides the provider from the model
+   * selector without unlogging.
    */
   onEnabledChange: (enabled: boolean) => void;
   onModelIdChange: (modelId: string) => void;
@@ -33,10 +31,8 @@ export interface WebProviderCardProps {
     value: boolean,
   ) => void;
   /**
-   * @deprecated 2026-06-08 UI redesign: Recheck button was removed.
-   * The Login button already re-verifies the session as part of its
-   * flow, so a separate recheck control was redundant. Prop is kept
-   * for SubSection wiring compat.
+   * Kept for SubSection wiring compat. Login button already re-verifies
+   * the session, so this is unused in the UI.
    */
   onRecheck: () => void;
 

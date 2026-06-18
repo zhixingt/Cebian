@@ -14,7 +14,7 @@ describe('makeTriggerSlashPrompt', () => {
   beforeEach(() => vi.restoreAllMocks());
 
   it('reads the file, replaces template vars, calls onLoaded, and toasts on success', async () => {
-    vi.spyOn(vfs.vfs, 'readFile').mockResolvedValue('---\nname: alpha\n---\nHello {{name}}!');
+    vi.spyOn(vfs.vfs, 'readFile').mockResolvedValue(new TextEncoder().encode('---\nname: alpha\n---\nHello {{name}}!'));
     vi.spyOn(template, 'gatherTemplateVars').mockResolvedValue({ name: 'world' });
     vi.spyOn(template, 'replaceTemplateVars').mockReturnValue('Hello world!');
     const onLoaded = vi.fn();

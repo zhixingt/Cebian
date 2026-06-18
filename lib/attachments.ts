@@ -1,6 +1,11 @@
 import type { ImageContent } from '@earendil-works/pi-ai';
 import { escapeXml } from './utils';
 import { RECORDING_SCHEMA_COMMENT } from './recorder/schema-doc';
+import { loadPdfJs } from './pdf-loader';
+
+// Lazy-load heavy parsers only when needed
+let mammoth: typeof import('mammoth') | undefined;
+let XLSX: typeof import('xlsx') | undefined;
 
 // ─── Attachment types ───
 
@@ -77,6 +82,9 @@ const TEXT_EXTENSIONS = new Set([
   '.sql', '.yaml', '.yml', '.toml', '.ini', '.cfg',
   '.json', '.xml', '.html', '.htm', '.css', '.scss', '.less',
   '.env', '.gitignore', '.editorconfig',
+  // Office & PDF documents (read as text; binary formats may produce garbled output,
+  // but the user explicitly requested support and the LLM can still attempt extraction)
+  '.doc', '.docx', '.xls', '.xlsx', '.pdf',
 ]);
 
 const IMAGE_MIME_TYPES = new Set([
@@ -170,6 +178,102 @@ export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// ─── Frontend text extraction for Office & PDF ───
+
+const EXTRACTABLE_EXTENSIONS = new Set(['.pdf', '.docx', '.xls', '.xlsx']);
+
+export function isExtractableFile(name: string): boolean {
+  return EXTRACTABLE_EXTENSIONS.has(getFileExtension(name));
+}
+
+/**
+ * 所有支持上传的文件扩展名集合（用于 `<input accept>` 属性）。
+ * 动态聚合 TEXT_EXTENSIONS 和 EXTRACTABLE_EXTENSIONS，与代码逻辑保持同步，
+ * 避免硬编码 accept 属性导致遗漏。
+ */
+// .doc is not supported in browser; code already prompts user to convert to .docx
+export const UPLOADABLE_EXTENSIONS = new Set(
+  Array.from(new Set([...TEXT_EXTENSIONS, ...EXTRACTABLE_EXTENSIONS]))
+    .filter((ext) => ext !== '.doc'),
+);
+
+/**
+ * 用于 `<input accept>` 属性的扩展名白名单。
+ * Windows 文件对话框对不认识/过长的扩展名列表会整体失效，
+ * 因此只保留最常见、Windows 能可靠识别的扩展名。
+ * 其他支持格式仍可通过"所有文件"选择，代码层面的过滤逻辑不变。
+ */
+export const ACCEPT_EXTENSIONS = new Set([
+  '.txt', '.md', '.csv',
+  '.js', '.ts', '.py', '.java', '.go', '.php', '.sh', '.sql', '.yaml', '.yml',
+  '.json', '.xml', '.html', '.htm', '.css',
+  '.pdf', '.docx', '.xls', '.xlsx',
+]);
+
+/**
+ * Extract plain text from PDF, DOCX, or XLSX files in the browser.
+ * Returns null for unsupported formats or on failure.
+ * The result is truncated to ~50k chars to prevent token overflow.
+ */
+export async function extractTextFromFile(file: File): Promise<string | null> {
+  const ext = getFileExtension(file.name);
+  console.log('[extract] start', file.name, 'ext:', ext, 'size:', file.size);
+
+  try {
+    if (ext === '.pdf') {
+      console.log('[extract] loading pdfjs for', file.name);
+      const pdfjs = await loadPdfJs();
+      console.log('[extract] pdfjs loaded, reading arrayBuffer');
+      const arrayBuffer = await file.arrayBuffer();
+      console.log('[extract] arrayBuffer ready, parsing PDF');
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      console.log('[extract] PDF parsed, pages:', pdf.numPages);
+      let text = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map((item: any) => item.str).join(' ') + '\n';
+      }
+      console.log('[extract] PDF text extracted, length:', text.length);
+      return text.slice(0, 50_000);
+    }
+
+    if (ext === '.docx') {
+      console.log('[extract] loading mammoth for', file.name);
+      mammoth ??= await import('mammoth');
+      console.log('[extract] mammoth loaded, reading arrayBuffer');
+      const arrayBuffer = await file.arrayBuffer();
+      console.log('[extract] arrayBuffer ready, extracting text');
+      const result = await mammoth.extractRawText({ arrayBuffer });
+      console.log('[extract] DOCX text extracted, length:', result.value.length);
+      return result.value.slice(0, 50_000);
+    }
+
+    if (ext === '.xlsx' || ext === '.xls') {
+      console.log('[extract] loading xlsx for', file.name);
+      const xlsxLib = XLSX ?? (await import('xlsx'));
+      XLSX = xlsxLib;
+      console.log('[extract] xlsx loaded, reading arrayBuffer');
+      const arrayBuffer = await file.arrayBuffer();
+      console.log('[extract] arrayBuffer ready, parsing workbook');
+      const workbook = xlsxLib.read(arrayBuffer, { type: 'array' });
+      console.log('[extract] workbook parsed, sheets:', workbook.SheetNames.join(', '));
+      return workbook.SheetNames
+        .map((name) => {
+          const sheet = workbook.Sheets[name];
+          return `[Sheet: ${name}]\n${xlsxLib.utils.sheet_to_csv(sheet)}`;
+        })
+        .join('\n\n')
+        .slice(0, 50_000);
+    }
+  } catch (err) {
+    console.error('[extract] failed for', file.name, err);
+  }
+
+  console.log('[extract] returning null for', file.name);
+  return null;
 }
 
 

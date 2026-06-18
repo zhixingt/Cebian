@@ -112,6 +112,36 @@ const API_DOCS: Record<string, { summary: string; methods: Record<string, Method
       },
     },
   },
+  cookies: {
+    summary: 'Read and manage browser cookies',
+    methods: {
+      get: {
+        signature: 'get(details)',
+        params: 'details: {url: string, name: string, storeId?: string}',
+        example: 'args: [{"url": "https://example.com", "name": "session_id"}]',
+      },
+      getAll: {
+        signature: 'getAll(details)',
+        params: 'details: {url?: string, name?: string, domain?: string, path?: string, secure?: boolean, session?: boolean, storeId?: string}',
+        example: 'args: [{"domain": "example.com"}]  or  args: [{"url": "https://example.com"}]',
+      },
+      set: {
+        signature: 'set(details)',
+        params: 'details: {url: string, name: string, value?: string, domain?: string, path?: string, secure?: boolean, httpOnly?: boolean, sameSite?: "no_restriction" | "lax" | "strict", expirationDate?: number, storeId?: string}',
+        example: 'args: [{"url": "https://example.com", "name": "test", "value": "123"}]',
+      },
+      remove: {
+        signature: 'remove(details)',
+        params: 'details: {url: string, name: string, storeId?: string}',
+        example: 'args: [{"url": "https://example.com", "name": "session_id"}]',
+      },
+      getAllCookieStores: {
+        signature: 'getAllCookieStores()',
+        params: '(no arguments)',
+        example: 'args: []',
+      },
+    },
+  },
   bookmarks: {
     summary: 'Search, read, create, update bookmarks',
     methods: {
@@ -187,36 +217,6 @@ const API_DOCS: Record<string, { summary: string; methods: Record<string, Method
       },
     },
   },
-  cookies: {
-    summary: 'Read and manage browser cookies',
-    methods: {
-      get: {
-        signature: 'get(details)',
-        params: 'details: {url: string, name: string, storeId?: string}',
-        example: 'args: [{"url": "https://example.com", "name": "session_id"}]',
-      },
-      getAll: {
-        signature: 'getAll(details)',
-        params: 'details: {url?: string, name?: string, domain?: string, path?: string, secure?: boolean, session?: boolean, storeId?: string}',
-        example: 'args: [{"domain": "example.com"}]  or  args: [{"url": "https://example.com"}]',
-      },
-      set: {
-        signature: 'set(details)',
-        params: 'details: {url: string, name: string, value?: string, domain?: string, path?: string, secure?: boolean, httpOnly?: boolean, sameSite?: "no_restriction" | "lax" | "strict", expirationDate?: number, storeId?: string}',
-        example: 'args: [{"url": "https://example.com", "name": "test", "value": "123"}]',
-      },
-      remove: {
-        signature: 'remove(details)',
-        params: 'details: {url: string, name: string, storeId?: string}',
-        example: 'args: [{"url": "https://example.com", "name": "session_id"}]',
-      },
-      getAllCookieStores: {
-        signature: 'getAllCookieStores()',
-        params: '(no arguments)',
-        example: 'args: []',
-      },
-    },
-  },
   topSites: {
     summary: 'Get most frequently visited sites',
     methods: {
@@ -277,36 +277,6 @@ const API_DOCS: Record<string, { summary: string; methods: Record<string, Method
       },
     },
   },
-  alarms: {
-    summary: 'Create and manage scheduled alarms',
-    methods: {
-      get: {
-        signature: 'get(name?)',
-        params: 'name?: string — alarm name, omit to get unnamed alarm',
-        example: 'args: ["myAlarm"]',
-      },
-      getAll: {
-        signature: 'getAll()',
-        params: '(no arguments)',
-        example: 'args: []',
-      },
-      create: {
-        signature: 'create(name?, alarmInfo)',
-        params: 'name?: string, alarmInfo: {when?: number, delayInMinutes?: number, periodInMinutes?: number} — at least one of when/delayInMinutes required, periodInMinutes for repeating',
-        example: 'args: ["reminder", {"delayInMinutes": 5}]  or  args: [{"delayInMinutes": 1, "periodInMinutes": 60}]',
-      },
-      clear: {
-        signature: 'clear(name?)',
-        params: 'name?: string',
-        example: 'args: ["myAlarm"]',
-      },
-      clearAll: {
-        signature: 'clearAll()',
-        params: '(no arguments)',
-        example: 'args: []',
-      },
-    },
-  },
   notifications: {
     summary: 'Create and manage desktop notifications',
     methods: {
@@ -332,6 +302,36 @@ const API_DOCS: Record<string, { summary: string; methods: Record<string, Method
       },
       getPermissionLevel: {
         signature: 'getPermissionLevel()',
+        params: '(no arguments)',
+        example: 'args: []',
+      },
+    },
+  },
+  alarms: {
+    summary: 'Create and manage scheduled alarms',
+    methods: {
+      get: {
+        signature: 'get(name?)',
+        params: 'name?: string — alarm name, omit to get unnamed alarm',
+        example: 'args: ["myAlarm"]',
+      },
+      getAll: {
+        signature: 'getAll()',
+        params: '(no arguments)',
+        example: 'args: []',
+      },
+      create: {
+        signature: 'create(name?, alarmInfo)',
+        params: 'name?: string, alarmInfo: {when?: number, delayInMinutes?: number, periodInMinutes?: number} — at least one of when/delayInMinutes required, periodInMinutes for repeating',
+        example: 'args: ["reminder", {"delayInMinutes": 5}]  or  args: [{"delayInMinutes": 1, "periodInMinutes": 60}]',
+      },
+      clear: {
+        signature: 'clear(name?)',
+        params: 'name?: string',
+        example: 'args: ["myAlarm"]',
+      },
+      clearAll: {
+        signature: 'clearAll()',
         params: '(no arguments)',
         example: 'args: []',
       },

@@ -34,6 +34,7 @@ export default defineConfig({
   reporter: [
     ['list'],
     ['html', { open: 'never', outputFolder: 'e2e/report' }],
+    ['json', { outputFile: 'e2e/report/report.json' }],
   ],
   outputDir: 'e2e/test-results',
   use: {

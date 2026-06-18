@@ -1,4 +1,4 @@
-import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send, Crosshair, FileText, Film } from 'lucide-react';
+import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send, Crosshair, FileText, Film, Copy, Trash2, Pencil } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, type ReactNode, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,18 +9,154 @@ import { showDialog } from '@/lib/dialog';
 import { RECORDING_MIME } from '@/lib/attachments';
 import { t } from '@/lib/i18n';
 import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
+import { copyText as copyToClipboard } from '@/lib/clipboard';
 import type { Message } from '@earendil-works/pi-ai';
 
+/* ─── Message Actions (hover copy + edit + delete) ─── */
+function MessageActions({ onCopy, onEdit, onDelete }: { onCopy?: () => void; onEdit?: () => void; onDelete?: () => void }) {
+  return (
+    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+      {onCopy && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="size-6 text-muted-foreground hover:text-foreground"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCopy();
+          }}
+          aria-label={t('common.copy')}
+        >
+          <Copy className="size-3" />
+        </Button>
+      )}
+      {onEdit && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="size-6 text-muted-foreground hover:text-foreground"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+          aria-label={t('common.edit')}
+        >
+          <Pencil className="size-3" />
+        </Button>
+      )}
+      {onDelete && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="size-6 text-muted-foreground hover:text-destructive"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          aria-label={t('common.delete')}
+        >
+          <Trash2 className="size-3" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
 /* ─── User Message ─── */
-export function UserMessageBubble({ msg, children }: { msg?: Message; children?: ReactNode }) {
+export function UserMessageBubble({
+  msg,
+  children,
+  onCopy,
+  onEdit,
+  onDelete,
+}: {
+  msg?: Message;
+  children?: ReactNode;
+  onCopy?: () => void;
+  onEdit?: (newText: string) => void;
+  onDelete?: () => void;
+}) {
   const text = msg ? extractUserText(msg) : null;
   const attachments = useMemo(() => msg ? extractUserAttachments(msg) : null, [msg]);
   const hasAttachments = attachments && (attachments.images.length > 0 || attachments.elements.length > 0 || attachments.files.length > 0 || attachments.recordings.length > 0);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(text ?? '');
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (isEditing && textareaRef.current) {
+      textareaRef.current.focus();
+      textareaRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleEditSubmit = () => {
+    const trimmed = editText.trim();
+    if (!trimmed || trimmed === text) {
+      setIsEditing(false);
+      return;
+    }
+    onEdit?.(trimmed);
+    setIsEditing(false);
+  };
+
+  const handleEditKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleEditSubmit();
+    }
+    if (e.key === 'Escape') {
+      setIsEditing(false);
+      setEditText(text ?? '');
+    }
+  };
 
   return (
-    <div className="self-end max-w-[95%]">
-      <div className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed w-fit ml-auto whitespace-pre-wrap break-all">
-        {text ?? children}
+    <div className="self-end max-w-[95%] group">
+      <div className="flex items-start gap-1 justify-end">
+        {!isEditing && (
+          <MessageActions
+            onCopy={onCopy ?? (text ? () => copyToClipboard(text) : undefined)}
+            onEdit={onEdit ? () => { setEditText(text ?? ''); setIsEditing(true); } : undefined}
+            onDelete={onDelete}
+          />
+        )}
+        {isEditing ? (
+          <div className="flex flex-col gap-1.5 w-full min-w-[200px]">
+            <textarea
+              ref={textareaRef}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={handleEditKeyDown}
+              className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed w-full ml-auto whitespace-pre-wrap break-all resize-none focus:outline-none focus:ring-1 focus:ring-primary/30 min-h-[60px]"
+              rows={1}
+            />
+            <div className="flex items-center justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => { setIsEditing(false); setEditText(text ?? ''); }}
+              >
+                {t('common.cancel')}
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                className="h-7 text-xs"
+                disabled={!editText.trim() || editText.trim() === text}
+                onClick={handleEditSubmit}
+              >
+                <Send className="size-3 mr-1" />
+                {t('common.send')}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed w-fit ml-auto whitespace-pre-wrap break-all text-justify" style={{ textAlignLast: 'left' }}>
+            {text ?? children}
+          </div>
+        )}
       </div>
 
       {hasAttachments && (
@@ -91,6 +227,7 @@ export function AgentMessage({
   meta,
   copyText,
   onRetry,
+  onDelete,
 }: {
   children?: ReactNode;
   isStreaming?: boolean;
@@ -102,21 +239,30 @@ export function AgentMessage({
   /** When provided, a retry button is shown in the meta row. Caller decides
    *  eligibility (last turn-closing assistant, agent idle). */
   onRetry?: () => void;
+  onDelete?: () => void;
 }) {
   return (
-    <div className={`self-start w-full ${showHeader ? '' : '-mt-1'}`}>
+    <div className={`self-start w-full group ${showHeader ? '' : '-mt-1'}`}>
       {showHeader && (
         <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground font-medium">
           <Bot className="size-3.5 text-primary" />
           Cebian Agent
         </div>
       )}
-      <div className="text-[0.9rem] leading-relaxed space-y-3">
-        {children}
-        {isStreaming && (
-          <span
-            aria-hidden
-            className="inline-block w-2 h-4.5 bg-primary animate-pulse rounded-sm align-text-bottom ml-0.5"
+      <div className="flex items-start gap-1">
+        <div className="text-[0.9rem] leading-relaxed space-y-3 flex-1 min-w-0">
+          {children}
+          {isStreaming && (
+            <span
+              aria-hidden
+              className="inline-block w-2 h-4.5 bg-primary animate-pulse rounded-sm align-text-bottom ml-0.5"
+            />
+          )}
+        </div>
+        {!isStreaming && (
+          <MessageActions
+            onCopy={copyText ? () => copyToClipboard(copyText) : undefined}
+            onDelete={onDelete}
           />
         )}
       </div>
@@ -127,9 +273,60 @@ export function AgentMessage({
   );
 }
 
+/* ─── Collapsible Container (auto-fold long messages) ─── */
+function CollapsibleContainer({ children, maxLines = 30 }: { children: ReactNode; maxLines?: number }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [needsCollapse, setNeedsCollapse] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = contentRef.current;
+    if (!el) return;
+    const check = () => {
+      const lh = parseFloat(getComputedStyle(el).lineHeight);
+      const lineHeight = Number.isFinite(lh) ? lh : el.clientHeight / maxLines;
+      if (!lineHeight) return;
+      setNeedsCollapse(el.scrollHeight > lineHeight * maxLines + 1);
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [children, maxLines]);
+
+  return (
+    <div>
+      <div
+        ref={contentRef}
+        className={isExpanded ? '' : 'overflow-hidden'}
+        style={isExpanded ? undefined : { maxHeight: `${maxLines * 1.6}em` }}
+      >
+        {children}
+      </div>
+      {needsCollapse && (
+        <button
+          type="button"
+          onClick={() => setIsExpanded(v => !v)}
+          className="mt-1 text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors"
+        >
+          {isExpanded ? (
+            <>{t('chat.collapse')} <ChevronRight className="size-3 -rotate-90" /></>
+          ) : (
+            <>{t('chat.expand')} <ChevronRight className="size-3 rotate-90" /></>
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ─── Agent Text Block (Markdown) ─── */
 export function AgentTextBlock({ content }: { content: string }) {
-  return <MarkdownRenderer content={content} />;
+  return (
+    <CollapsibleContainer>
+      <MarkdownRenderer content={content} />
+    </CollapsibleContainer>
+  );
 }
 
 /* ─── Thinking Block (renders pi-ai ThinkingContent) ─── */

@@ -2,6 +2,7 @@ import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { TOOL_INTERACT } from '@/lib/types';
 import { executeInTabWithArgs, waitForNavigation } from '@/lib/tab-helpers';
+import { checkElementVisibility } from './element-visibility';
 
 // ─── Shared field schemas (reused by top-level params and sequence steps) ───
 
@@ -35,10 +36,10 @@ const modifiersField = Type.Optional(Type.Array(Type.String(), {
   description: 'Modifier keys to hold: "ctrl", "shift", "alt", "meta".',
 }));
 const deltaXField = Type.Optional(Type.Number({
-  description: 'Horizontal scroll amount for scroll. Default: 0.',
+  description: 'Horizontal offset for scroll or drag. For scroll: amount to scroll. For drag: horizontal pixels to move. Default: 0.',
 }));
 const deltaYField = Type.Optional(Type.Number({
-  description: 'Vertical scroll amount for scroll. Positive = down. Default: 300.',
+  description: 'Vertical offset for scroll or drag. For scroll: positive = down. For drag: vertical pixels to move. Default: 300 for scroll, 0 for drag.',
 }));
 const timeoutField = Type.Optional(Type.Number({
   description: 'Timeout in ms for wait/wait_hidden. Default: 3000.',
@@ -49,7 +50,7 @@ const stepActions = [
   Type.Literal('click'), Type.Literal('dblclick'), Type.Literal('rightclick'),
   Type.Literal('hover'), Type.Literal('focus'), Type.Literal('type'), Type.Literal('clear'),
   Type.Literal('select'), Type.Literal('scroll'), Type.Literal('keypress'),
-  Type.Literal('wait'), Type.Literal('wait_hidden'),
+  Type.Literal('wait'), Type.Literal('wait_hidden'), Type.Literal('drag'),
 ] as const;
 
 // ─── Parameters: single flat object (OpenAI requires top-level "type": "object") ───
@@ -92,6 +93,10 @@ const InteractParameters = Type.Object({
       deltaX: deltaXField,
       deltaY: deltaYField,
       timeout: timeoutField,
+      condition: Type.Optional(Type.Union([
+        Type.Literal('visible'),
+        Type.Literal('hidden'),
+      ], { description: 'Skip this step if condition is not met. "visible" = skip if selector element is not visible. "hidden" = skip if selector element is visible.' })),
     }),
     {
       description:
@@ -104,7 +109,8 @@ const InteractParameters = Type.Object({
 
 // ─── In-page interaction function (self-contained) ───
 
-function performInteraction(params: {
+/** 在页面上下文中执行单个交互动作。自包含，可被 chrome.scripting.executeScript 注入。 */
+export function performInteraction(params: {
   action: string;
   selector?: string;
   x?: number;
@@ -121,11 +127,44 @@ function performInteraction(params: {
   /** Whether the element was found by coordinates (skip scrollIntoView). */
   let resolvedByCoords = false;
 
+  /**
+   * 元素定位回退链：
+   * 1. CSS 选择器（selector）
+   * 2. 文本匹配（selector 以 "text=" 开头）
+   * 3. Role+Label（selector 以 "role=" 开头，格式 role:xxx,label:yyy）
+   * 4. 坐标回退（x/y）
+   */
   function getEl(): HTMLElement {
     if (selector) {
-      const el = document.querySelector<HTMLElement>(selector);
-      if (!el) throw new Error(`Element not found: ${selector}`);
-      return el;
+      // 1. CSS 选择器（可能因非标准格式抛异常，需要 try-catch）
+      try {
+        const el = document.querySelector<HTMLElement>(selector);
+        if (el) return el;
+      } catch { /* 非标准 selector（如 text=xxx），继续回退链 */ }
+
+      // 2. 文本匹配：selector 格式 "text=提交按钮"
+      if (selector.startsWith('text=')) {
+        const searchText = selector.slice(5);
+        const found = findByText(searchText);
+        if (found) return found;
+      }
+
+      // 3. Role+Label：selector 格式 "role:button,label:提交"
+      if (selector.startsWith('role:')) {
+        const found = findByRoleLabel(selector);
+        if (found) return found;
+      }
+
+      // 4. 坐标回退
+      if (x != null && y != null) {
+        const coordEl = document.elementFromPoint(x, y) as HTMLElement | null;
+        if (coordEl) {
+          resolvedByCoords = true;
+          return coordEl;
+        }
+      }
+
+      throw new Error(`Element not found: ${selector}${x != null && y != null ? ` (coordinate fallback (${x}, ${y}) also failed)` : ''}`);
     }
     if (x != null && y != null) {
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
@@ -134,6 +173,74 @@ function performInteraction(params: {
       return el;
     }
     throw new Error('Either selector or x/y coordinates are required.');
+  }
+
+  /** 通过可见文本内容查找元素 */
+  function findByText(searchText: string): HTMLElement | null {
+    // 优先匹配按钮/链接/标签的文本
+    const candidates = document.querySelectorAll<HTMLElement>(
+      'button, a, label, span, [role="button"], [role="link"], [role="tab"], h1, h2, h3, h4, h5, h6, option, summary'
+    );
+    // 第一遍：精确匹配
+    for (const el of candidates) {
+      if (el.textContent?.trim() === searchText) {
+        return el;
+      }
+    }
+    // 第二遍：子串匹配（作为 fallback，避免误匹配过短文本）
+    if (searchText.length >= 2) {
+      for (const el of candidates) {
+        const text = el.textContent?.trim() ?? '';
+        if (text.length > searchText.length && text.includes(searchText)) {
+          return el;
+        }
+      }
+    }
+    // 回退到 XPath 全文搜索
+    try {
+      const xpath = `//*[contains(text(), ${xpathEscape(searchText)})]`;
+      const result = document.evaluate(
+        xpath, document, null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE, null,
+      );
+      return result.singleNodeValue as HTMLElement | null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** 通过 role + label 查找元素，格式 "role:button,label:提交" */
+  function findByRoleLabel(selectorStr: string): HTMLElement | null {
+    const parts = selectorStr.slice(5).split(','); // 去掉 "role:" 前缀
+    let role = '';
+    let label = '';
+    for (const part of parts) {
+      if (part.startsWith('label:')) {
+        label = part.slice(6);
+      } else if (!role) {
+        role = part;
+      }
+    }
+    if (role) {
+      const selector = label
+        ? `[role="${role}"][aria-label*="${cssEscape(label)}"]`
+        : `[role="${role}"]`;
+      const el = document.querySelector<HTMLElement>(selector);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  /** XPath 字符串转义 */
+  function xpathEscape(str: string): string {
+    if (!str.includes("'")) return `'${str}'`;
+    if (!str.includes('"')) return `"${str}"`;
+    return `concat('${str.replace(/'/g, "',\"'\",'")}')`;
+  }
+
+  /** CSS 选择器特殊字符转义 */
+  function cssEscape(str: string): string {
+    return str.replace(/([[\]{}()*+?.\\^$|])/g, '\\$1');
   }
 
   /** Description of what was targeted, for result messages. */
@@ -244,19 +351,61 @@ function performInteraction(params: {
    */
   function resolveTarget(): { el: HTMLElement; point: { clientX: number; clientY: number } } {
     if (selector) {
-      const el = document.querySelector<HTMLElement>(selector);
-      if (!el) throw new Error(`Element not found: ${selector}`);
-      el.scrollIntoView({ block: 'center', behavior: 'instant' });
-      const r = el.getBoundingClientRect();
-      return { el, point: { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 } };
+      // 1. CSS 选择器（可能因非标准格式抛异常，需要 try-catch）
+      try {
+        const el = document.querySelector<HTMLElement>(selector);
+        if (el) {
+          el.scrollIntoView({ block: 'center', behavior: 'instant' });
+          const r = el.getBoundingClientRect();
+          return { el, point: { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 } };
+        }
+      } catch { /* 非标准 selector（如 text=xxx），继续回退链 */ }
+
+      // 2. 文本匹配：selector 格式 "text=提交按钮"
+      if (selector.startsWith('text=')) {
+        const searchText = selector.slice(5);
+        const found = findByText(searchText);
+        if (found) {
+          found.scrollIntoView({ block: 'center', behavior: 'instant' });
+          const r = found.getBoundingClientRect();
+          return { el: found, point: { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 } };
+        }
+      }
+
+      // 3. Role+Label：selector 格式 "role:button,label:提交"
+      if (selector.startsWith('role:')) {
+        const found = findByRoleLabel(selector);
+        if (found) {
+          found.scrollIntoView({ block: 'center', behavior: 'instant' });
+          const r = found.getBoundingClientRect();
+          return { el: found, point: { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 } };
+        }
+      }
+
+      // 4. 坐标回退
+      if (x != null && y != null) {
+        let cx = x;
+        let cy = y;
+        const dpr = window.devicePixelRatio || 1;
+        if (dpr > 1
+          && (cx > window.innerWidth || cy > window.innerHeight)
+          && cx / dpr <= window.innerWidth
+          && cy / dpr <= window.innerHeight) {
+          cx = cx / dpr;
+          cy = cy / dpr;
+        }
+        const stack = document.elementsFromPoint(cx, cy) as HTMLElement[];
+        if (stack.length > 0) {
+          const coordEl = stack.find(e => getComputedStyle(e).pointerEvents !== 'none') ?? stack[0];
+          return { el: coordEl, point: { clientX: cx, clientY: cy } };
+        }
+      }
+
+      throw new Error(`Element not found: ${selector}${x != null && y != null ? ` (coordinate fallback (${x}, ${y}) also failed)` : ''}`);
     }
     if (x != null && y != null) {
       let cx = x;
       let cy = y;
-      // DPR auto-correction: if (x, y) falls outside the viewport but (x/dpr, y/dpr)
-      // lands inside it, the agent almost certainly passed screenshot pixels. Rescue
-      // the call instead of failing. Harmless for callers already using CSS pixels
-      // because in-viewport coordinates short-circuit the `if`.
       const dpr = window.devicePixelRatio || 1;
       if (dpr > 1
         && (cx > window.innerWidth || cy > window.innerHeight)
@@ -534,6 +683,52 @@ function performInteraction(params: {
       });
     }
 
+    case 'drag': {
+      // Drag from source element/coords to target element/coords
+      // Uses selector/x+y for source, deltaX/deltaY for offset
+      const sourceEl = getEl();
+      if (!resolvedByCoords) sourceEl.scrollIntoView({ block: 'center', behavior: 'instant' });
+
+      const sourceRect = sourceEl.getBoundingClientRect();
+      const startX = x ?? (sourceRect.left + sourceRect.width / 2);
+      const startY = y ?? (sourceRect.top + sourceRect.height / 2);
+      const endX = startX + (deltaX ?? 0);
+      const endY = startY + (deltaY ?? 0);
+
+      // Fire drag events sequence: mousedown → mousemove → mouseup
+      const downEvent = new MouseEvent('mousedown', {
+        bubbles: true, cancelable: true,
+        clientX: startX, clientY: startY,
+        ...modInit(),
+      });
+      sourceEl.dispatchEvent(downEvent);
+
+      // Simulate drag movement with intermediate mousemove events
+      const steps = 5;
+      for (let i = 1; i <= steps; i++) {
+        const progress = i / steps;
+        const moveX = startX + (endX - startX) * progress;
+        const moveY = startY + (endY - startY) * progress;
+        const moveEvent = new MouseEvent('mousemove', {
+          bubbles: true, cancelable: true,
+          clientX: moveX, clientY: moveY,
+          ...modInit(),
+        });
+        document.dispatchEvent(moveEvent);
+      }
+
+      const upEvent = new MouseEvent('mouseup', {
+        bubbles: true, cancelable: true,
+        clientX: endX, clientY: endY,
+        ...modInit(),
+      });
+      document.dispatchEvent(upEvent);
+
+      return Promise.resolve(
+        `Dragged ${targetDesc} by (${deltaX ?? 0}, ${deltaY ?? 0})`
+      );
+    }
+
     default:
       // Resolve (don't reject) — chrome.scripting.executeScript silently swallows
       // rejections from injected functions, which would surface to the model as an
@@ -556,11 +751,15 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
     'focus (give an element keyboard focus without clicking — useful before keypress, or to reveal focus-only UI like autocompletes), ' +
     'type (text input), clear, select (dropdown), scroll (page or element via selector), ' +
     'keypress (pass a selector to focus that element first — strongly recommended when submitting forms via Enter), ' +
+    'drag (drag an element by offset using deltaX/deltaY, or from x/y coordinates), ' +
     'wait (element appears), wait_hidden (element disappears), ' +
     'wait_navigation (page load completes). ' +
+    'Selector fallback chain: CSS selector → text=visible text → role:roleName,label:ariaLabel → x/y coordinates. ' +
+    'Use "text=Submit" to find by visible text, "role:button,label:Submit" by role+label. ' +
     'For element discovery, use the dedicated `inspect` tool — it returns absolute selectors, role, label, and state. ' +
     'Use "sequence" with a "steps" array to batch multiple actions in one call ' +
     '(e.g. click → wait → type → keypress). Each step supports the same parameters. ' +
+    'Steps support a "condition" field: "visible" skips if selector element is not visible, "hidden" skips if visible. ' +
     'Execution stops on the first error and returns all results so far. ' +
     'Elements are scrolled into view automatically before interaction.',
   parameters: InteractParameters,
@@ -605,7 +804,21 @@ export const interactTool: AgentTool<typeof InteractParameters> = {
 
       for (let i = 0; i < steps.length; i++) {
         signal?.throwIfAborted();
-        const step = steps[i];
+        const step = steps[i] as Record<string, unknown>;
+
+        // 条件检查：如果 step 有 condition 字段，先在页面中检查
+        if (step.condition && step.selector) {
+          const conditionResult = await executeInTabWithArgs(
+            tabId,
+            checkElementVisibility,
+            [{ selector: step.selector as string, condition: step.condition as string }],
+            frameId,
+          );
+          if (!conditionResult) {
+            results.push(`[${i + 1}] Skipped (condition "${step.condition}" not met for ${step.selector})`);
+            continue;
+          }
+        }
 
         try {
           const result = await runInPageStep(tabId, step, frameId);

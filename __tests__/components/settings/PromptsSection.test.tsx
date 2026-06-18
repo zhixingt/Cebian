@@ -22,7 +22,7 @@ const renderWithRouter = () =>
           element={
             <Outlet
               context={
-                { basePath: '/settings', breakpoint: 'standard' } as SettingsOutletContext
+                { basePath: '/settings', breakpoint: 'medium' } as SettingsOutletContext
               }
             />
           }

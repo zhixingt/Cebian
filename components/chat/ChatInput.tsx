@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback, useImperativeHandle, forwardRef, type KeyboardEvent } from 'react';
-import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film } from 'lucide-react';
+import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film, Play, Pencil, BookOpen, Scissors, MousePointerClick, FileInput, Eye, Loader2 } from 'lucide-react';
 import { showDialog } from '@/lib/dialog';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -20,16 +20,32 @@ import {
   MAX_ATTACHMENT_COUNT, MAX_IMAGE_SIZE, MAX_TEXT_FILE_SIZE,
   RECORDING_MIME,
   isImageFile, isTextFile, formatFileSize,
+  isExtractableFile, extractTextFromFile,
+  ACCEPT_EXTENSIONS,
   type Attachment,
 } from '@/lib/attachments';
 import { recordingToAttachment } from '@/lib/recorder/to-attachment';
+import { sessionToSequence } from '@/lib/recorder/session-to-sequence';
+import type { RecordedSession } from '@/lib/recorder/types';
+import type { SequenceStep } from '@/lib/recorder/session-to-sequence';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
+import { RecordingEditor } from '@/components/chat/RecordingEditor';
 import { useRecorder } from '@/hooks/useRecorder';
 import { useWebProviders } from '@/hooks/useWebProviders';
 import { useMobileEmulation } from '@/hooks/useMobileEmulation';
 import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 import type { PromptDispatchResult } from '@/hooks/useBackgroundAgent';
+import type { QuickToolId } from '@/components/chat/QuickActionsBar';
+
+/** 页面操作快速工具定义（与 QuickActionsBar 原先的一致） */
+const QUICK_TOOLS = [
+  { id: 'read-page' as QuickToolId, icon: BookOpen, labelKey: 'chat.quickActions.toolReadPage' },
+  { id: 'screenshot-analyze' as QuickToolId, icon: Scissors, labelKey: 'chat.quickActions.toolScreenshotAnalyze' },
+  { id: 'operate-page' as QuickToolId, icon: MousePointerClick, labelKey: 'chat.quickActions.toolOperatePage' },
+  { id: 'fill-form' as QuickToolId, icon: FileInput, labelKey: 'chat.quickActions.toolFillForm' },
+  { id: 'watch-page' as QuickToolId, icon: Eye, labelKey: 'chat.quickActions.toolWatchPage' },
+] as const;
 
 interface ChatInputProps {
   onSend: (
@@ -44,6 +60,10 @@ interface ChatInputProps {
   userHistory?: string[];
   /** Conversation id; changing it resets history navigation state. */
   sessionId?: string | null;
+  /** Called when a page-operation quick tool button is clicked. */
+  onQuickTool?: (toolId: QuickToolId) => void;
+  /** Whether page watcher is currently active (for watch-page button state). */
+  isWatching?: boolean;
 }
 
 /**
@@ -60,8 +80,47 @@ export interface ChatInputHandle {
   handleQuickAction: (fileName: string) => Promise<void>;
 }
 
+// ─── ReplayButton：打开录制编辑器 ───
+
+function ReplayButton({ disabled, attachments, onOpenEditor }: {
+  disabled?: boolean;
+  attachments: Attachment[];
+  onOpenEditor: (recording: Attachment) => void;
+}) {
+  // 找到最近的录制附件
+  const lastRecording = useMemo(() => {
+    for (let i = attachments.length - 1; i >= 0; i--) {
+      if (attachments[i].type === 'recording') return attachments[i];
+    }
+    return null;
+  }, [attachments]);
+
+  const hasRecording = lastRecording !== null;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => lastRecording && onOpenEditor(lastRecording)}
+            disabled={disabled || !hasRecording}
+            aria-label={hasRecording ? t('chat.recorder.editAndReplay') : t('chat.recorder.none')}
+          >
+            <Play className="size-3.5" />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {hasRecording ? t('chat.recorder.editAndReplay') : t('chat.recorder.none')}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId },
+  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId, onQuickTool, isWatching },
   ref,
 ) {
   const [value, setValue] = useState('');
@@ -151,6 +210,22 @@ const { providers: webProvidersList } = useWebProviders();
     setCurrentThinkingLevel(level);
   };
 
+  // ── Page-operation quick tools (moved from QuickActionsBar) ──
+  const [pendingTool, setPendingTool] = useState<QuickToolId | null>(null);
+  const handleToolClick = useCallback(
+    (toolId: QuickToolId) => {
+      if (pendingTool) return;
+      if (toolId === 'watch-page') {
+        onQuickTool?.(toolId);
+        return;
+      }
+      setPendingTool(toolId);
+      onQuickTool?.(toolId);
+      setTimeout(() => setPendingTool(null), 2000);
+    },
+    [onQuickTool, pendingTool],
+  );
+
   // Auto-resize textarea. When the value is empty (initial mount, after
   // send) we clear the inline height entirely and let CSS `min-h-11 /
   // max-h-37.5` drive sizing. This avoids a first-paint race in the
@@ -199,6 +274,8 @@ const { providers: webProvidersList } = useWebProviders();
   // the composer becomes editable again while the agent replies.
   const isDispatchingRef = useRef(false);
   const [isDispatching, setIsDispatching] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorRecording, setEditorRecording] = useState<Attachment | null>(null);
 
   // Keep the ref in sync with state so any post-await reader sees the
   // most-recent attachments without depending on a re-render.
@@ -564,7 +641,7 @@ const { providers: webProvidersList } = useWebProviders();
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isDispatchingRef.current) {
       e.target.value = '';
       return;
@@ -585,47 +662,78 @@ const { providers: webProvidersList } = useWebProviders();
     }
 
     for (const file of filesToProcess) {
-      if (isImageFile(file)) {
-        // 当前模型不支持多模态时，跳过图片文件（文本文件仍照常处理）。
-        if (!supportsImage) {
-          toast.warning(t('chat.composer.modelNoImage'));
-          continue;
+      const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+      console.log('[upload] processing file:', file.name, 'size:', file.size, 'type:', file.type, 'ext:', ext);
+
+      // Legacy .doc is not extractable in browser — prompt conversion
+      if (ext === '.doc') {
+        toast.info(t('chat.upload.docConvertHint'));
+        continue;
+      }
+
+      try {
+        if (isImageFile(file)) {
+          // 当前模型不支持多模态时，跳过图片文件（文本文件仍照常处理）。
+          if (!supportsImage) {
+            toast.warning(t('chat.composer.modelNoImage'));
+            continue;
+          }
+          if (file.size > MAX_IMAGE_SIZE) {
+            toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_IMAGE_SIZE)]));
+            continue;
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (isDispatchingRef.current) return;
+            if (!supportsImageRef.current) return;
+            const dataUrl = reader.result as string;
+            const base64 = dataUrl.split(',', 2)[1] ?? '';
+            const mimeType = file.type || 'image/png';
+            setAttachments((prev) => {
+              if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
+              return [...prev, { type: 'image', source: 'upload', data: base64, mimeType, name: file.name }];
+            });
+          };
+          reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
+          reader.readAsDataURL(file);
+        } else if (isExtractableFile(file.name)) {
+          // PDF / DOCX / XLSX — extract plain text in browser
+          if (file.size > MAX_TEXT_FILE_SIZE * 10) {
+            toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE * 10)]));
+            continue;
+          }
+          console.log('[upload] extracting text from', file.name);
+          const extracted = await extractTextFromFile(file);
+          console.log('[upload] extracted result for', file.name, ':', extracted ? `length=${extracted.length}` : 'null');
+          if (extracted != null) {
+            setAttachments((prev) => {
+              if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
+              return [...prev, { type: 'file', content: extracted, name: file.name, mimeType: file.type || 'application/octet-stream', size: file.size }];
+            });
+          } else {
+            toast.error(t('chat.composer.readFileFailed', [file.name]));
+          }
+        } else if (isTextFile(file.name)) {
+          if (file.size > MAX_TEXT_FILE_SIZE) {
+            toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE)]));
+            continue;
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (isDispatchingRef.current) return;
+            setAttachments((prev) => {
+              if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
+              return [...prev, { type: 'file', content: reader.result as string, name: file.name, mimeType: file.type || 'text/plain', size: file.size }];
+            });
+          };
+          reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
+          reader.readAsText(file);
+        } else {
+          toast.error(t('chat.composer.unsupportedFileType', [file.name]));
         }
-        if (file.size > MAX_IMAGE_SIZE) {
-          toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_IMAGE_SIZE)]));
-          continue;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (isDispatchingRef.current) return;
-          if (!supportsImageRef.current) return;
-          const dataUrl = reader.result as string;
-          const base64 = dataUrl.split(',', 2)[1] ?? '';
-          const mimeType = file.type || 'image/png';
-          setAttachments((prev) => {
-            if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
-            return [...prev, { type: 'image', source: 'upload', data: base64, mimeType, name: file.name }];
-          });
-        };
-        reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
-        reader.readAsDataURL(file);
-      } else if (isTextFile(file.name)) {
-        if (file.size > MAX_TEXT_FILE_SIZE) {
-          toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE)]));
-          continue;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (isDispatchingRef.current) return;
-          setAttachments((prev) => {
-            if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
-            return [...prev, { type: 'file', content: reader.result as string, name: file.name, mimeType: file.type || 'text/plain', size: file.size }];
-          });
-        };
-        reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
-        reader.readAsText(file);
-      } else {
-        toast.error(t('chat.composer.unsupportedFileType', [file.name]));
+      } catch (err) {
+        console.error('[upload] unexpected error processing', file.name, err);
+        toast.error(t('chat.composer.readFileFailed', [file.name]));
       }
     }
 
@@ -701,6 +809,7 @@ const { providers: webProvidersList } = useWebProviders();
   };
 
   return (
+    <>
     <footer className="px-4 py-4 bg-background relative">
       {/* Slash menu — dynamic VFS prompts */}
       {isSlashMenuVisible && (
@@ -748,6 +857,7 @@ const { providers: webProvidersList } = useWebProviders();
             variant="ghost"
             size="icon-xs"
             title={isPicking ? t('chat.composer.cancelPick') : t('chat.composer.pickElement')}
+            aria-label={isPicking ? t('chat.composer.cancelPick') : t('chat.composer.pickElement')}
             onClick={handlePickElement}
             disabled={isDispatching}
             className={isPicking ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
@@ -755,6 +865,7 @@ const { providers: webProvidersList } = useWebProviders();
             <MousePointer2 className="size-3.5" />
           </Button>
           <RecordButton disabled={isDispatching} />
+          <ReplayButton disabled={isDispatching} attachments={attachments} onOpenEditor={(rec) => { setEditorRecording(rec); setEditorOpen(true); }} />
           <Tooltip>
             <TooltipTrigger asChild>
               <span
@@ -766,6 +877,7 @@ const { providers: webProvidersList } = useWebProviders();
                   size="icon-xs"
                   onClick={handleScreenshot}
                   disabled={isDispatching || !supportsImage}
+                  aria-label={supportsImage ? t('chat.composer.screenshot') : t('chat.composer.modelNoImage')}
                 >
                   <Camera className="size-3.5" />
                 </Button>
@@ -775,14 +887,14 @@ const { providers: webProvidersList } = useWebProviders();
               {supportsImage ? t('chat.composer.screenshot') : t('chat.composer.modelNoImage')}
             </TooltipContent>
           </Tooltip>
-          <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()} disabled={isDispatching}>
+          <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} aria-label={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()} disabled={isDispatching}>
             <Paperclip className="size-3.5" />
           </Button>
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            accept={`${supportsImage ? 'image/*,' : ''}.txt,.md,.csv,.tsv,.log,.js,.ts,.jsx,.tsx,.mjs,.cjs,.py,.java,.c,.cpp,.h,.hpp,.go,.rs,.rb,.php,.sh,.bash,.sql,.yaml,.yml,.toml,.ini,.cfg,.json,.xml,.html,.htm,.css,.scss,.less,.env,.gitignore,.editorconfig`}
+            accept={`${supportsImage ? 'image/*,' : ''}${Array.from(ACCEPT_EXTENSIONS).join(',')}`}
             className="hidden"
             disabled={isDispatching}
             onChange={handleFileUpload}
@@ -791,12 +903,59 @@ const { providers: webProvidersList } = useWebProviders();
             variant="ghost"
             size="icon-xs"
             title={t('chat.composer.mobileMode')}
+            aria-label={t('chat.composer.mobileMode')}
             className={isActiveTabMobile ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
             onClick={toggleMobile}
             disabled={isDispatching}
           >
             <Smartphone className="size-3.5" />
           </Button>
+
+          {/* Divider + Page-operation quick tools (merged from QuickActionsBar) */}
+          {onQuickTool && (
+            <>
+              <Separator orientation="vertical" className="h-4! mx-1 bg-border" />
+              {QUICK_TOOLS.map((tool) => {
+                const Icon = tool.icon;
+                const active = tool.id === 'watch-page' && isWatching;
+                const isPending = pendingTool === tool.id;
+                return (
+                  <Tooltip key={tool.id}>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex relative">
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          data-quick-tool={tool.id}
+                          disabled={!!pendingTool || isDispatching}
+                          onClick={() => handleToolClick(tool.id)}
+                          className={[
+                            'relative',
+                            active && 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary',
+                            isPending && 'opacity-60 scale-95',
+                            !!pendingTool && !isPending && 'opacity-40 cursor-not-allowed',
+                          ].join(' ')}
+                          aria-label={t(tool.labelKey)}
+                        >
+                          {isPending ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Icon className="size-3.5" />
+                          )}
+                        </Button>
+                        {active && (
+                          <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-green-400 animate-pulse" />
+                        )}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {active ? t('chat.quickActions.toolWatchPageStop') : t(tool.labelKey)}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </>
+          )}
 
           {attachments.length > 0 && (
             <>
@@ -828,6 +987,7 @@ const { providers: webProvidersList } = useWebProviders();
                         className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
                         disabled={isDispatching}
                         onClick={() => removeAttachment(i)}
+                        aria-label={t('chat.attachments.delete')}
                       >
                         <X className="size-2.5" />
                       </button>
@@ -853,7 +1013,19 @@ const { providers: webProvidersList } = useWebProviders();
                       <button
                         className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
                         disabled={isDispatching}
+                        onClick={() => {
+                          setEditorRecording(att);
+                          setEditorOpen(true);
+                        }}
+                        aria-label={t('chat.recorder.editAndReplay')}
+                      >
+                        <Pencil className="size-2.5" />
+                      </button>
+                      <button
+                        className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                        disabled={isDispatching}
                         onClick={() => removeAttachment(i)}
+                        aria-label={t('chat.attachments.delete')}
                       >
                         <X className="size-2.5" />
                       </button>
@@ -881,6 +1053,7 @@ const { providers: webProvidersList } = useWebProviders();
                         className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
                         disabled={isDispatching}
                         onClick={() => removeAttachment(i)}
+                        aria-label={t('chat.attachments.delete')}
                       >
                         <X className="size-2.5" />
                       </button>
@@ -895,6 +1068,7 @@ const { providers: webProvidersList } = useWebProviders();
         {/* Textarea */}
         <textarea
           ref={textareaRef}
+          data-chat-input
           rows={1}
           value={value}
           onChange={(e) => handleInput(e.target.value)}
@@ -950,5 +1124,18 @@ const { providers: webProvidersList } = useWebProviders();
         </div>
       </div>
     </footer>
+
+    <RecordingEditor
+      open={editorOpen}
+      onOpenChange={setEditorOpen}
+      recording={editorRecording}
+      onReplay={(steps) => {
+        if (steps.length === 0) return;
+        const stepsJson = JSON.stringify(steps, null, 2);
+        const prompt = t('chat.recorder.replayPrompt', [stepsJson]);
+        void onSend(prompt, undefined, null);
+      }}
+    />
+    </>
   );
 });

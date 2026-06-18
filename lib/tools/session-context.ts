@@ -8,13 +8,13 @@ import type { InteractiveBridge, PendingRequest } from './interactive-bridge';
 
 export type ToolStateCallback = (
   toolName: string,
-  pending: PendingRequest<any> | null,
+  pending: PendingRequest<unknown> | null,
 ) => void;
 
 export class SessionToolContext {
-  private bridges = new Map<string, InteractiveBridge<any, any>>();
+  private bridges = new Map<string, InteractiveBridge<unknown, unknown>>();
   /** Per-session interactive AgentTool instances, in registration order. */
-  private interactiveTools: AgentTool<any>[] = [];
+  private interactiveTools: AgentTool[] = [];
   private bridgeUnsubs: (() => void)[] = [];
   private pendingState = new Map<string, boolean>();
   private listeners = new Set<ToolStateCallback>();
@@ -35,8 +35,8 @@ export class SessionToolContext {
    */
   register(
     toolName: string,
-    bridge: InteractiveBridge<any, any>,
-    tool: AgentTool<any>,
+    bridge: InteractiveBridge<unknown, unknown>,
+    tool: AgentTool,
   ): void {
     this.bridges.set(toolName, bridge);
     this.interactiveTools.push(tool);
@@ -59,7 +59,7 @@ export class SessionToolContext {
   }
 
   /** Get the pending request for a specific tool. */
-  getPending(toolName: string): PendingRequest<any> | null {
+  getPending(toolName: string): PendingRequest<unknown> | null {
     return this.bridges.get(toolName)?.getPending() ?? null;
   }
 
@@ -67,7 +67,7 @@ export class SessionToolContext {
    * Snapshot of all registered interactive AgentTool instances, in registration
    * order. Returns a fresh array; safe to spread into a tools list.
    */
-  getInteractiveTools(): AgentTool<any>[] {
+  getInteractiveTools(): AgentTool[] {
     return [...this.interactiveTools];
   }
 
@@ -80,8 +80,8 @@ export class SessionToolContext {
   }
 
   /** Snapshot all currently pending interactive tool requests. */
-  getPendingRequests(): Array<{ toolName: string; pending: PendingRequest<any> }> {
-    const pending: Array<{ toolName: string; pending: PendingRequest<any> }> = [];
+  getPendingRequests(): Array<{ toolName: string; pending: PendingRequest<unknown> }> {
+    const pending: Array<{ toolName: string; pending: PendingRequest<unknown> }> = [];
     for (const [toolName, bridge] of this.bridges) {
       const request = bridge.getPending();
       if (request) pending.push({ toolName, pending: request });
@@ -90,7 +90,7 @@ export class SessionToolContext {
   }
 
   /** Resolve a specific tool's pending request with the user's response. */
-  resolve(toolName: string, response: any): void {
+  resolve(toolName: string, response: unknown): void {
     this.bridges.get(toolName)?.resolve(response);
   }
 

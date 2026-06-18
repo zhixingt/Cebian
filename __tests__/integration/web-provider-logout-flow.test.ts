@@ -69,13 +69,14 @@ describe('T14 #7: Logout flow → next chat shows "please log in" error (no wast
 
   function makeModel(providerId: 'glm' = 'glm'): Model<typeof WEB_SESSION_API> {
     const preset = WEB_PROVIDER_PRESETS.find(p => p.id === providerId)!;
+    const defaultModel = preset.models.find(m => m.id === preset.defaultModelId)!;
     return {
       id: `web:${providerId}:${preset.defaultModelId}`,
       name: `${preset.id} ${preset.defaultModelId}`,
       api: WEB_SESSION_API,
       provider: WEB_SESSION_API,
       baseUrl: preset.loginUrl,
-      reasoning: preset.defaultSupportsReasoning,
+      reasoning: defaultModel.supportsReasoning,
       input: ['text'],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow: 128000,

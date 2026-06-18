@@ -1,10 +1,45 @@
 {
   "version": 1,
   "skills": {
+    "brainstorming": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "8df9b47092524833138b58682d03f2e153a242e550d1693657afdbee0cc9cdb0"
+    },
+    "dispatching-parallel-agents": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "e21044ae7496fc285f1df9ff3fb518a3a20bea6f5216c1f59f4987e12c769a0a"
+    },
+    "executing-plans": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "b41c919caf1bb07fbacb0e29899ac513f9eb11cd4dd695975ad352c2c03cc4d7"
+    },
+    "find-skills": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\vercel-skills-extract\\skills-main",
+      "sourceType": "local",
+      "computedHash": "d31e234f0c90694a670222cdd1dafa853e051d7066beda389f1097c22dadd461"
+    },
+    "finishing-a-development-branch": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "932d23af11a3eb2b758f5b1d9aec7b6d28ddd26658328414f87f34dff7179d19"
+    },
     "frontend-design": {
-      "source": "anthropics/skills",
-      "sourceType": "github",
-      "computedHash": "516bd2154eb843a8240e43d5b285229129853114ad7075a5e141e1c08e408c84"
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\anthropics-skills-extract\\skills-main",
+      "sourceType": "local",
+      "computedHash": "4eabc66183767153e404b39d1b839b1c37f2d82d86f0a0d7e880a579d8d62336"
+    },
+    "receiving-code-review": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "2760c85d4f4117b0006e7ba755f4bbd61f8f4c185f347999763c97f507274e30"
+    },
+    "requesting-code-review": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "874f3786b05007a8b4a60452a4cd89b9917c645d34b6b1e40ea05037d12f0e67"
     },
     "shadcn": {
       "source": "shadcn/ui",
@@ -16,15 +51,55 @@
       "sourceType": "github",
       "computedHash": "57f470f512f45bdac598e302bc72fd62bf2b649fc7fad032efe97720149cde4d"
     },
+    "subagent-driven-development": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "b38be2f3a092d758127f6d47e77c2493885aebf38aae359e4c786df2c343b837"
+    },
+    "systematic-debugging": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "7246fdd3a795fc3daff0af72044ca99bf836e4e6a46844742858786fdfb86488"
+    },
+    "test-driven-development": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "126f1ebf6ccd414f42544f6e83d8cc5adb089e1108eaffb7c400701e37eecd9f"
+    },
+    "using-git-worktrees": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "bd10bc57c23040630b17c877a9bc7b4be40c35161a2e2f110d770d78e3b0a4ff"
+    },
+    "using-superpowers": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "de10fd3ff46d797acc92b9df6b3ea456a5cd1d095b73c90bc921e83cce4c5bb9"
+    },
     "vercel-react-best-practices": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
       "computedHash": "257b84bf218a7d3b2cba56e929b7e933cf71cb89f2e24ab601759c599d1c23f2"
     },
+    "verification-before-completion": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "9b446f0c7fe1cfb560b1d34439523b1a76d5f177290007b2c053a1c749a4a8ba"
+    },
     "web-artifacts-builder": {
       "source": "anthropics/skills",
       "sourceType": "github",
       "computedHash": "8506451d6d3a3494ddca091b0f0ff7a9961ddd4301df2b6264dd3f98bed75b0a"
+    },
+    "writing-plans": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "2b986445454a025ca2c3839f8a2024747e8cce0517948437232cd113d2719060"
+    },
+    "writing-skills": {
+      "source": "C:\\Users\\xiaoz\\AppData\\Local\\Temp\\superpowers-extract\\superpowers-main",
+      "sourceType": "local",
+      "computedHash": "c0a92e629e39ea91b1f54da67a6aa92723008a8ef5b500c6de078f55485937c7"
     }
   }
 }

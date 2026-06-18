@@ -6,13 +6,15 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "#i18n": ["./.wxt/i18n/index.ts"]
+      "#i18n": ["./.wxt/i18n/index.ts"],
+      "#imports": ["./vitest-stubs/imports.ts"]
     }
   },
   "exclude": [
     "e2e/**",
     "node_modules",
     ".output",
-    ".wxt"
+    "skills/**",
+    "scripts/**"
   ]
 }

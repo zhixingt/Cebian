@@ -1,13 +1,15 @@
-﻿# Cebian 擴充功能 i18n —— 繁體中文（zh_TW，台灣/港澳使用者）。
+# Cebian 擴充功能 i18n —— 繁體中文（zh_TW，台灣/港澳使用者）。
 # 修改時請同步 locales/en.yml 與 locales/zh_CN.yml。規範見 .agents/skills/i18n-naming/SKILL.md。
 
 # ─── Manifest（扁平頂層 key，見規範「Manifest localization」）───
 extName: "CebianX · 教務智能助手"
 extDescription: "瀏覽器側邊欄裡的 AI 智能體，用你自己的 OpenAI / Anthropic / Google API Key，免訂閱、無帳號。讀網頁、拾取元素、裝 MCP 工具、跑 Skill 工作流，資料全部存於本機。AGPL-3.0 開源。"
 actionTitle: "開啟 CebianX 側邊欄"
+toggleSidebarCollapse: "切換側邊欄折疊"
 
 # ─── 通用（UI 中複用）───
 common:
+  all: "全部"
   newChat: "新對話"
   send: "傳送"
   history: "歷史記錄"
@@ -33,7 +35,12 @@ common:
   newFolder: "新增資料夾"
   search: "搜尋"
   searchPlaceholder: "搜尋…"
+  noMatch: "無相符結果"
   moreActions: "更多操作"
+  sidebarCollapse: "收起側邊欄"
+  expandSidebar: "展開側邊欄"
+  currentSession: "目前會話"
+  collapseSidebar: "收起側邊欄"
   empty:
     history: "尚無歷史記錄"
     folder: "空資料夾"
@@ -68,6 +75,7 @@ settings:
     instructions: "指引"
     prompts: "提示詞"
     skills: "技能"
+    workflows: "工作流"
     mcp: "MCP 伺服器"
     advanced: "進階"
     about: "關於"
@@ -75,7 +83,9 @@ settings:
     title: "AI 供應商"
   about:
     title: "關於"
-    tagline: "AI 瀏覽器側邊欄助手"
+    tagline: "瀏覽器 AI 智能體工作台"
+    projectDesc: "專案說明"
+    followAuthor: "關注作者：微信公眾號（一隻貓頭貓）"
     feedback: "意見回饋"
     checkUpdate: "檢查更新"
     checking: "檢查中…"
@@ -85,10 +95,13 @@ settings:
     viewInstallGuide: "檢視安裝指南"
     checkFailed: "檢查更新失敗"
   advanced:
-    title: "進階"
+    title: "高级"
     maxRounds:
       label: "最大對話輪數"
       hint: "超出後自動截斷早期訊息"
+    collapseHide:
+      label: "收起時完全隱藏側邊欄"
+      hint: "折疊模式下徹底隱藏面板，而非顯示圖示欄"
   instructions:
     title: "指引"
     label: "自訂指引"
@@ -152,6 +165,101 @@ settings:
       confirmOverwriteTitle: "覆寫現有技能？"
       # $1 = 技能名稱（多個時以逗號分隔）
       confirmOverwriteDescription: "「$1」將被取代，且已授予的權限將被清除。是否繼續？"
+  workflows:
+    title: "工作流"
+    hint: "錄製、編輯和執行瀏覽器自動化工作流。"
+    tabMy: "我的自動化"
+    tabDiscover: "發現"
+    new: "新增工作流"
+    searchPlaceholder: "搜尋工作流…"
+    empty:
+      title: "暫無工作流"
+      hint: "錄製一次會話或建立工作流以開始使用。"
+    # $1 = 步驟數
+    stepCount:
+      1: "1 個步驟"
+      n: "$1 個步驟"
+    # $1 = 執行次數
+    runCount:
+      1: "已執行 1 次"
+      n: "已執行 $1 次"
+    run: "執行"
+    # $1 = 工作流名稱
+    running: "正在執行「$1」…"
+    # $1 = 工作流名稱
+    runSuccess: "「$1」執行成功"
+    # $1 = 工作流名稱, $2 = 錯誤訊息
+    runFailed: "「$1」執行失敗：$2"
+    # $1 = 工作流名稱
+    runVariables: "執行「$1」 — 請輸入變數"
+    # $1 = 工作流名稱
+    deleteConfirm: "刪除工作流「$1」？此操作無法復原。"
+    # $1 = 工作流名稱
+    deleteSuccess: "已刪除「$1」"
+    deleteFailed: "刪除失敗"
+    loadFailed: "載入工作流失敗"
+    import: "匯入"
+    export: "匯出"
+    exportCeb: "匯出 .ceb"
+    # $1 = 工作流名稱
+    importSuccess: "已匯入「$1」"
+    importFailed: "匯入失敗"
+    saveFailed: "儲存失敗"
+    status:
+      success: "成功"
+      failure: "失敗"
+      cancelled: "已取消"
+      neverRun: "未執行"
+    discover:
+      title: "發現工作流"
+      hint: "瀏覽預置工作流，一鍵添加到我的自動化。"
+      example: "範例"
+      template: "模板"
+      add: "添加"
+      added: "已添加"
+      # $1 = 工作流名稱
+      addSuccess: "已添加「$1」"
+    editor:
+      title: "編輯工作流"
+      nameLabel: "名稱"
+      namePlaceholder: "工作流名稱"
+      descLabel: "描述"
+      descPlaceholder: "這個工作流做什麼用？"
+      stepsLabel: "步驟"
+      addStep: "新增步驟"
+      emptySteps: "暫無步驟，新增一個步驟開始編輯。"
+      # $1 = 工作流名稱
+      saveSuccess: "已儲存「$1」"
+      saveFailed: "儲存失敗"
+      aiGenerate: "AI 生成"
+      aiGenerateBtn: "生成"
+      aiHint: "描述你想讓瀏覽器自動完成的任務，AI 會將其拆解為操作步驟。"
+      aiPlaceholder: "例如：搜尋「天氣預報」，點擊第一個結果，提取頁面標題"
+      aiGenerating: "AI 正在生成工作流…"
+      aiNoModel: "未找到可用的 AI 模型，請先在聊天介面選擇一個模型。"
+      aiFailed: "生成失敗，請重試或手動新增步驟。"
+      # $1 = 步驟數
+      aiSuccess: "已生成 $1 個步驟"
+      triggerLabel: "觸發方式"
+      triggerManual: "手動執行"
+      triggerUrl: "URL 匹配"
+      triggerUrlPlaceholder: "正規表示式，例如：example\\.com/dashboard"
+      triggerCron: "定時任務"
+      triggerCronPlaceholder: "Cron 運算式，例如：0 9 * * *"
+      triggerDom: "DOM 觸發"
+      triggerDomPlaceholder: "CSS 選擇器，例如：button.buy-now"
+    history:
+      # $1 = 工作流名稱
+      title: "$1 的執行歷程"
+      empty: "暫無執行紀錄"
+      steps: "個步驟"
+      clearAll: "清空紀錄"
+      # $1 = 工作流名稱
+      clearConfirm: "清空「$1」的所有執行紀錄？此操作無法復原。"
+      variables: "變數"
+      copyVariables: "複製變數"
+      downloadVariables: "下載變數"
+      copied: "已複製"
   mcp:
     title: "MCP 伺服器"
     description: "連接 Model Context Protocol 伺服器，把它們的工具開放給 agent 使用。"
@@ -198,8 +306,22 @@ settings:
       headers: "自訂 Headers"
       headerKeyPlaceholder: "Header 名稱（如 X-MCP-Toolsets）"
       headerValuePlaceholder: "Header 值"
-      addHeader: "新增 Header"
+      addHeader: "添加 Header"
       removeHeader: "移除 Header"
+    addHermes: "添加 Hermes 預設"
+    hermesAdded: "Hermes 預設已添加"
+  apiDiscovery:
+    title: "API 發現"
+    description: "自動學習網站內部 API，加速 Agent 操作。憑證零信任設計，不存儲任何敏感資訊。"
+    enable: "啟用 API 發現"
+    enableHint: "啟用後可在當前分頁開啟流量捕獲，自動分析並生成 API Skill"
+    capture: "流量捕獲"
+    startCapture: "開始捕獲"
+    stopAndAnalyze: "停止並分析"
+    captureStarted: "捕獲已開始"
+    skills: "API Skill 列表"
+    refresh: "重新整理"
+    noSkills: "暫無自動發現的 API Skill。開始捕獲流量以發現 API。"
   editor:
     selectFile: "選擇一個檔案開始編輯"
     saving: "儲存中…"
@@ -212,6 +334,7 @@ settings:
 
 # ─── 聊天 ───
 chat:
+  dismiss: "關閉"
   composer:
     placeholder: "輸入 / 查看命令…"
     pickElement: "選擇元素"
@@ -243,10 +366,13 @@ chat:
     noPrompts: "尚無 Prompt，前往 AI 設定建立"
     noMatch: "無相符結果"
     iframeEnterHint: "⏎ 點擊進入"
+  upload:
+    docConvertHint: "請轉換為 .docx 後上傳"
   attachments:
     image: "圖片"
     screenshot: "螢幕截圖"
     imageAlt: "附件圖片"
+    delete: "刪除附件"
     # $1 = 事件數量, $2 = 時長 (M:SS)
     recordingMeta: "$1 個事件 · $2"
     recordingTruncated: "已截斷"
@@ -259,6 +385,28 @@ chat:
     startRejectedBusy: "另一個側邊欄正在錄製，請先停止後再開始新的錄製。"
     autoStoppedEvents: "錄製已自動停止：達到事件上限"
     autoStoppedTime: "錄製已自動停止：達到時長上限"
+    editAndReplay: "編輯並回放錄製"
+    none: "暫無錄製可回放"
+    defaultDesc: "錄製工作流"
+    replayPrompt: "請回放以下錄製操作步驟，使用 interact 工具的 sequence action 執行：\n```json\n$1\n```"
+    replayPromptPrefix: "請使用 interact 工具的 sequence action 執行以下操作步驟："
+  emptyState:
+    slogan: "思之所至，行之所達。"
+    viewCommands: "查看命令"
+    startChat: "輸入問題開始對話"
+    historyInput: "歷史輸入"
+  quickTool:
+    prompts:
+      readPage: "請閱讀當前頁面內容並總結要點"
+      screenshotAnalyze: "請分析這張截圖中的內容"
+      screenshotFallback: "請截圖當前頁面並分析其中的內容"
+      operatePage: "請幫我操作當前頁面，我會告訴你需要做什麼"
+      fillForm: "請幫我填寫當前頁面的表單"
+  fileTree:
+    unfavorite: "取消收藏"
+    favorite: "添加收藏"
+    unfavoriteShortcut: "取消快捷指令"
+    favoriteShortcut: "添加為快捷指令"
   askUser:
     placeholder: "輸入回覆…"
   model:
@@ -297,6 +445,63 @@ chat:
   quickActions:
     broken: "原檔案已遺失"
     brokenClick: "原檔案已遺失，請到設定頁面處理"
+    toolReadPage: "閱讀頁面"
+    scrollLeft: "向左捲動"
+    label: "快捷操作"
+    scrollRight: "向右捲動"
+    toolScreenshotAnalyze: "截圖分析"
+    toolOperatePage: "操作頁面"
+    toolFillForm: "填寫表單"
+    toolWatchPage: "監控頁面"
+    toolWatchPageStop: "停止監控"
+    watchStarted: "已開始監控頁面變化"
+    watchAlreadyActive: "頁面監控已在運行中"
+    watchStopped: "已停止監控頁面"
+    watchFailed: "啟動頁面監控失敗"
+    # $1 = 變化節點數
+    pageChanged: "偵測到頁面變化（$1 個節點）"
+  recordingEditor:
+    title: "錄製編輯器"
+    stepsCount: "個步驟"
+    saveAsCommand: "儲存為指令"
+    saveAsWorkflow: "儲存為工作流"
+    saveNamePlaceholder: "指令名稱"
+    workflowNamePlaceholder: "工作流名稱"
+    saveDescPlaceholder: "指令描述（選填）"
+    save: "儲存"
+    # $1 = 指令名稱
+    saved: "已儲存為快捷指令「$1」"
+    # $1 = 工作流名稱
+    savedAsWorkflow: "已儲存工作流「$1」"
+    saveFailed: "儲存失敗"
+    insertAfter: "在下方插入步驟"
+    moveUp: "上移"
+    moveDown: "下移"
+    delete: "刪除"
+    addStep: "新增步驟"
+    replay: "回放"
+    noSteps: "無可回放步驟"
+    aiOptimize: "AI 優化"
+    optimizeTitle: "AI 優化建議"
+    noSuggestions: "暫無可優化項，當前錄製已經很棒了！"
+    apply: "應用"
+    applied: "已應用"
+    optimizationApplied: "優化已應用"
+    actionLabels:
+      click: "點擊"
+      dblclick: "雙擊"
+      rightclick: "右鍵"
+      hover: "懸停"
+      focus: "聚焦"
+      type: "輸入"
+      clear: "清空"
+      select: "選擇"
+      scroll: "滾動"
+      keypress: "按鍵"
+      drag: "拖曳"
+      wait: "等待出現"
+      wait_hidden: "等待消失"
+      wait_navigation: "等待導航"
   message:
     # $1 = 輸入 token 數（已格式化，如「1.2k」），$2 = 輸出 token 數（已格式化）
     tokensInOut: "↑$1 ↓$2"
@@ -306,6 +511,8 @@ chat:
     tokensInBreakdownHitWrite: "未快取 $1 · 快取 $2 · 寫快取 $3"
     # 最新一輪 assistant 訊息左下角重試按鈕的 tooltip / aria-label
     retry: "重試"
+  collapse: "收起"
+  expand: "展開"
   session:
     loading: "載入工作階段…"
     modelError: "模型回傳錯誤"
@@ -318,6 +525,21 @@ chat:
     reconnecting: "連線中斷，正在重試…"
     welcomeReady: "有什麼我可以幫忙的？"
     scrollToBottom: "跳至最新訊息"
+
+background:
+  contextMenu:
+    readPage: "用 Cebian 閱讀此頁面"
+    summarize: "用 Cebian 總結此頁面"
+    operateSelection: "用 Cebian 操作選中內容"
+    openLink: "用 Cebian 打開此連結"
+    screenshot: "用 Cebian 截圖此頁面"
+  contextMenuPrompts:
+    readPage: "請閱讀當前頁面的內容，告訴我這個頁面講了什麼。"
+    summarize: "請總結當前頁面的主要內容，提煉關鍵資訊。"
+    operateSelection: "請對當前選中的內容進行操作：\"$1\""
+    openLink: "請在當前頁面中點擊或打開這個連結：$1"
+    screenshot: "請截取當前頁面的截圖。"
+    default: "請幫我處理當前頁面。"
 
 # ─── 供應商子元件（OAuth / API Key / 自訂）───
 provider:
@@ -521,6 +743,12 @@ errors:
     # $1 = 技能名稱
     reservedName: "此技能名稱為系統保留：$1"
     parseFrontmatter: "無法解析 SKILL.md 的 frontmatter。"
+  boundary:
+    title: "介面異常"
+    unknownError: "未知錯誤"
+    retry: "重試"
+    reload: "重新載入"
+    retryLimit: "已達到重試上限，請重新載入"
 
 # ───── Web (Browser Session) providers ─────
 webProviders:
@@ -566,3 +794,5 @@ webProviders:
     # ⭐ ②
     loginFailed: "登入失敗，請重試。"
     loginTimedOut: "登入逾時（5 分鐘），請重試。"
+  retryLimit: "已達到重試上限，請重新載入"
+

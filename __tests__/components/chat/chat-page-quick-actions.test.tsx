@@ -57,6 +57,8 @@ vi.mock('@/lib/message-helpers', () => ({
   getToolCalls: vi.fn().mockReturnValue([]),
   findToolResult: vi.fn().mockReturnValue(undefined),
   extractUserText: vi.fn().mockReturnValue(''),
+  buildToolResultIndex: vi.fn().mockReturnValue(new Map()),
+  buildTurnMetaMap: vi.fn().mockReturnValue(new Map()),
 }));
 vi.mock('@/lib/tools/tool-labels', () => ({ getToolLabel: vi.fn() }));
 vi.mock('@/lib/tools/ui-registry', () => ({
@@ -78,17 +80,22 @@ vi.mock('@/components/chat/Message', () => ({
 }));
 vi.mock('@/components/chat/ToolCard', () => ({ ToolCard: () => null }));
 vi.mock('@/components/chat/ToolCardWithUI', () => ({ ToolCardWithUI: () => null }));
+vi.mock('@/components/chat/AssistantMessageItem', () => ({ AssistantMessageItem: () => null }));
+vi.mock('@/components/chat/ToolResultBubble', () => ({ ToolResultBubble: () => null }));
 
 import * as scanner from '@/lib/ai-config/scanner';
 import { ChatPage } from '@/entrypoints/sidepanel/pages/chat';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 const renderInRouter = (ui: React.ReactNode) =>
   render(
-    <MemoryRouter initialEntries={['/chat/new']}>
-      <Routes>
-        <Route path="/chat/new" element={ui} />
-      </Routes>
-    </MemoryRouter>,
+    <TooltipProvider>
+      <MemoryRouter initialEntries={['/chat/new']}>
+        <Routes>
+          <Route path="/chat/new" element={ui} />
+        </Routes>
+      </MemoryRouter>
+    </TooltipProvider>,
   );
 
 const makePrompt = (fileName: string, name = fileName.replace('.md', '')) => ({
@@ -119,7 +126,10 @@ describe('ChatPage mounts QuickActionsBar', () => {
     expect(await screen.findByTestId('quick-actions-bar')).toBeInTheDocument();
   });
 
-  it('does NOT render the quick-actions-bar when favorites is empty', () => {
+  it('does NOT render the quick-actions-bar when favorites is empty AND no onQuickTool', () => {
+    // ChatPage always passes onQuickTool, so the bar always renders.
+    // This test verifies the bar still renders (with tool buttons) even when
+    // there are no favorite prompts.
     vi.mocked(useStorageItem).mockImplementation((item, fallback) => {
       if (item === favoritePrompts) return [[], vi.fn()];
       return [fallback, vi.fn()];
@@ -128,6 +138,7 @@ describe('ChatPage mounts QuickActionsBar', () => {
 
     renderInRouter(<ChatPage />);
 
-    expect(screen.queryByTestId('quick-actions-bar')).toBeNull();
+    // Bar should NOT render when there are no favorites (tools moved to ChatInput)
+    expect(screen.queryByTestId('quick-actions-bar')).not.toBeInTheDocument();
   });
 });

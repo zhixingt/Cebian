@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDb } from '@/lib/db';
 import {
   WEB_LLM_CONVERSATION_UPDATE,
@@ -18,13 +18,20 @@ function makeContextWithUserText(text: string): any {
 }
 
 describe('9.2 multi-turn: buildContentFetchRequest + listener integration', () => {
+  beforeAll(async () => {
+    // 预热 Dexie + fake-indexeddb，避免首次数据库操作超时
+    await getDb().open();
+    // 预加载模块，避免首次动态导入超时
+    await import('@/lib/ai-config/web-provider-stream');
+  }, 30000);
+
   beforeEach(async () => {
     try {
       await getDb().webProviderConversations.clear();
     } catch {
       /* table may not exist */
     }
-  });
+  }, 10000);
 
   it('passes empty chatId when no conversation state is stored', async () => {
     const { buildContentFetchRequest } = await import('@/lib/ai-config/web-provider-stream');
@@ -58,7 +65,7 @@ describe('9.2 multi-turn: buildContentFetchRequest + listener integration', () =
     const body = JSON.parse(req.init.body as string);
     expect(body.prompt).toBe('hello');
     expect(body.chatId).toBe('');
-  });
+  }, 10000);
 
   it('injects stored conversationId as chatId in body', async () => {
     await setConversation({

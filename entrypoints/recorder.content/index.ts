@@ -67,7 +67,7 @@ export default defineContentScript({
   runAt: 'document_idle',
   world: 'ISOLATED',
 
-  main(ctx) {
+  main(ctx: InstanceType<typeof ContentScriptContext>) {
     // Idempotency: if a previous instance is still armed (e.g. the user
     // toggled recording off+on quickly, or the background re-injected),
     // stop it before we install ourselves.
@@ -150,6 +150,15 @@ export default defineContentScript({
       : never;
     function emit(partial: EmitArg): void {
       if (!initState) return;
+      // SPA 导航检测：URL 变化时重置 scroll 基准，防止导航后的首次 scroll
+      // 产生异常大的 delta（如从旧页面滚动位置计算到新页面顶部）。
+      if (location.href !== lastUrl) {
+        lastUrl = location.href;
+        lastScrollX = window.scrollX;
+        lastScrollY = window.scrollY;
+        scrollAccumDx = 0;
+        scrollAccumDy = 0;
+      }
       send({
         ...partial,
         tabId: initState.tabId,
@@ -228,6 +237,7 @@ export default defineContentScript({
     let lastScrollX = window.scrollX;
     let lastScrollY = window.scrollY;
     let scrollFlushTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastUrl = location.href;
 
     function installInteractionListeners(): void {
       // All listeners are window-level capture-phase so we see events the
@@ -252,6 +262,19 @@ export default defineContentScript({
 
       window.addEventListener('scroll', onScroll, opts);
       onCleanup(() => window.removeEventListener('scroll', onScroll, opts));
+
+      // SPA 导航检测：popstate / hashchange 时重置 scroll 基准
+      function onNavigation(): void {
+        lastUrl = location.href;
+        lastScrollX = window.scrollX;
+        lastScrollY = window.scrollY;
+        scrollAccumDx = 0;
+        scrollAccumDy = 0;
+      }
+      window.addEventListener('popstate', onNavigation, opts);
+      onCleanup(() => window.removeEventListener('popstate', onNavigation, opts));
+      window.addEventListener('hashchange', onNavigation, opts);
+      onCleanup(() => window.removeEventListener('hashchange', onNavigation, opts));
 
       // Drain any in-flight per-input debounces on stop so the last typed
       // value is recorded.

@@ -39,8 +39,8 @@ function ensureDefaults(): Promise<void> {
       for (const dir of DEFAULT_DIRS) {
         try {
           await pfs().mkdir(dir);
-        } catch (e: any) {
-          if (e.code !== 'EEXIST') throw e;
+        } catch (e: unknown) {
+          if ((e as { code?: string })?.code !== 'EEXIST') throw e;
         }
       }
     })();
@@ -204,8 +204,8 @@ async function mkdir(dirPath: string, opts?: MkdirOptions | number): Promise<voi
     current += '/' + part;
     try {
       await pfs().mkdir(current, mkdirOpts);
-    } catch (e: any) {
-      if (e.code !== 'EEXIST') throw e;
+    } catch (e: unknown) {
+      if ((e as { code?: string })?.code !== 'EEXIST') throw e;
     }
   }
 }
@@ -233,8 +233,8 @@ async function rmImpl(targetPath: string, opts?: RmOptions): Promise<void> {
   let info;
   try {
     info = await pfs().stat(targetPath);
-  } catch (e: any) {
-    if (force && e.code === 'ENOENT') return;
+  } catch (e: unknown) {
+    if (force && (e as { code?: string })?.code === 'ENOENT') return;
     throw e;
   }
 
@@ -320,8 +320,8 @@ async function appendFile(
   let existing = '';
   try {
     existing = (await pfs().readFile(filePath, 'utf8')) as string;
-  } catch (e: any) {
-    if (e.code !== 'ENOENT') throw e;
+  } catch (e: unknown) {
+    if ((e as { code?: string })?.code !== 'ENOENT') throw e;
   }
   await writeFile(filePath, existing + data, opts);
 }

@@ -3,6 +3,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import type { TextContent, ImageContent } from '@earendil-works/pi-ai';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage, type SessionMeta } from '@/lib/protocol';
 import type { SessionRecord } from '@/lib/db';
 import type { Attachment } from '@/lib/attachments';
@@ -30,7 +31,7 @@ export interface AgentPortState {
 
 export interface PendingToolInfo {
   toolCallId: string;
-  args: any;
+  args: unknown;
 }
 
 export type PromptDispatchResult =
@@ -84,6 +85,19 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
 
     const handleMessage = (msg: ServerMessage) => {
       if (unmounted) return;
+      try {
+        handleMessageInner(msg);
+      } catch (err) {
+        console.error('[AgentPort] Unhandled error in message handler:', err);
+        // Don't let a single bad message crash the entire sidepanel.
+        // Report it as a non-fatal error so the user can continue.
+        if (err instanceof Error) {
+          setState(prev => ({ ...prev, lastError: err.message }));
+        }
+      }
+    };
+
+    function handleMessageInner(msg: ServerMessage) {
       const isCurrentSession = (sessionId: string | null | undefined) =>
         sessionId != null && sessionId === sessionIdRef.current;
       switch (msg.type) {
@@ -402,7 +416,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
 
     // Optimistically add user message to local state for immediate UI feedback
     setState(prev => {
-      const content: any[] = [{ type: 'text' as const, text: text.trim() }];
+      const content: Array<TextContent | ImageContent> = [{ type: 'text' as const, text: text.trim() }];
       // Include image attachments in optimistic message for preview
       if (attachments) {
         for (const att of attachments) {
@@ -414,7 +428,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
       const userMsg = { role: 'user' as const, content, timestamp: Date.now() };
       return {
         ...prev,
-        messages: [...prev.messages, userMsg as any],
+        messages: [...prev.messages, userMsg],
         isAgentRunning: true,
         lastError: null,
       };
@@ -526,11 +540,15 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     postMessage({ type: 'session_list' });
   }, [postMessage]);
 
+  const deleteMessage = useCallback((sessionId: string, messageIndex: number) => {
+    postMessage({ type: 'delete_message', sessionId, messageIndex });
+  }, [postMessage]);
+
   const deleteSession = useCallback((sessionId: string) => {
     postMessage({ type: 'session_delete', sessionId });
   }, [postMessage]);
 
-  const resolveTool = useCallback((toolName: string, response: any) => {
+  const resolveTool = useCallback((toolName: string, response: unknown) => {
     const sessionId = sessionIdRef.current;
     if (sessionId) {
       postMessage({ type: 'resolve_tool', sessionId, toolName, response });
@@ -564,6 +582,7 @@ export function useBackgroundAgent(callbacks: AgentPortCallbacks) {
     unsubscribe,
     listSessions,
     deleteSession,
+    deleteMessage,
     resolveTool,
     cancelTool,
   };

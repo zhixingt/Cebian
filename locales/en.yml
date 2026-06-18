@@ -1,4 +1,4 @@
-﻿# Cebian extension i18n — English (default).
+# Cebian extension i18n — English (default).
 # Edit this file along with locales/zh_CN.yml and locales/zh_TW.yml.
 # See .agents/skills/i18n-naming/SKILL.md.
 
@@ -6,9 +6,11 @@
 extName: "CebianX · Academic Assistant"
 extDescription: "Side panel AI agent. BYO key (OpenAI/Anthropic/Google), no account. Element picker, MCP tools, skills. AGPL-3.0, local-first."
 actionTitle: "Open CebianX sidebar"
+toggleSidebarCollapse: "Toggle sidebar collapse"
 
 # ─── Common (reused across the UI) ───
 common:
+  all: "All"
   newChat: "New chat"
   send: "Send"
   history: "History"
@@ -34,7 +36,12 @@ common:
   newFolder: "New folder"
   search: "Search"
   searchPlaceholder: "Search…"
+  noMatch: "No matches"
   moreActions: "More actions"
+  sidebarCollapse: "Collapse sidebar"
+  expandSidebar: "Expand sidebar"
+  currentSession: "Current session"
+  collapseSidebar: "Collapse sidebar"
   empty:
     history: "No history yet"
     folder: "Empty folder"
@@ -72,6 +79,7 @@ settings:
     instructions: "Instructions"
     prompts: "Prompts"
     skills: "Skills"
+    workflows: "Workflows"
     mcp: "MCP Servers"
     advanced: "Advanced"
     about: "About"
@@ -79,7 +87,9 @@ settings:
     title: "AI providers"
   about:
     title: "About"
-    tagline: "AI browser sidebar assistant"
+    tagline: "Browser AI Agent Workbench"
+    projectDesc: "Project Description"
+    followAuthor: "Follow author: WeChat (一只猫头猫)"
     feedback: "Feedback"
     checkUpdate: "Check for updates"
     checking: "Checking…"
@@ -93,6 +103,9 @@ settings:
     maxRounds:
       label: "Max conversation rounds"
       hint: "Older messages are truncated when exceeded"
+    collapseHide:
+      label: "Fully hide when collapsed"
+      hint: "Completely hide the panel in collapsed mode instead of showing the icon bar"
   instructions:
     title: "Instructions"
     label: "Custom instructions"
@@ -156,6 +169,101 @@ settings:
       confirmOverwriteTitle: "Overwrite existing skill?"
       # $1 = skill name(s), comma-separated
       confirmOverwriteDescription: "\"$1\" will be replaced and its saved permissions will be cleared. Continue?"
+  workflows:
+    title: "Workflows"
+    hint: "Record, edit and run browser automation workflows."
+    tabMy: "My Workflows"
+    tabDiscover: "Discover"
+    new: "New workflow"
+    searchPlaceholder: "Search workflows…"
+    empty:
+      title: "No workflows yet"
+      hint: "Record a session or create a workflow to get started."
+    # $1 = step count
+    stepCount:
+      1: "1 step"
+      n: "$1 steps"
+    # $1 = run count
+    runCount:
+      1: "Ran 1 time"
+      n: "Ran $1 times"
+    run: "Run"
+    # $1 = workflow name
+    running: "Running \"$1\"…"
+    # $1 = workflow name
+    runSuccess: "\"$1\" completed successfully"
+    # $1 = workflow name, $2 = error message
+    runFailed: "\"$1\" failed: $2"
+    # $1 = workflow name
+    runVariables: "Run \"$1\" — Enter Variables"
+    # $1 = workflow name
+    deleteConfirm: "Delete workflow \"$1\"? This cannot be undone."
+    # $1 = workflow name
+    deleteSuccess: "Deleted \"$1\""
+    deleteFailed: "Delete failed"
+    loadFailed: "Failed to load workflows"
+    import: "Import"
+    export: "Export"
+    exportCeb: "Export .ceb"
+    # $1 = workflow name
+    importSuccess: "Imported \"$1\""
+    importFailed: "Import failed"
+    saveFailed: "Save failed"
+    status:
+      success: "Success"
+      failure: "Failed"
+      cancelled: "Cancelled"
+      neverRun: "Never run"
+    discover:
+      title: "Discover Workflows"
+      hint: "Browse preset workflows and add them to My Workflows with one click."
+      example: "Example"
+      template: "Template"
+      add: "Add"
+      added: "Added"
+      # $1 = workflow name
+      addSuccess: "Added \"$1\""
+    editor:
+      title: "Edit Workflow"
+      nameLabel: "Name"
+      namePlaceholder: "Workflow name"
+      descLabel: "Description"
+      descPlaceholder: "What does this workflow do?"
+      stepsLabel: "Steps"
+      addStep: "Add step"
+      emptySteps: "No steps yet. Add a step to get started."
+      # $1 = workflow name
+      saveSuccess: "Saved \"$1\""
+      saveFailed: "Save failed"
+      aiGenerate: "AI Generate"
+      aiGenerateBtn: "Generate"
+      aiHint: "Describe the task you want the browser to automate, and AI will break it down into steps."
+      aiPlaceholder: "e.g. Search for weather forecast, click the first result, extract the page title"
+      aiGenerating: "AI is generating workflow…"
+      aiNoModel: "No AI model available. Please select a model in the chat interface first."
+      aiFailed: "Generation failed. Please retry or add steps manually."
+      # $1 = step count
+      aiSuccess: "Generated $1 steps"
+      triggerLabel: "Trigger"
+      triggerManual: "Manual"
+      triggerUrl: "URL Match"
+      triggerUrlPlaceholder: "RegExp, e.g. example\\.com/dashboard"
+      triggerCron: "Scheduled"
+      triggerCronPlaceholder: "Cron expression, e.g. 0 9 * * *"
+      triggerDom: "DOM Trigger"
+      triggerDomPlaceholder: "CSS selector, e.g. button.buy-now"
+    history:
+      # $1 = workflow name
+      title: "Run history: $1"
+      empty: "No run records yet"
+      steps: "steps"
+      clearAll: "Clear records"
+      # $1 = workflow name
+      clearConfirm: "Clear all run records for \"$1\"? This cannot be undone."
+      variables: "Variables"
+      copyVariables: "Copy variables"
+      downloadVariables: "Download variables"
+      copied: "Copied"
   mcp:
     title: "MCP Servers"
     description: "Connect Model Context Protocol servers to expose their tools to the agent."
@@ -202,8 +310,22 @@ settings:
       headers: "Custom headers"
       headerKeyPlaceholder: "Header name (e.g. X-MCP-Toolsets)"
       headerValuePlaceholder: "Header value"
-      addHeader: "Add header"
-      removeHeader: "Remove header"
+      addHeader: "Add Header"
+      removeHeader: "Remove Header"
+    addHermes: "Add Hermes Preset"
+    hermesAdded: "Hermes preset added"
+  apiDiscovery:
+    title: "API Discovery"
+    description: "Automatically learn website internal APIs to accelerate Agent operations. Zero-trust credential design."
+    enable: "Enable API Discovery"
+    enableHint: "When enabled, capture traffic on the current tab to discover and generate API Skills"
+    capture: "Traffic Capture"
+    startCapture: "Start Capture"
+    stopAndAnalyze: "Stop & Analyze"
+    captureStarted: "Capture started"
+    skills: "API Skills"
+    refresh: "Refresh"
+    noSkills: "No auto-discovered API Skills yet. Start capturing traffic to discover APIs."
   editor:
     selectFile: "Select a file to start editing"
     saving: "Saving…"
@@ -216,6 +338,7 @@ settings:
 
 # ─── Chat surface ───
 chat:
+  dismiss: "Dismiss"
   composer:
     placeholder: "Type '/' for commands…"
     pickElement: "Pick element"
@@ -247,10 +370,13 @@ chat:
     noPrompts: "No prompts yet — create one from AI config"
     noMatch: "No matches"
     iframeEnterHint: "⏎ enter"
+  upload:
+    docConvertHint: "Please convert to .docx before uploading"
   attachments:
     image: "Image"
     screenshot: "Screenshot"
     imageAlt: "Attachment image"
+    delete: "Delete attachment"
     # $1 = event count, $2 = formatted duration (M:SS)
     recordingMeta: "$1 events · $2"
     recordingTruncated: "truncated"
@@ -263,6 +389,28 @@ chat:
     startRejectedBusy: "Another sidepanel is already recording. Stop it first to start a new recording."
     autoStoppedEvents: "Recording auto-stopped: event limit reached"
     autoStoppedTime: "Recording auto-stopped: time limit reached"
+    editAndReplay: "Edit and replay recording"
+    none: "No recording to replay"
+    defaultDesc: "Recorded workflow"
+    replayPrompt: "Please replay the following recorded steps using interact tool's sequence action:\n```json\n$1\n```"
+    replayPromptPrefix: "Please execute the following steps using interact tool's sequence action:"
+  emptyState:
+    slogan: "As Thought Reaches, So Action Arrives."
+    viewCommands: "View commands"
+    startChat: "Type a message to start"
+    historyInput: "History"
+  quickTool:
+    prompts:
+      readPage: "Please read the current page and summarize the key points"
+      screenshotAnalyze: "Please analyze the content of this screenshot"
+      screenshotFallback: "Please take a screenshot of the current page and analyze its content"
+      operatePage: "Please help me operate the current page, and I will tell you what to do"
+      fillForm: "Please help me fill out the form on the current page"
+  fileTree:
+    unfavorite: "Remove favorite"
+    favorite: "Add favorite"
+    unfavoriteShortcut: "Remove shortcut"
+    favoriteShortcut: "Add as shortcut"
   askUser:
     placeholder: "Type a reply…"
   model:
@@ -304,6 +452,63 @@ chat:
   quickActions:
     broken: "Original file is missing"
     brokenClick: "Original file is missing. Please handle it in Settings."
+    toolReadPage: "Read Page"
+    scrollLeft: "Scroll left"
+    label: "Quick actions"
+    scrollRight: "Scroll right"
+    toolScreenshotAnalyze: "Screenshot & Analyze"
+    toolOperatePage: "Operate Page"
+    toolFillForm: "Fill Form"
+    toolWatchPage: "Watch Page"
+    toolWatchPageStop: "Stop Watching"
+    watchStarted: "Started watching page changes"
+    watchAlreadyActive: "Page watcher is already active"
+    watchStopped: "Stopped watching page"
+    watchFailed: "Failed to start page watcher"
+    # $1 = number of changed nodes
+    pageChanged: "Page change detected ($1 nodes)"
+  recordingEditor:
+    title: "Recording Editor"
+    stepsCount: "steps"
+    saveAsCommand: "Save as Command"
+    saveAsWorkflow: "Save as Workflow"
+    saveNamePlaceholder: "Command name"
+    workflowNamePlaceholder: "Workflow name"
+    saveDescPlaceholder: "Description (optional)"
+    save: "Save"
+    # $1 = command name
+    saved: "Saved as command \"$1\""
+    # $1 = workflow name
+    savedAsWorkflow: "Saved workflow \"$1\""
+    saveFailed: "Save failed"
+    insertAfter: "Insert step below"
+    moveUp: "Move up"
+    moveDown: "Move down"
+    delete: "Delete"
+    addStep: "Add step"
+    replay: "Replay"
+    noSteps: "No steps to replay"
+    aiOptimize: "AI Optimize"
+    optimizeTitle: "AI Optimization Suggestions"
+    noSuggestions: "No optimizations found. Your recording looks great!"
+    apply: "Apply"
+    applied: "Applied"
+    optimizationApplied: "Optimization applied"
+    actionLabels:
+      click: "Click"
+      dblclick: "Double-click"
+      rightclick: "Right-click"
+      hover: "Hover"
+      focus: "Focus"
+      type: "Type"
+      clear: "Clear"
+      select: "Select"
+      scroll: "Scroll"
+      keypress: "Keypress"
+      drag: "Drag"
+      wait: "Wait for visible"
+      wait_hidden: "Wait for hidden"
+      wait_navigation: "Wait for navigation"
   message:
     # $1 = input tokens (formatted, e.g. "1.2k"), $2 = output tokens (formatted)
     tokensInOut: "↑$1 ↓$2"
@@ -313,6 +518,8 @@ chat:
     tokensInBreakdownHitWrite: "uncached $1 · cached $2 · write $3"
     # Tooltip/aria-label for the retry button on the latest assistant turn.
     retry: "Retry"
+  collapse: "Collapse"
+  expand: "Expand"
   session:
     loading: "Loading session…"
     modelError: "Model returned an error"
@@ -330,7 +537,22 @@ chat:
     welcomeReady: "What can I help you with?"
     scrollToBottom: "Jump to latest"
 
-# ─── Provider sub-components (OAuth / API Key / custom) ───
+background:
+  contextMenu:
+    readPage: "Read this page with Cebian"
+    summarize: "Summarize this page with Cebian"
+    operateSelection: "Operate selected content with Cebian"
+    openLink: "Open this link with Cebian"
+    screenshot: "Screenshot this page with Cebian"
+  contextMenuPrompts:
+    readPage: "Please read the current page and tell me what it is about."
+    summarize: "Please summarize the main content of the current page and extract key information."
+    operateSelection: "Please operate on the currently selected content: \"$1\""
+    openLink: "Please click or open this link in the current page: $1"
+    screenshot: "Please take a screenshot of the current page."
+    default: "Please help me with the current page."
+
+# ─── Provider sub-components (OAuth / API Key / Custom) ───
 provider:
   section:
     viaApiKey: "Via API Key"
@@ -532,6 +754,12 @@ errors:
     # $1 = skill name
     reservedName: "Skill name is reserved: $1"
     parseFrontmatter: "Failed to parse SKILL.md frontmatter."
+  boundary:
+    title: "UI Error"
+    unknownError: "Unknown error"
+    retry: "Retry"
+    reload: "Reload"
+    retryLimit: "Retry limit reached, please reload"
 
 # ───── Web (Browser Session) providers ─────
 webProviders:
@@ -577,3 +805,5 @@ webProviders:
     # ⭐ ②: new error messages
     loginFailed: "Login failed. Please try again."
     loginTimedOut: "Login timed out after 5 minutes. Please try again."
+  retryLimit: "Retry limit reached, please reload"
+

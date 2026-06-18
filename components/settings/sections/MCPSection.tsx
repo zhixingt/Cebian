@@ -2,6 +2,9 @@ import { useStorageItem } from '@/hooks/useStorageItem';
 import { mcpServers } from '@/lib/storage';
 import { MCPServerCard } from '@/components/settings/mcp/MCPServerCard';
 import { MCPServerAddForm } from '@/components/settings/mcp/MCPServerForm';
+import { Button } from '@/components/ui/button';
+import { addMCPServer } from '@/lib/mcp/store';
+import { toast } from 'sonner';
 import { t } from '@/lib/i18n';
 
 /**
@@ -34,7 +37,28 @@ export function MCPSection() {
         </div>
       )}
 
-      <MCPServerAddForm />
+      <div className="space-y-2">
+        <MCPServerAddForm />
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={async () => {
+            try {
+              await addMCPServer({
+                name: 'Hermes',
+                transport: { type: 'streamable-http', url: 'http://127.0.0.1:3000/mcp' },
+                auth: { type: 'none' },
+              });
+              toast.success(t('settings.mcp.hermesAdded'));
+            } catch (err) {
+              toast.error(err instanceof Error ? err.message : String(err));
+            }
+          }}
+        >
+          {t('settings.mcp.addHermes')}
+        </Button>
+      </div>
     </div>
   );
 }

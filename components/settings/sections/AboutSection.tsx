@@ -10,6 +10,7 @@
  */
 import { t } from '@/lib/i18n';
 import { Button } from '@/components/ui/button';
+import { ExternalLink, Globe, FileText, MessageCircle } from 'lucide-react';
 
 export function AboutSection() {
   // Read the manifest version directly so we don't have to call
@@ -20,40 +21,44 @@ export function AboutSection() {
       : '';
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-6">
+    <div className="flex-1 overflow-y-auto p-6 space-y-5">
       <h2 className="text-base font-semibold">{t('settings.about.title')}</h2>
 
-      <div className="space-y-1">
-        <p className="text-sm font-medium">CebianX v{currentVersion}</p>
+      {/* Version + tagline */}
+      <div className="rounded-lg border border-border bg-card/50 p-4 space-y-1">
+        <p className="text-sm font-semibold">CebianX v{currentVersion}</p>
         <p className="text-xs text-muted-foreground">{t('settings.about.tagline')}</p>
-        <div className="flex gap-2 pt-2 text-xs text-muted-foreground">
-          <a
-            href="https://github.com/maotoumao/Cebian"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="underline underline-offset-2 hover:text-foreground transition-colors"
-          >
-            GitHub
-          </a>
-          <span>·</span>
-          <a
-            href="https://github.com/maotoumao/Cebian/blob/HEAD/LICENSE"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="underline underline-offset-2 hover:text-foreground transition-colors"
-          >
-            AGPL-3.0
-          </a>
-          <span>·</span>
-          <a
-            href="https://github.com/maotoumao/Cebian/issues"
-            target="_blank"
-            rel="noreferrer noopener"
-            className="underline underline-offset-2 hover:text-foreground transition-colors"
-          >
-            {t('settings.about.feedback')}
-          </a>
-        </div>
+      </div>
+
+      {/* Quick links */}
+      <div className="flex flex-wrap gap-2">
+        <a
+          href="https://github.com/maotoumao/Cebian"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card/50 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        >
+          <Globe size={13} />
+          GitHub
+        </a>
+        <a
+          href="https://github.com/maotoumao/Cebian/issues"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card/50 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        >
+          <MessageCircle size={13} />
+          {t('settings.about.feedback')}
+        </a>
+        <a
+          href="https://github.com/maotoumao/Cebian/blob/HEAD/LICENSE"
+          target="_blank"
+          rel="noreferrer noopener"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card/50 px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        >
+          <FileText size={13} />
+          AGPL-3.0
+        </a>
       </div>
 
       <UpdateCheckSection />
@@ -63,34 +68,18 @@ export function AboutSection() {
   );
 }
 
-/**
- * Renders a section header (title + horizontal divider) followed by
- * a card-styled body. Used by the "项目说明" section so it has the same
- * visual shape as the "检查更新" section.
- */
-function SectionHeader({ title }: { title: string }) {
-  return (
-    <div className="flex items-center gap-3">
-      <p className="text-sm font-medium">{title}</p>
-      <div className="h-px flex-1 bg-gradient-to-r from-border to-transparent" />
-    </div>
-  );
-}
-
 function UpdateCheckSection() {
-  // Disabled by design — the action is not exposed. The button is kept as
+  // Disabled by design — the action is not exposed. The section is kept as
   // a visual affordance so users can see the feature exists.
   return (
-    <div className="space-y-3">
-      <SectionHeader title={t('settings.about.checkUpdate')} />
-      <div className="flex items-center gap-3 rounded-md border border-border bg-card/50 px-4 py-3">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled
-          aria-disabled="true"
-          title={t('settings.about.checkUpdate')}
-        >
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-3">
+        <p className="text-sm font-medium">{t('settings.about.checkUpdate')}</p>
+        <div className="h-px flex-1 bg-gradient-to-r from-border to-transparent" />
+      </div>
+      <div className="flex items-center justify-between rounded-lg border border-dashed border-border/60 bg-muted/30 px-4 py-3">
+        <span className="text-xs text-muted-foreground">{t('settings.about.upToDate')}</span>
+        <Button variant="ghost" size="sm" disabled className="h-7 text-xs opacity-50 cursor-not-allowed">
           {t('settings.about.checkUpdate')}
         </Button>
       </div>
@@ -100,30 +89,33 @@ function UpdateCheckSection() {
 
 function ProjectSourceSection() {
   return (
-    <div className="space-y-3">
-      <SectionHeader title="项目说明" />
-      <div className="rounded-md border border-border bg-card/50 px-4 py-3 text-xs text-muted-foreground space-y-2.5">
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-3">
+        <p className="text-sm font-medium">{t('settings.about.projectDesc')}</p>
+        <div className="h-px flex-1 bg-gradient-to-r from-border to-transparent" />
+      </div>
+      <div className="rounded-lg border border-border bg-card/50 px-4 py-3 text-xs text-muted-foreground space-y-2">
         <p>
           Forked from:{' '}
           <a
             href="https://github.com/maotoumao/Cebian"
             target="_blank"
             rel="noreferrer noopener"
-            className="underline underline-offset-2 hover:text-foreground"
+            className="inline-flex items-center gap-0.5 underline underline-offset-2 hover:text-foreground transition-colors"
           >
-            maotoumao/Cebian
+            maotoumao/Cebian <ExternalLink size={10} className="opacity-60" />
           </a>
         </p>
-        <p>关注作者：微信公众号（一只猫头猫）</p>
+        <p>{t('settings.about.followAuthor')}</p>
         <p>
           Maintainer: 肖泽林 (
           <a
             href="https://github.com/zhixingt"
             target="_blank"
             rel="noreferrer noopener"
-            className="underline underline-offset-2 hover:text-foreground"
+            className="inline-flex items-center gap-0.5 underline underline-offset-2 hover:text-foreground transition-colors"
           >
-            @zhixingt
+            @zhixingt <ExternalLink size={10} className="opacity-60" />
           </a>
           )
         </p>
@@ -132,4 +124,3 @@ function ProjectSourceSection() {
     </div>
   );
 }
-

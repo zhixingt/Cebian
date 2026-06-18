@@ -81,6 +81,7 @@ vi.mock('@/components/chat/ToolCardWithUI', () => ({
 }));
 
 import { ChatPage } from '@/entrypoints/sidepanel/pages/chat';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 beforeEach(() => {
   capturedCallbacks.current = null;
@@ -90,11 +91,13 @@ describe('ChatPage forwards onOpenSettings to useBackgroundAgent', () => {
   it('passes the onOpenSettings prop into useBackgroundAgent (so 401 relogin navigates to /settings)', () => {
     const onOpenSettings = vi.fn();
     render(
-      <MemoryRouter initialEntries={['/chat/new']}>
-        <Routes>
-          <Route path="/chat/new" element={<ChatPage onOpenSettings={onOpenSettings} />} />
-        </Routes>
-      </MemoryRouter>,
+      <TooltipProvider>
+        <MemoryRouter initialEntries={['/chat/new']}>
+          <Routes>
+            <Route path="/chat/new" element={<ChatPage onOpenSettings={onOpenSettings} />} />
+          </Routes>
+        </MemoryRouter>
+      </TooltipProvider>,
     );
     expect(capturedCallbacks.current).not.toBeNull();
     expect(capturedCallbacks.current.onOpenSettings).toBe(onOpenSettings);
@@ -103,11 +106,13 @@ describe('ChatPage forwards onOpenSettings to useBackgroundAgent', () => {
   it('tolerates missing onOpenSettings prop (no throw, callback is undefined)', () => {
     expect(() => {
       render(
-        <MemoryRouter initialEntries={['/chat/new']}>
-          <Routes>
-            <Route path="/chat/new" element={<ChatPage />} />
-          </Routes>
-        </MemoryRouter>,
+        <TooltipProvider>
+          <MemoryRouter initialEntries={['/chat/new']}>
+            <Routes>
+              <Route path="/chat/new" element={<ChatPage />} />
+            </Routes>
+          </MemoryRouter>
+        </TooltipProvider>,
       );
     }).not.toThrow();
     expect(capturedCallbacks.current.onOpenSettings).toBeUndefined();

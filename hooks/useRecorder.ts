@@ -99,25 +99,30 @@ export function useRecorder(): UseRecorderResult {
     const p = new Promise<void>((resolve) => {
       let done = false;
 
-      // We use the session listener purely as a 'BG finished and delivered'
-      // signal. The session itself is consumed elsewhere (ChatInput's own
-      // subscribeSession effect appends it to attachments). The BG fires
-      // its onRecordingFinished hook synchronously inside `recorder.stop()`,
-      // and that delivery rides the same port as our stop ack, so it always
-      // arrives before any subsequent message.
-      const unsubscribe = recorderChannel.subscribeSession(() => {
+      function finish(): void {
         if (done) return;
         done = true;
-        unsubscribe();
+        unsubSession();
+        unsubStatus();
         resolve();
+      }
+
+      // 双保险：session 到达 或 status 变为 idle 都 resolve
+      // session 路径：正常 stop() 时 background 发送 recorder_session
+      // status 路径：cap-trigger 自动停止后 background 发送 idle status
+      const unsubSession = recorderChannel.subscribeSession(() => {
+        finish();
+      });
+      const unsubStatus = recorderChannel.subscribeStatus((s) => {
+        if (!s.isRecording) {
+          finish();
+        }
       });
 
       const posted = recorderChannel.stop();
       if (!posted) {
         // Port vanished between the isConnected check and now.
-        done = true;
-        unsubscribe();
-        resolve();
+        finish();
       }
     }).finally(() => {
       // Identity check: only clear if no later stop() has overwritten us.

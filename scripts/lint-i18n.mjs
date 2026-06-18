@@ -23,10 +23,25 @@ const EXTENSIONS = new Set(['.ts', '.tsx']);
 
 // Files exempt from scanning (i18n source, design files, generated, etc.)
 const EXEMPT_FILE_REGEXES = [
-  /[\\/]locales[\\/]/,
-  /[\\/]\.output[\\/]/,
-  /[\\/]node_modules[\\/]/,
-  /[\\/]design[\\/]/,
+  /[\/]locales[\/]/,
+  /[\/]\.output[\/]/,
+  /[\/]node_modules[\/]/,
+  /[\/]design[\/]/,
+  // AI system prompts and optimizer outputs are consumed by LLM, not end-users.
+  /ai-planner\.ts$/,
+  /ai-optimizer\.ts$/,
+  // Preset workflow data (names/descriptions) are data, not UI strings.
+  /presets\.ts$/,
+  // About section contains project metadata (author names, brand info) that are not localizable.
+  /AboutSection\.tsx$/,
+  // Memory system internals: Chinese stop-words, prompt fragments, and session
+  // summary labels are consumed by the LLM, not rendered in the UI.
+  /[\\/]memory[\\/]retrieval\.ts$/,
+  /[\\/]memory[\\/]prompt-builder\.ts$/,
+  /[\\/]memory[\\/]session-history\.ts$/,
+  // Tool schema descriptions are consumed by the LLM for tool selection.
+  /[\\/]tools[\\/]smart-interact\.ts$/,
+  /[\\/]tools[\\/]smart-read-page\.ts$/,
   // i18n wrapper itself contains comments, but no zh strings.
 ];
 
@@ -36,10 +51,10 @@ const CJK_RE = /[\u4e00-\u9fa5]/;
 // indicates a namespace violation per the i18n-naming skill.
 const ALLOWED_TOP_KEYS = new Set([
   // Manifest exception (Chrome __MSG_*__ does not allow dots in key).
-  'extName', 'extDescription', 'actionTitle',
+  'extName', 'extDescription', 'actionTitle', 'toggleSidebarCollapse',
   // Namespaces.
   'common', 'chat', 'settings', 'provider', 'tools', 'vfs', 'dialogs', 'errors', 'agent',
-  'webProviders',
+  'webProviders', 'background',
 ]);
 
 async function* walk(dir) {
@@ -60,16 +75,61 @@ async function* walk(dir) {
   }
 }
 
+function stripInlineComments(line) {
+  // Remove // comments
+  let s = line.split('//')[0];
+  // Remove /* ... */ comments (simple, non-nested)
+  s = s.replace(/\/\*.*?\*\//g, '');
+  return s;
+}
+
 async function scanFile(absPath) {
   const text = await fs.readFile(absPath, 'utf8');
   const hits = [];
   const lines = text.split(/\r?\n/);
+  let inBlockComment = false;
+  let blockIsJsx = false;
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Skip pure comment lines.
     const trimmed = line.trim();
-    if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) continue;
-    if (CJK_RE.test(line)) {
+
+    // Handle block comment boundaries
+    if (!inBlockComment) {
+      if (trimmed.startsWith('{/*')) {
+        inBlockComment = true;
+        blockIsJsx = true;
+        if (trimmed.endsWith('*/}')) {
+          inBlockComment = false;
+        }
+        continue;
+      }
+      if (trimmed.startsWith('/*')) {
+        inBlockComment = true;
+        blockIsJsx = false;
+        if (trimmed.endsWith('*/')) {
+          inBlockComment = false;
+        }
+        continue;
+      }
+    } else {
+      if (blockIsJsx && trimmed.endsWith('*/}')) {
+        inBlockComment = false;
+        continue;
+      }
+      if (!blockIsJsx && trimmed.endsWith('*/')) {
+        inBlockComment = false;
+        continue;
+      }
+      // Still inside block comment
+      continue;
+    }
+
+    // Skip pure line comments
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+
+    const codeOnly = stripInlineComments(line);
+    if (CJK_RE.test(codeOnly)) {
       hits.push({ lineNo: i + 1, line: line.trim() });
     }
   }

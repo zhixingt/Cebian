@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { copyText } from '@/lib/clipboard';
 import { t } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 
 /**
  * Icon-only copy button with a brief check-mark confirmation swap.

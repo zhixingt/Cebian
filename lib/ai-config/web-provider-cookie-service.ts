@@ -44,17 +44,18 @@ interface LoginResponse {
  * message channel open (we use async sendResponse).
  */
 export function registerCookieService(): void {
-  chrome.runtime.onMessage.addListener((msg: any, _sender: any, sendResponse: any) => {
-    if (msg?.type === 'WEB_PROVIDER_LOGIN') {
-      handleLogin(msg.presetId)
+  chrome.runtime.onMessage.addListener((msg: unknown, _sender: chrome.runtime.MessageSender, sendResponse: (response?: unknown) => void) => {
+    const m = msg as { type?: string; presetId?: string };
+    if (m?.type === 'WEB_PROVIDER_LOGIN') {
+      handleLogin(m.presetId!)
         .then(sendResponse)
         .catch(err => {
           sendResponse({ success: false, error: String(err), status: 'loggedOut' as LoginStatus });
         });
       return true;
     }
-    if (msg?.type === 'WEB_PROVIDER_RECHECK') {
-      handleRecheck(msg.presetId)
+    if (m?.type === 'WEB_PROVIDER_RECHECK') {
+      handleRecheck(m.presetId!)
         .then(sendResponse)
         .catch(err => {
           sendResponse({ success: false, error: String(err), status: 'loggedOut' as LoginStatus });
@@ -93,7 +94,7 @@ async function handleLogin(presetId: string): Promise<LoginResponse> {
       isTabFocused = false;
     } else {
       chrome.tabs.get(tabId).then(t => {
-        chrome.windows.get(t.windowId, (w: any) => {
+        chrome.windows.get(t.windowId, (w: chrome.windows.Window) => {
           isTabFocused = w.focused;
         });
       }).catch(() => { /* tab gone */ });
