@@ -56,6 +56,25 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     }));
   };
 
+  // ⑭: Port-based abort channel. The SW opens a port named
+  // `abort-${requestId}` and posts `{type:'abort'}` when the user clicks
+  // Stop. The ISOLATED bridge forwards this as a `ceb-web-provider-message`
+  // CustomEvent with `{type:'WEB_LLM_ABORT'}`. We listen for it here and
+  // set `window.__webProviderAbortFlag = true` so the SSE reading loop
+  // below can break early instead of continuing to push chunks after the
+  // user cancelled. Without this, the SW-side stream is cancelled but
+  // the MAIN-world IIFE keeps running and eventually pushes
+  // WEB_LLM_DONE with full accumulated text — leaving residual text in
+  // the assistant message bubble.
+  (window as unknown as { __webProviderAbortFlag?: boolean }).__webProviderAbortFlag = false;
+  const abortListener = (event: Event) => {
+    const data = (event as CustomEvent<Record<string, unknown>>).detail;
+    if (data && data.type === 'WEB_LLM_ABORT') {
+      (window as unknown as { __webProviderAbortFlag?: boolean }).__webProviderAbortFlag = true;
+    }
+  };
+  document.addEventListener('ceb-web-provider-message', abortListener);
+
   // ⑬: Adapter-level wall-clock timeout. Race the body against a
   // timer so a hung stream can't pin the sidepanel. Inner async +
   // Promise.race + finally ensures the timer is cleared exactly once
@@ -438,8 +457,29 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     
       try {
         while (true) {
+          // ⑭: check the abort flag at the top of each polling iteration.
+          // The SW posts `{type:'abort'}` on the port when the user clicks
+          // Stop; the ISOLATED bridge forwards it as a CustomEvent with
+          // `{type:'WEB_LLM_ABORT'}`; our listener sets the flag. Break
+          // early so no residual text is pushed after cancel.
+          if ((window as unknown as { __webProviderAbortFlag?: boolean }).__webProviderAbortFlag) {
+            postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
+            return;
+          }
           const { done, value } = await reader.read();
           if (done) break;
+          // ⑭: re-check the abort flag after `reader.read()` returns.
+          // The read above can block for a long time (waiting for the
+          // next SSE event). If the user clicks Stop while we're blocked
+          // here, the flag is set but we wouldn't notice it until the
+          // NEXT iteration's top-of-loop check — by which time we'd have
+          // already processed the chunk that just arrived and pushed a
+          // residual WEB_LLM_CHUNK. Checking here ensures we drop any
+          // chunk that arrives after the abort signal.
+          if ((window as unknown as { __webProviderAbortFlag?: boolean }).__webProviderAbortFlag) {
+            postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
+            return;
+          }
           buffer += decoder.decode(value, { stream: true });
           let guard = 0;
           while (guard++ < 100) {
@@ -542,6 +582,8 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
     postToBridge({ type: 'WEB_LLM_DONE', requestId }, origin);
   } finally {
     if (timeoutHandle !== null) clearTimeout(timeoutHandle);
+    // ⑭: clean up the abort listener to avoid leaks on tab reuse.
+    document.removeEventListener('ceb-web-provider-message', abortListener);
   }
 };
 

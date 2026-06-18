@@ -130,8 +130,8 @@ function getDefaultDeps(): WebSessionStreamDeps {
     getAuthHeaders: (providerId) => getAuthHeadersForProvider(providerId),
     injectScripts: (tabId, request) => injectDomRelay(tabId, request),
     onMessage: (handler) => {
-      const listener = (msg: any) => {
-        if (msg && typeof msg === 'object' && typeof msg.type === 'string') {
+      const listener = (msg: unknown) => {
+        if (msg && typeof msg === 'object' && typeof (msg as { type?: unknown }).type === 'string') {
           handler(msg as WebProviderRelayMessage);
         }
       };
@@ -213,13 +213,19 @@ export function registerWebProviderStream(
 function runWebSessionStream(
   model: Model<typeof WEB_SESSION_API>,
   context: Context,
-  _options: SimpleStreamOptions | undefined,
+  options: SimpleStreamOptions | undefined,
   deps: WebSessionStreamDeps,
 ): AssistantMessageEventStream {
   const stream = createAssistantMessageEventStream();
 
+  // ⑭: Capture the AbortSignal from options. When the user clicks Stop,
+  // pi-ai aborts this signal. We pass it to orchestrateStream so it can
+  // post `{type:'abort'}` on the abort port, which the ISOLATED bridge
+  // forwards to the MAIN-world IIFE so it can break its polling loop.
+  const signal = options?.signal;
+
   // Fire-and-forget orchestration
-  void orchestrateStream(model, context, stream, deps).catch((err) => {
+  void orchestrateStream(model, context, stream, deps, signal).catch((err) => {
     // Defensive: any uncaught error from the orchestrator. This path
     // is reached only when the orchestrator's try/catch failed to push
     // an error event into the stream (e.g. thrown before try/catch
@@ -236,8 +242,20 @@ async function orchestrateStream(
   context: Context,
   stream: AssistantMessageEventStream,
   deps: WebSessionStreamDeps,
+  signal?: AbortSignal,
 ): Promise<void> {
   let unregisterMsg: (() => void) | null = null;
+  // ⑭: abort port — opened after we know the tabId, closed in finally.
+  let abortPort: chrome.runtime.Port | null = null;
+  const onAbort = (): void => {
+    if (abortPort) {
+      try {
+        abortPort.postMessage({ type: 'abort' });
+      } catch {
+        // Port may already be disconnected (tab closed, etc.) — harmless.
+      }
+    }
+  };
 
   // ⑫: DIAGNOSTIC — user flow vs E2E: E2E calls the adapter directly via
   // page.evaluate, bypassing this entire orchestration layer. If GLM/DeepSeek
@@ -282,6 +300,32 @@ async function orchestrateStream(
     } catch (e) {
       diagStep(`step 4 FAIL: openTab threw`, e);
       throw e;
+    }
+
+    // ⑭: Open the abort port BEFORE injecting scripts so the ISOLATED
+    // bridge's onConnect listener is ready when we post the abort. The
+    // port name uses a per-request UUID so concurrent sessions don't
+    // collide. When the AbortSignal fires (user clicked Stop), we post
+    // `{type:'abort'}` on this port; the ISOLATED bridge forwards it to
+    // the MAIN world via a CustomEvent, and the IIFE's polling loop
+    // breaks early.
+    const abortId = crypto.randomUUID();
+    try {
+      abortPort = chrome.tabs.connect(tabId, { name: `abort-${abortId}` });
+      diagStep(`step 4: abort port opened (name=abort-${abortId})`);
+    } catch (e) {
+      // Non-fatal: if the port can't be opened (tab closed, etc.), the
+      // abort just won't reach the MAIN world — same as the old behavior.
+      diagStep(`step 4: abort port open FAILED (non-fatal)`, e);
+      abortPort = null;
+    }
+    if (signal) {
+      if (signal.aborted) {
+        // Signal already aborted before we started — abort immediately.
+        onAbort();
+      } else {
+        signal.addEventListener('abort', onAbort, { once: true });
+      }
     }
 
     // ⑪: Resolve content-fetch handler for this provider. If available, take
@@ -469,6 +513,18 @@ async function orchestrateStream(
       unregisterMsg = null;
       setTimeout(fn, 100);
     }
+    // ⑭: Clean up the abort port and signal listener to prevent leaks.
+    if (signal) {
+      signal.removeEventListener('abort', onAbort);
+    }
+    if (abortPort) {
+      try {
+        abortPort.disconnect();
+      } catch {
+        // Port may already be disconnected — harmless.
+      }
+      abortPort = null;
+    }
   }
 }
 
@@ -494,8 +550,8 @@ function buildRelayRequest(
     } else {
       // Concatenate text parts; ignore image/file (MVP = text only)
       messageText = lastUserMsg.content
-        .filter((c: any) => c.type === 'text')
-        .map((c: any) => c.text)
+        .filter((c: { type: string; text?: string }) => c.type === 'text')
+        .map((c: { type: string; text?: string }) => c.text ?? '')
         .join('\n');
     }
   }
@@ -539,8 +595,8 @@ export async function buildContentFetchRequest(
       messageText = lastUserMsg.content;
     } else {
       messageText = lastUserMsg.content
-        .filter((c: any) => c.type === 'text')
-        .map((c: any) => c.text)
+        .filter((c: { type: string; text?: string }) => c.type === 'text')
+        .map((c: { type: string; text?: string }) => c.text ?? '')
         .join('\n');
     }
   }

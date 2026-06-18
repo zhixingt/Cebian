@@ -385,6 +385,7 @@ export function installIsolatedBridge(providerId: string, debug: boolean = false
     __cebWebProviderBridge?: {
       providerId: string;
       listener?: EventListener;
+      connectListener?: (port: { name: string; onMessage: { addListener: (fn: (msg: unknown) => void) => void } }) => void;
     };
   };
   const existing = w.__cebWebProviderBridge;
@@ -443,4 +444,38 @@ export function installIsolatedBridge(providerId: string, debug: boolean = false
     type: 'WEB_LLM_RELAY_READY',
     providerId,
   }).catch(() => { /* SW may not be ready; harmless */ });
+
+  // ⑭: Port-based abort channel. The SW opens a port named
+  // `abort-${requestId}` via `chrome.tabs.connect(tabId, {name: ...})`
+  // and posts `{type:'abort'}` when the user clicks Stop. We listen
+  // for the connection here (in the ISOLATED world) and forward the
+  // abort signal to the MAIN world via a `ceb-web-provider-message`
+  // CustomEvent with `{type:'WEB_LLM_ABORT'}`. The MAIN-world IIFE
+  // has a listener that sets `window.__webProviderAbortFlag = true`,
+  // causing its polling/SSE loop to break early.
+  //
+  // Guard against duplicate onConnect listeners (same reload-survival
+  // concern as the message listener above): remove the old connect
+  // listener (captured from `existing` BEFORE we overwrote
+  // `w.__cebWebProviderBridge` above) before adding a new one.
+  if (existing?.connectListener) {
+    chrome.runtime.onConnect.removeListener(existing.connectListener);
+  }
+  const connectListener = (port: { name: string; onMessage: { addListener: (fn: (msg: unknown) => void) => void } }) => {
+    // Only handle ports named `abort-*` (other ports are for unrelated
+    // features like the agent port in background/index.ts).
+    if (!port.name || !port.name.startsWith('abort-')) return;
+    port.onMessage.addListener((msg: unknown) => {
+      if (msg && typeof msg === 'object' && (msg as { type?: unknown }).type === 'abort') {
+        // Forward to MAIN world via the shared document CustomEvent
+        // channel. The MAIN-world IIFE listens for this and sets
+        // `window.__webProviderAbortFlag = true`.
+        document.dispatchEvent(new CustomEvent('ceb-web-provider-message', {
+          detail: { type: 'WEB_LLM_ABORT', providerId },
+        }));
+      }
+    });
+  };
+  chrome.runtime.onConnect.addListener(connectListener);
+  (w.__cebWebProviderBridge as { connectListener?: typeof connectListener }).connectListener = connectListener;
 }

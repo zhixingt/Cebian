@@ -241,6 +241,16 @@ export const WEB_LLM_NEEDS_RELOGIN = 'WEB_LLM_NEEDS_RELOGIN' as const;
 // can echo it back. Providers that don't track a session id (or whose
 // server is stateless) simply don't emit this event.
 export const WEB_LLM_CONVERSATION_UPDATE = 'WEB_LLM_CONVERSATION_UPDATE' as const;
+/**
+ * Abort signal sent from the SW to the MAIN-world IIFE via the ISOLATED
+ * bridge. The SW opens a port named `abort-${requestId}` and posts
+ * `{type: 'abort'}` on it when the user clicks Stop. The ISOLATED bridge
+ * forwards this as a `ceb-web-provider-message` CustomEvent with
+ * `{type: 'WEB_LLM_ABORT'}`; the MAIN-world IIFE listens for it and sets
+ * `window.__webProviderAbortFlag = true` so the polling/SSE loop can break
+ * early instead of continuing to push chunks after the user cancelled.
+ */
+export const WEB_LLM_ABORT = 'WEB_LLM_ABORT' as const;
 
 /**
  * Discriminated union of messages the content script sends to the SW.
@@ -266,7 +276,8 @@ export type WebProviderRelayMessage =
       modelId: string;
       conversationId?: string;
       parentMessageId?: string;
-    };
+    }
+  | { type: typeof WEB_LLM_ABORT; providerId?: WebProvider['presetId'] };
 
 // ====================================================================
 // ⑧ injectDomRelay: SW → ISOLATED bridge → MAIN fetcher
