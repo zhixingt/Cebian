@@ -218,6 +218,9 @@ export async function runDomRelayMainWorld(request: DomRelayRequest): Promise<vo
   // the MAIN-world IIFE keeps polling the DOM and eventually pushes
   // WEB_LLM_DONE with full accumulated text — leaving residual text in
   // the assistant message bubble.
+  // MVP assumption: one active web-provider session per tab at a time.
+  // If concurrent sessions are ever supported, this flag must be keyed
+  // by session/request id instead of being a singleton.
   (window as unknown as { __webProviderAbortFlag?: boolean }).__webProviderAbortFlag = false;
   const abortListener = (event: Event) => {
     const data = (event as CustomEvent<Record<string, unknown>>).detail;
@@ -468,6 +471,15 @@ export function installIsolatedBridge(providerId: string, debug: boolean = false
     }
     if (typeof data.type !== 'string' || !data.type.startsWith('WEB_LLM_')) {
       log('[WS-DIAG-BRIDGE] DROPPING (not WEB_LLM_ type)');
+      return;
+    }
+    // Abort signals are bridge→MAIN only; never forward back to SW.
+    // The connectListener below dispatches WEB_LLM_ABORT on this same
+    // CustomEvent channel to reach the MAIN-world IIFE; without this
+    // guard the bridge's own listener would re-send it to the SW,
+    // forming a feedback loop (SW → port → bridge → SW).
+    if (data.type === 'WEB_LLM_ABORT') {
+      log('[WS-DIAG-BRIDGE] DROPPING (abort is bridge→MAIN only)');
       return;
     }
     log('[WS-DIAG-BRIDGE] forwarding to SW', data.type);

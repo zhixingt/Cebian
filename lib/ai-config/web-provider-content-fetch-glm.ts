@@ -66,6 +66,9 @@ export const glmMainWorldFetch = async (request: ContentFetchRequest): Promise<v
   // the MAIN-world IIFE keeps running and eventually pushes
   // WEB_LLM_DONE with full accumulated text — leaving residual text in
   // the assistant message bubble.
+  // MVP assumption: one active web-provider session per tab at a time.
+  // If concurrent sessions are ever supported, this flag must be keyed
+  // by session/request id instead of being a singleton.
   (window as unknown as { __webProviderAbortFlag?: boolean }).__webProviderAbortFlag = false;
   const abortListener = (event: Event) => {
     const data = (event as CustomEvent<Record<string, unknown>>).detail;

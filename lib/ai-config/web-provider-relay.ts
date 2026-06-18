@@ -276,8 +276,12 @@ export type WebProviderRelayMessage =
       modelId: string;
       conversationId?: string;
       parentMessageId?: string;
-    }
-  | { type: typeof WEB_LLM_ABORT; providerId?: WebProvider['presetId'] };
+    };
+
+// Note: WEB_LLM_ABORT is intentionally NOT part of WebProviderRelayMessage.
+// It is a bridge→MAIN-world internal signal dispatched on the document
+// CustomEvent channel; the SW never receives it and orchestrateStream's
+// switch has no case for it. Adding it here would imply SW handles it.
 
 // ====================================================================
 // ⑧ injectDomRelay: SW → ISOLATED bridge → MAIN fetcher
