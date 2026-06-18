@@ -208,6 +208,25 @@ export async function runDomRelayMainWorld(request: DomRelayRequest): Promise<vo
   const normalizeForComparison = (text: string): string =>
     text.replace(/\s+/g, ' ').trim();
 
+  // ⑭: Port-based abort channel. The SW opens a port named
+  // `abort-${requestId}` and posts `{type:'abort'}` when the user clicks
+  // Stop. The ISOLATED bridge forwards this as a `ceb-web-provider-message`
+  // CustomEvent with `{type:'WEB_LLM_ABORT'}`. We listen for it here and
+  // set `window.__webProviderAbortFlag = true` so the DOM polling loop
+  // below can break early instead of continuing to push chunks after the
+  // user cancelled. Without this, the SW-side stream is cancelled but
+  // the MAIN-world IIFE keeps polling the DOM and eventually pushes
+  // WEB_LLM_DONE with full accumulated text — leaving residual text in
+  // the assistant message bubble.
+  (window as unknown as { __webProviderAbortFlag?: boolean }).__webProviderAbortFlag = false;
+  const abortListener = (event: Event) => {
+    const data = (event as CustomEvent<Record<string, unknown>>).detail;
+    if (data && data.type === 'WEB_LLM_ABORT') {
+      (window as unknown as { __webProviderAbortFlag?: boolean }).__webProviderAbortFlag = true;
+    }
+  };
+  document.addEventListener('ceb-web-provider-message', abortListener);
+
   try {
     // 0. ⑨: pre-flight "needs relogin" check.
     //    The most reliable signal that the user's session expired is that the
@@ -316,11 +335,29 @@ export async function runDomRelayMainWorld(request: DomRelayRequest): Promise<vo
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
+      // ⑭: check the abort flag at the top of each polling iteration.
+      // The SW posts `{type:'abort'}` on the port when the user clicks
+      // Stop; the ISOLATED bridge forwards it as a CustomEvent with
+      // `{type:'WEB_LLM_ABORT'}`; our listener sets the flag. Break
+      // early so no residual text is pushed after cancel.
+      if ((window as unknown as { __webProviderAbortFlag?: boolean }).__webProviderAbortFlag) {
+        postToBridge({ type: 'WEB_LLM_DONE', providerId: request.providerId });
+        return;
+      }
       if (Date.now() - startedAt > maxMs) {
         postToBridge({ type: 'WEB_LLM_ERROR', providerId: request.providerId, error: `Reader timeout after ${maxMs}ms` });
         return;
       }
       await new Promise((r) => setTimeout(r, pollMs));
+      // ⑭: re-check the abort flag after the poll delay. The setTimeout
+      // above can block for pollMs; if the user clicked Stop while we
+      // were waiting, the flag is set but we wouldn't notice it until
+      // the NEXT iteration's top-of-loop check — by which time we'd
+      // have already read the DOM and pushed a residual WEB_LLM_CHUNK.
+      if ((window as unknown as { __webProviderAbortFlag?: boolean }).__webProviderAbortFlag) {
+        postToBridge({ type: 'WEB_LLM_DONE', providerId: request.providerId });
+        return;
+      }
 
       const el = document.querySelector(request.domStrategy.reader.assistantMessageSelector) as HTMLElement | null;
       if (!el) continue;  // No message yet, keep polling
@@ -357,6 +394,9 @@ export async function runDomRelayMainWorld(request: DomRelayRequest): Promise<vo
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     postToBridge({ type: 'WEB_LLM_ERROR', providerId: request.providerId, error: msg });
+  } finally {
+    // ⑭: clean up the abort listener to avoid leaks on tab reuse.
+    document.removeEventListener('ceb-web-provider-message', abortListener);
   }
 }
 
