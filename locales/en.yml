@@ -755,6 +755,8 @@ errors:
     requestFailed: "Request failed: $1"
   mobile:
     toggleFailed: "Failed to toggle mobile mode"
+    permissionDenied: "Debugger permission is required for mobile emulation"
+    notAvailable: "Mobile emulation is not available in this environment"
   skillPackage:
     invalid: "Invalid skill package."
     tooLarge: "Skill package is too large."

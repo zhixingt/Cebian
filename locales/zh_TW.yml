@@ -744,6 +744,8 @@ errors:
     requestFailed: "請求失敗：$1"
   mobile:
     toggleFailed: "行動裝置模式切換失敗"
+    permissionDenied: "行動裝置仿真需要 debugger 權限"
+    notAvailable: "目前環境不支援行動裝置仿真"
   skillPackage:
     invalid: "無效的技能包。"
     tooLarge: "技能包過大。"

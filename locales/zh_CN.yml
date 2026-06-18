@@ -745,6 +745,8 @@ errors:
     requestFailed: "请求失败：$1"
   mobile:
     toggleFailed: "移动端模式切换失败"
+    permissionDenied: "移动仿真需要 debugger 权限"
+    notAvailable: "当前环境不支持移动仿真"
   skillPackage:
     invalid: "无效的技能包。"
     tooLarge: "技能包过大。"

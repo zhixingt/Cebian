@@ -10,6 +10,11 @@ export function useMobileEmulation() {
 
   // Reconstruct state on mount (sidepanel reopen)
   useEffect(() => {
+    // debugger 是 optional_permissions，未授权时 chrome.debugger 为 undefined
+    if (typeof chrome === 'undefined' || !chrome.debugger) {
+      setIsActiveTabMobile(false);
+      return;
+    }
     chrome.debugger.getTargets((targets) => {
       const attachedTabIds = targets
         .filter((t) => t.attached && t.tabId != null)
@@ -42,17 +47,33 @@ export function useMobileEmulation() {
 
     chrome.tabs.onActivated.addListener(onActivated);
     chrome.tabs.onRemoved.addListener(onRemoved);
-    chrome.debugger.onDetach.addListener(onDetach);
+    if (chrome.debugger) {
+      chrome.debugger.onDetach.addListener(onDetach);
+    }
 
     return () => {
       chrome.tabs.onActivated.removeListener(onActivated);
       chrome.tabs.onRemoved.removeListener(onRemoved);
-      chrome.debugger.onDetach.removeListener(onDetach);
+      if (chrome.debugger) {
+        chrome.debugger.onDetach.removeListener(onDetach);
+      }
     };
   }, []);
 
   const toggle = useCallback(async () => {
     try {
+      // 首次使用时请求 debugger 权限
+      if (chrome.debugger && !(await chrome.permissions.contains({ permissions: ['debugger'] }))) {
+        const granted = await chrome.permissions.request({ permissions: ['debugger'] });
+        if (!granted) {
+          toast.error(t('errors.mobile.permissionDenied'));
+          return;
+        }
+      }
+      if (!chrome.debugger) {
+        toast.error(t('errors.mobile.notAvailable'));
+        return;
+      }
       const tabId = await getActiveTabId();
       if (mobileTabsRef.current.has(tabId)) {
         await detachEmulation(tabId);
