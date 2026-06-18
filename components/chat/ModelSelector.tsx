@@ -173,6 +173,7 @@ export function ModelSelector({
             {providerModels.map((group, i) => (
               <div key={group.provider}>
                 {i > 0 && <CommandSeparator />}
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 <CommandGroup heading={group.label.startsWith('webProviders.') ? t('webProviders.selector.groupLabel' as any) : group.label}>
                   {group.models.map(model => (
                     <CommandItem

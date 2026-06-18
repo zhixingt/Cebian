@@ -89,7 +89,7 @@ export async function runDomRelayMainWorld(request: DomRelayRequest): Promise<vo
         return { ok: false, error: 'execCommand insertText returned false' };
       }
     } else {
-      return { ok: false, error: `Unknown setMethod: ${(strategy as any).setMethod}` };
+      return { ok: false, error: `Unknown setMethod: ${strategy.setMethod}` };
     }
     return { ok: true, element: el };
   };
@@ -125,7 +125,7 @@ export async function runDomRelayMainWorld(request: DomRelayRequest): Promise<vo
       root.dispatchEvent(new KeyboardEvent('keyup', init));
       return { ok: true, method: 'enter-bubbled' };
     }
-    return { ok: false, error: `Unknown sendMethod: ${(strategy as any).sendMethod}` };
+    return { ok: false, error: `Unknown sendMethod: ${strategy.sendMethod}` };
   };
 
   /**

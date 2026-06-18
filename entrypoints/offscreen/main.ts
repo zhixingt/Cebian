@@ -203,8 +203,9 @@ chrome.runtime.onMessage.addListener(
 
       const markdown = htmlToMarkdown(html);
       sendResponse({ result: markdown } satisfies OffscreenResponse);
-    } catch (err: any) {
-      sendResponse({ error: err.message ?? String(err) } satisfies OffscreenResponse);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      sendResponse({ error: message } satisfies OffscreenResponse);
     }
 
     return true; // keep sendResponse channel open

@@ -1,0 +1,1271 @@
+﻿
+D:\Project\CebianX\Cebian\__tests__\background\session-watcher-bg.test.ts
+   96:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  118:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  135:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  160:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  184:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  215:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  231:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  240:45  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  241:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  246:54  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  251:10  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  287:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  300:45  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  305:54  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  310:10  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  347:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  348:45  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  355:54  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  356:61  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  359:11  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\background\web-provider-relogin.test.ts
+  13:15  warning  'WebProvider' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  16:28  warning  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+  26:14  warning  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+  29:33  warning  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\components\chat\ChatInput-trigger.test.tsx
+  55:58  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  55:73  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  58:74  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  64:56  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  74:10  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  75:87  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  79:10  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  82:76  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  89:65  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\components\chat\Message.test.tsx
+    2:37  warning  'waitFor' is defined but never used. Allowed unused vars must match /^_/u              @typescript-eslint/no-unused-vars
+  253:31  warning  Unexpected any. Specify a different type                                               @typescript-eslint/no-explicit-any
+  254:11  warning  'roInstance' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  318:13  warning  'container' is assigned a value but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\components\chat\ModelSelector.test.ts
+   4:36   warning  'ProviderGroup' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   6:10   warning  'getModels' is defined but never used. Allowed unused vars must match /^_/u      @typescript-eslint/no-unused-vars
+  70:10   warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+  72:108  warning  Unexpected any. Specify a different type                                         @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\components\chat\QuickActionsBar.test.tsx
+  2:46  warning  'act' is defined but never used. Allowed unused vars must match /^_/u              @typescript-eslint/no-unused-vars
+  6:10  warning  'TooltipProvider' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\components\chat\RecordingEditor.test.tsx
+    2:46  warning  'within' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   54:10  warning  't' is defined but never used. Allowed unused vars must match /^_/u       @typescript-eslint/no-unused-vars
+   87:33  warning  Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+  100:61  warning  Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+  281:37  warning  Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+  302:37  warning  Unexpected any. Specify a different type                                  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\components\chat\ToolCard.test.tsx
+  34:35  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\entrypoints\background\agent-manager-self-heal.test.ts
+  15:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  22:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  49:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  52:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  56:41  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\entrypoints\background\startup-active-model-cleanup.test.ts
+   5:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   8:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  13:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  17:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\entrypoints\sidepanel\pages\chat\index.test.tsx
+  25:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  28:35  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\hooks\handle-web-provider-needs-relogin.test.ts
+  29:75  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\hooks\useBackgroundAgent-relogin.test.ts
+   4:15  warning  'WebProvider' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  30:15  warning  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+  31:38  warning  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+  31:48  warning  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+  39:31  warning  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+  46:14  warning  Unexpected any. Specify a different type                                       @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\hooks\useRecorder.test.ts
+   11:7   warning  'originalSetPort' is assigned a value but never used. Allowed unused vars must match /^_/u         @typescript-eslint/no-unused-vars
+   12:7   warning  'originalPublishStatus' is assigned a value but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+   13:7   warning  'originalPublishSession' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  163:11  warning  'p1' is assigned a value but never used. Allowed unused vars must match /^_/u                      @typescript-eslint/no-unused-vars
+  164:11  warning  'p2' is assigned a value but never used. Allowed unused vars must match /^_/u                      @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\hooks\useStorageItem.test.ts
+  1:32  warning  'vi' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\hooks\useUpdateCheck.test.ts
+  103:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  112:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  121:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  154:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  174:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\hooks\useWebProviderWebLogin.test.ts
+    6:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   10:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   76:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  112:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\integration\web-provider-logout-flow.test.ts
+   16:15  warning  'WebProvider' is defined but never used. Allowed unused vars must match /^_/u        @typescript-eslint/no-unused-vars
+   42:39  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+   43:16  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+   47:41  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+   91:55  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+   99:54  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  105:11  warning  'fetchSpy' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  105:79  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  132:19  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  140:27  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  141:27  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  142:27  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\integration\web-provider-relogin-flow.test.ts
+    8:3   warning  'handleWebProviderRelogin' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   50:36  warning  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+   70:39  warning  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+   71:16  warning  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+   74:35  warning  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+   82:41  warning  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+   95:50  warning  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+   96:40  warning  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+   98:37  warning  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+  161:13  warning  'getDb' is assigned a value but never used. Allowed unused vars must match /^_/u            @typescript-eslint/no-unused-vars
+  163:11  warning  'p' is assigned a value but never used. Allowed unused vars must match /^_/u                @typescript-eslint/no-unused-vars
+  163:39  warning  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+  169:55  warning  Unexpected any. Specify a different type                                                    @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\minifier-mangle-safety.test.ts
+  47:9  warning  'jsFiles' is never reassigned. Use 'const' instead  prefer-const
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-bundle.test.ts
+  15:29  warning  'provider' is assigned a value but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+  36:21  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  37:18  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  39:39  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  40:16  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  43:39  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-content-fetch-glm-abort.test.ts
+  188:11  warning  'addSpy' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-content-script.test.ts
+   16:47  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   17:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   19:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   19:56  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   27:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   27:62  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   43:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  110:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  169:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  197:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  198:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  228:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  229:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  230:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  279:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  280:16  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  281:44  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-cookie-service.test.ts
+    5:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+    6:15  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+    8:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   16:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   19:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   46:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   56:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   57:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   58:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   66:63  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  101:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  104:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  132:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  148:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  255:47  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  272:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  274:47  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-cross-context.test.ts
+  43:136  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  73:17   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  75:12   warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-crypto.test.ts
+   6:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  10:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  14:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-diag.test.ts
+  36:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  43:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-dom-strategy.test.ts
+   9:8  warning  'ReaderCallbacks' is defined but never used. Allowed unused vars must match /^_/u         @typescript-eslint/no-unused-vars
+  11:8  warning  'WebProviderDomStrategy' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-models.test.ts
+  10:10  warning  'getWebProviderRepository' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-relay-tab-registry.test.ts
+   37:11  warning  'created' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   55:20  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+   76:27  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+   89:20  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+  102:27  warning  Unexpected any. Specify a different type                                            @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-relay.test.ts
+   27:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   29:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   30:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   68:56  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   71:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  119:30  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  165:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  166:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  168:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  168:61  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  186:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  186:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  195:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  196:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  196:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  208:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  209:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  209:60  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  235:40  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  235:61  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-session-watcher.test.ts
+    1:48  warning  'afterEach' is defined but never used. Allowed unused vars must match /^_/u                @typescript-eslint/no-unused-vars
+  115:7   warning  'lastIntervalId' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-snapshot-diff.test.ts
+  4:8  warning  'SnapshotDiffResult' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-store.test.ts
+  45:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  76:29  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-stream-multiturn.test.ts
+    2:55  warning  'vi' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   12:49  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+   57:28  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+   60:17  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+   62:43  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+   63:15  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+   95:28  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+   98:17  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  100:43  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  101:15  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  132:28  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  135:17  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  137:40  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  138:15  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  175:28  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  178:17  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  180:49  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  181:15  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  205:28  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  217:17  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  219:23  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  220:15  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  249:28  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  261:17  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  263:18  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+  264:15  warning  Unexpected any. Specify a different type                              @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\ai-config\web-provider-stream.test.ts
+   11:3   warning  'createAssistantMessageEventStream' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   19:28  warning  Unexpected any. Specify a different type                                                             @typescript-eslint/no-explicit-any
+  131:19  warning  Unexpected any. Specify a different type                                                             @typescript-eslint/no-explicit-any
+  138:72  warning  Unexpected any. Specify a different type                                                             @typescript-eslint/no-explicit-any
+  154:19  warning  Unexpected any. Specify a different type                                                             @typescript-eslint/no-explicit-any
+  161:27  warning  Unexpected any. Specify a different type                                                             @typescript-eslint/no-explicit-any
+  162:27  warning  Unexpected any. Specify a different type                                                             @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\capture\analyzer.test.ts
+  45:10  warning  'findEndpoint' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\lib\capture\api-executor.test.ts
+  116:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  147:23  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  389:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  406:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\capture\handler.test.ts
+  164:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  213:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  313:12  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  350:66  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  408:78  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  513:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\mcp\native-messaging-host.test.ts
+  342:32  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  408:23  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  409:25  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  438:23  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  439:25  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  492:23  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  493:25  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  544:13  warning  'shutdown' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  546:23  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  547:25  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  577:23  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  578:25  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\mcp\server.test.ts
+  129:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  149:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  168:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  191:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  209:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  231:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  253:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  274:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  292:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  306:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  325:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  344:53  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\message-helpers.test.ts
+  115:82  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  156:75  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  160:58  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  194:74  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\page-watcher.test.ts
+   7:6   warning  Unexpected any. Specify a different type                                                     @typescript-eslint/no-explicit-any
+  64:10  warning  'makeCharacterDataMutation' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  84:23  warning  Unexpected any. Specify a different type                                                     @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\recorder\ai-optimizer.test.ts
+  36:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  49:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\recorder\sidepanel-channel.test.ts
+  33:45  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\tools\execute-js.test.ts
+  1:32  warning  'vi' is defined but never used. Allowed unused vars must match /^_/u          @typescript-eslint/no-unused-vars
+  1:36  warning  'beforeEach' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\lib\tools\interact.test.ts
+    1:48  warning  'afterEach' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  565:57  warning  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+  792:76  warning  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+  837:56  warning  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+  971:68  warning  Unexpected any. Specify a different type                                     @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\tools\smart-interact.test.ts
+  285:12  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\tools\smart-read-page.test.ts
+  195:12  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\tools\ui-registry.test.ts
+  5:10  warning  'createRegistry' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\lib\tools\url-pattern.test.ts
+  7:8  warning  'MatchPattern' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\lib\tools\visual-locate.test.ts
+  11:32  warning  'vi' is defined but never used. Allowed unused vars must match /^_/u                         @typescript-eslint/no-unused-vars
+  12:52  warning  'VISUAL_LOCATE_ENABLED_KEY' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\__tests__\lib\workflow\ai-planner.benchmark.test.ts
+   17:32   warning  'vi' is defined but never used. Allowed unused vars must match /^_/u               @typescript-eslint/no-unused-vars
+   22:28   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+   68:39   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+   89:42   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+   90:58   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  101:76   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  120:34   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  200:63   warning  Unnecessary escape character: \"                                                   no-useless-escape
+  200:66   warning  Unnecessary escape character: \"                                                   no-useless-escape
+  202:113  warning  Unnecessary escape character: \"                                                   no-useless-escape
+  202:117  warning  Unnecessary escape character: \"                                                   no-useless-escape
+  212:63   warning  Unnecessary escape character: \"                                                   no-useless-escape
+  212:70   warning  Unnecessary escape character: \"                                                   no-useless-escape
+  212:149  warning  Unnecessary escape character: \"                                                   no-useless-escape
+  212:159  warning  Unnecessary escape character: \"                                                   no-useless-escape
+  212:230  warning  Unnecessary escape character: \"                                                   no-useless-escape
+  212:238  warning  Unnecessary escape character: \"                                                   no-useless-escape
+  230:55   warning  Unnecessary escape character: \"                                                   no-useless-escape
+  230:71   warning  Unnecessary escape character: \"                                                   no-useless-escape
+  339:61   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  339:75   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  387:24   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  441:5    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  442:5    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  443:5    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  446:7    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  448:5    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  449:5    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  450:5    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  451:5    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  452:5    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  453:5    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  454:5    warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  487:14   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  511:27   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  556:26   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  557:26   warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\workflow\ai-planner.test.ts
+   14:28  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   60:39  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   81:42  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   82:58  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  132:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  133:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  144:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  169:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  185:24  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\workflow\engine.test.ts
+   31:25  warning  'WorkflowRunState' is defined but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+   36:3   warning  'updateRunState' is defined but never used. Allowed unused vars must match /^_/u     @typescript-eslint/no-unused-vars
+   37:3   warning  'listRunningStates' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   65:32  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  224:26  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  375:62  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+  407:18  warning  Unexpected any. Specify a different type                                             @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\workflow\executor-retry.test.ts
+  248:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\workflow\export-utils.test.ts
+  66:52  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\workflow\repository.test.ts
+   65:47  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   70:58  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   75:61  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   88:72  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  113:42  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  125:58  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  139:14  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  199:59  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\__tests__\lib\workflow\schema.test.ts
+  11:15  warning  'Workflow' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\assets\skills\browserwing\scripts\batch-fill.js
+  68:11  warning  'snap' is assigned a value but never used. Allowed unused vars must match /^_/u      @typescript-eslint/no-unused-vars
+  95:14  warning  'clickErr' is defined but never used. Allowed unused caught errors must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\components\chat\AssistantMessageItem.tsx
+   39:3   warning  'isAgentRunning' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+   44:3   warning  'canRetry' is defined but never used. Allowed unused args must match /^_/u        @typescript-eslint/no-unused-vars
+  108:49  warning  Unexpected any. Specify a different type                                          @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\components\chat\ChatInput.tsx
+   28:10  warning  'sessionToSequence' is defined but never used. Allowed unused vars must match /^_/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+   29:15  warning  'RecordedSession' is defined but never used. Allowed unused vars must match /^_/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             @typescript-eslint/no-unused-vars
+   30:15  warning  'SequenceStep' is defined but never used. Allowed unused vars must match /^_/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                @typescript-eslint/no-unused-vars
+  148:3   warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\Project\CebianX\Cebian\components\chat\ChatInput.tsx:148:3
+  146 |   const slashMenuRef = useRef<HTMLDivElement>(null);
+  147 |   const sessionIdRef = useRef<string | null>(sessionId ?? null);
+> 148 |   sessionIdRef.current = sessionId ?? null;
+      |   ^^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  149 |
+  150 |   const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
+  151 |   const [currentThinkingLevel, setCurrentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');                                                                                                                                                                                                                                                                                                           react-hooks/refs
+  192:3   warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\Project\CebianX\Cebian\components\chat\ChatInput.tsx:192:3
+  190 |   // 妯″瀷涔嬪悗鎵嶅洖璋冿紝鐢?ref 鍚屾璇诲彇鏈€鏂扮殑 supportsImage锛岄伩鍏嶈繜鍒扮殑鍥剧墖琚拷鍔犮€?  191 |   const supportsImageRef = useRef(supportsImage);
+> 192 |   supportsImageRef.current = supportsImage;
+      |   ^^^^^^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  193 |
+  194 |   // 鍒囨崲鍒颁笉鏀寔鍥剧墖鐨勬ā鍨嬫椂锛岃嚜鍔ㄥ墺绂诲凡鏈夌殑鍥剧墖闄勪欢锛堜繚鐣欐枃浠堕檮浠讹級锛?  195 |   // 閬垮厤鎶婂浘鐗囧彂缁欑函鏂囨湰妯″瀷瀵艰嚧璇锋眰寮傚父銆?                                                                                                                                                                                                                                                                                                                                                                                                                                     react-hooks/refs
+  198:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\chat\ChatInput.tsx:198:5
+  196 |   useEffect(() => {
+  197 |     if (supportsImage) return;
+> 198 |     setAttachments((prev) => {
+      |     ^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  199 |       if (!prev.some((a) => a.type === 'image')) return prev;
+  200 |       toast.info(t('chat.composer.imageStripped'));
+  201 |       return prev.filter((a) => a.type !== 'image');                       react-hooks/set-state-in-effect
+  300:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             no-console
+  373:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\chat\ChatInput.tsx:373:5
+  371 |   // Reset history navigation when switching sessions.
+  372 |   useEffect(() => {
+> 373 |     setHistoryIndex(null);
+      |     ^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  374 |     setDraft('');
+  375 |   }, [sessionId]);
+  376 |                                                                                                                                    react-hooks/set-state-in-effect
+  506:7   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\chat\ChatInput.tsx:506:7
+  504 |   useEffect(() => {
+  505 |     if (filteredPrompts.length === 0) {
+> 506 |       setSelectedPromptIndex(0);
+      |       ^^^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  507 |       return;
+  508 |     }
+  509 |     setSelectedPromptIndex((i) => Math.min(Math.max(i, 0), filteredPrompts.length - 1));                                                            react-hooks/set-state-in-effect
+  514:29  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\chat\ChatInput.tsx:514:29
+  512 |   // Reset highlight to the top whenever the menu (re)opens.
+  513 |   useEffect(() => {
+> 514 |     if (isSlashMenuVisible) setSelectedPromptIndex(0);
+      |                             ^^^^^^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  515 |   }, [isSlashMenuVisible]);
+  516 |
+  517 |   // Keep the highlighted item in view when navigating with the keyboard  react-hooks/set-state-in-effect
+  531:30  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\Project\CebianX\Cebian\components\chat\ChatInput.tsx:531:30
+  529 |   const triggerSlashPrompt = useMemo(
+  530 |     () =>
+> 531 |       makeTriggerSlashPrompt({
+      |                              ^
+> 532 |         toast,
+      | ^^^^^^^^^^^^^^
+> 533 |         onLoaded: (text) => {
+      | ^^^^^^^^^^^^^^
+> 534 |           setValue(text);
+      | ^^^^^^^^^^^^^^
+> 535 |           setShowSlash(false);
+      | ^^^^^^^^^^^^^^
+> 536 |           textareaRef.current?.focus();
+      | ^^^^^^^^^^^^^^
+> 537 |         },
+      | ^^^^^^^^^^^^^^
+> 538 |       }),
+      | ^^^^^^^^ Passing a ref to a function may read its value during render
+  539 |     [],
+  540 |   );
+  541 |                                                                                                                                     react-hooks/refs
+  666:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             no-console
+  705:11  warning  Unexpected console statement. Only these console methods are allowed: warn, error                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             no-console
+  707:11  warning  Unexpected console statement. Only these console methods are allowed: warn, error                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             no-console
+
+D:\Project\CebianX\Cebian\components\chat\ModelSelector.tsx
+   37:17   warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+  138:13   warning  'presetId' is assigned a value but never used. Allowed unused vars must match /^_/u                                             @typescript-eslint/no-unused-vars
+  176:122  warning  Unexpected any. Specify a different type                                                                                        @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\components\chat\RecordingEditor.tsx
+   29:6   warning  'PromptDispatchResult' is defined but never used. Allowed unused vars must match /^_/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            @typescript-eslint/no-unused-vars
+   33:61  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          @typescript-eslint/no-explicit-any
+   85:34  warning  Error: Cannot modify local variables after render completes
+
+This argument is a function which may reassign or mutate `nextLocalId` after render, which can cause inconsistent behavior on subsequent renders. Consider using state instead.
+
+D:\Project\CebianX\Cebian\components\chat\RecordingEditor.tsx:85:34
+  83 |
+  84 |   // 褰?recording 鍙樺寲鏃堕噸缃楠?> 85 |   const resetSteps = useCallback(() => {
+     |                                  ^^^^^^^
+> 86 |     nextLocalId = 0;
+     | ^^^^^^^^^^^^^^^^^^^^
+> 87 |     setSteps(assignLocalIds(initialSteps));
+     | ^^^^^^^^^^^^^^^^^^^^
+> 88 |     setShowOptimize(false);
+     | ^^^^^^^^^^^^^^^^^^^^
+> 89 |     setSuggestions([]);
+     | ^^^^^^^^^^^^^^^^^^^^
+> 90 |     setAppliedIds(new Set());
+     | ^^^^^^^^^^^^^^^^^^^^
+> 91 |   }, [initialSteps]);
+     | ^^^^ This function may (indirectly) reassign or modify `nextLocalId` after render
+  92 |
+  93 |   // 缂栬緫姝ラ瀛楁锛堢被鍨嬪畨鍏細鏍规嵁瀛楁绫诲瀷鑷姩杞崲锛?  94 |   const updateStep = useCallback(<K extends keyof SequenceStep>(index: number, field: K, value: SequenceStep[K]) => {
+
+D:\Project\CebianX\Cebian\components\chat\RecordingEditor.tsx:86:5
+  84 |   // 褰?recording 鍙樺寲鏃堕噸缃楠?  85 |   const resetSteps = useCallback(() => {
+> 86 |     nextLocalId = 0;
+     |     ^^^^^^^^^^^ This modifies `nextLocalId`
+  87 |     setSteps(assignLocalIds(initialSteps));
+  88 |     setShowOptimize(false);
+  89 |     setSuggestions([]);  react-hooks/immutability
+   86:5   warning  Error: Cannot reassign variable after render completes
+
+Reassigning `nextLocalId` after render has completed can cause inconsistent behavior on subsequent renders. Consider using state instead.
+
+D:\Project\CebianX\Cebian\components\chat\RecordingEditor.tsx:86:5
+  84 |   // 褰?recording 鍙樺寲鏃堕噸缃楠?  85 |   const resetSteps = useCallback(() => {
+> 86 |     nextLocalId = 0;
+     |     ^^^^^^^^^^^ Cannot reassign `nextLocalId` after render completes
+  87 |     setSteps(assignLocalIds(initialSteps));
+  88 |     setShowOptimize(false);
+  89 |     setSuggestions([]);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                react-hooks/immutability
+   86:19  warning  Assignments to the 'nextLocalId' variable from inside React Hook useCallback will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useCallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/exhaustive-deps
+  114:6   warning  React Hook useCallback has a missing dependency: 'nextLocalId'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/exhaustive-deps
+  149:21  warning  Assignments to the 'nextLocalId' variable from inside React Hook useCallback will be lost after each render. To preserve the value over time, store it in a useRef Hook and keep the mutable value in the '.current' property. Otherwise, you can move this variable directly inside useCallback                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  react-hooks/exhaustive-deps
+
+D:\Project\CebianX\Cebian\components\common\MarkdownRenderer.tsx
+  223:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\common\MarkdownRenderer.tsx:223:7
+  221 |   useEffect(() => {
+  222 |     if (!vfsPath) {
+> 223 |       setState({ kind: 'idle', path: null });
+      |       ^^^^^^^^ Avoid calling setState() directly within an effect
+  224 |       return;
+  225 |     }
+  226 |     let cancelled = false;  react-hooks/set-state-in-effect
+
+D:\Project\CebianX\Cebian\components\dialogs\confirm-outlet.tsx
+  30:3  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\Project\CebianX\Cebian\components\dialogs\confirm-outlet.tsx:30:3
+  28 |   // promise without depending on stale closure values.
+  29 |   const stateRef = useRef<ConfirmState | null>(null);
+> 30 |   stateRef.current = state;
+     |   ^^^^^^^^^^^^^^^^ Cannot update ref during render
+  31 |
+  32 |   useEffect(() => {
+  33 |     const off = onConfirmChange(setState);  react-hooks/refs
+
+D:\Project\CebianX\Cebian\components\editor\CodeMirrorEditor.tsx
+   78:3  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\Project\CebianX\Cebian\components\editor\CodeMirrorEditor.tsx:78:3
+  76 |
+  77 |   // Keep onChange ref current without recreating editor
+> 78 |   onChangeRef.current = onChange;
+     |   ^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  79 |
+  80 |   // Create editor on mount
+  81 |   useEffect(() => {  react-hooks/refs
+  148:5  warning  Unused eslint-disable directive (no problems were reported from 'react-hooks/exhaustive-deps')
+
+D:\Project\CebianX\Cebian\components\editor\FileTree.tsx
+  101:3   warning  Unused eslint-disable directive (no problems were reported from 'no-constant-condition')
+  321:21  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\editor\FileTree.tsx:321:21
+  319 |   }, [root]);
+  320 |
+> 321 |   useEffect(() => { scan(); }, [scan, refreshKey]);
+      |                     ^^^^ Avoid calling setState() directly within an effect
+  322 |
+  323 |   // After data updates, check if there's a pending edit node to activate
+  324 |   useEffect(() => {  react-hooks/set-state-in-effect
+
+D:\Project\CebianX\Cebian\components\layout\HistoryPanel.tsx
+  110:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\layout\HistoryPanel.tsx:110:7
+  108 |   useEffect(() => {
+  109 |     if (!open) {
+> 110 |       setQuery('');
+      |       ^^^^^^^^ Avoid calling setState() directly within an effect
+  111 |       setDisplayCount(PAGE_SIZE);
+  112 |     }
+  113 |   }, [open]);                                                                            react-hooks/set-state-in-effect
+  118:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\layout\HistoryPanel.tsx:118:5
+  116 |   useEffect(() => {
+  117 |     if (!open) return;
+> 118 |     setLoading(true);
+      |     ^^^^^^^^^^ Avoid calling setState() directly within an effect
+  119 |     const port = chrome.runtime.connect({ name: AGENT_PORT_NAME });
+  120 |     let settled = false;
+  121 |     const finish = () => {  react-hooks/set-state-in-effect
+
+D:\Project\CebianX\Cebian\components\layout\SidebarContext.tsx
+  29:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\Project\CebianX\Cebian\components\settings\SectionNav.tsx
+  18:14  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\Project\CebianX\Cebian\components\settings\SettingsLayout.tsx
+  71:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  72:27  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\components\settings\mcp\MCPServerForm.tsx
+  45:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\Project\CebianX\Cebian\components\settings\provider\ProviderApiKeyItem.tsx
+  44:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\settings\provider\ProviderApiKeyItem.tsx:44:5
+  42 |   // 鏅€氳緭鍏ヤ笉浼氳瑕嗙洊锛堟鏃?credential.apiKey 涓嶅彉锛夈€?  43 |   useEffect(() => {
+> 44 |     setKey(credential?.apiKey ?? "");
+     |     ^^^^^^ Avoid calling setState() directly within an effect
+  45 |   }, [credential?.apiKey]);
+  46 |
+  47 |   const [status, setStatus] = useState<  react-hooks/set-state-in-effect
+
+D:\Project\CebianX\Cebian\components\settings\provider\ProviderOAuthItem.tsx
+  29:3  warning  'provider' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\components\settings\provider\WebProviderCard.tsx
+  126:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  158:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\components\settings\sections\ApiDiscoverySection.tsx
+  62:12  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\settings\sections\ApiDiscoverySection.tsx:62:12
+  60 |   useEffect(() => {
+  61 |     if (enabled) {
+> 62 |       void refreshSkills();
+     |            ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  63 |     }
+  64 |   }, [enabled, refreshSkills]);
+  65 |  react-hooks/set-state-in-effect
+
+D:\Project\CebianX\Cebian\components\settings\sections\EditorPanel.tsx
+   57:3  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\Project\CebianX\Cebian\components\settings\sections\EditorPanel.tsx:57:3
+  55 |   // body from being written to a newly-selected file while its load is in flight.
+  56 |   const loadedPathRef = useRef<string | undefined>(undefined);
+> 57 |   filePathRef.current = filePath;
+     |   ^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  58 |   bodyRef.current = body;
+  59 |   savedRef.current = savedContent;
+  60 |   onSaveRef.current = onSave;                                                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   58:3  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\Project\CebianX\Cebian\components\settings\sections\EditorPanel.tsx:58:3
+  56 |   const loadedPathRef = useRef<string | undefined>(undefined);
+  57 |   filePathRef.current = filePath;
+> 58 |   bodyRef.current = body;
+     |   ^^^^^^^^^^^^^^^ Cannot update ref during render
+  59 |   savedRef.current = savedContent;
+  60 |   onSaveRef.current = onSave;
+  61 |                                                                                                                                                                                                                                                                                                                                                                                                                                                     react-hooks/refs
+   59:3  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\Project\CebianX\Cebian\components\settings\sections\EditorPanel.tsx:59:3
+  57 |   filePathRef.current = filePath;
+  58 |   bodyRef.current = body;
+> 59 |   savedRef.current = savedContent;
+     |   ^^^^^^^^^^^^^^^^ Cannot update ref during render
+  60 |   onSaveRef.current = onSave;
+  61 |
+  62 |   const language = filePath ? detectLanguage(filePath) : 'markdown';                                                                                                                                                                                                                                                                                                                                                                                                                                              react-hooks/refs
+   60:3  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\Project\CebianX\Cebian\components\settings\sections\EditorPanel.tsx:60:3
+  58 |   bodyRef.current = body;
+  59 |   savedRef.current = savedContent;
+> 60 |   onSaveRef.current = onSave;
+     |   ^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  61 |
+  62 |   const language = filePath ? detectLanguage(filePath) : 'markdown';
+  63 |   const dirty = !!filePath && body !== savedContent;                                                                                                                                                                                                                                                                                                                                                                                                                          react-hooks/refs
+  105:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\settings\sections\EditorPanel.tsx:105:7
+  103 |     if (!filePath) {
+  104 |       loadedPathRef.current = undefined;
+> 105 |       setBody('');
+      |       ^^^^^^^ Avoid calling setState() directly within an effect
+  106 |       setSavedContent('');
+  107 |       setStatus('idle');
+  108 |       return;                                                                                                         react-hooks/set-state-in-effect
+  142:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\settings\sections\EditorPanel.tsx:142:5
+  140 |     if (!filePath) return;
+  141 |     if (body === savedContent) return;
+> 142 |     setStatus('idle');
+      |     ^^^^^^^^^ Avoid calling setState() directly within an effect
+  143 |     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+  144 |     const pathAtSchedule = filePath;
+  145 |     debounceTimerRef.current = setTimeout(() => {  react-hooks/set-state-in-effect
+
+D:\Project\CebianX\Cebian\components\settings\sections\SkillsSection.tsx
+  21:10  warning  'vfs' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\components\settings\sections\WorkflowsSection.tsx
+    1:34  warning  'useMemo' is defined but never used. Allowed unused vars must match /^_/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   @typescript-eslint/no-unused-vars
+   36:3   warning  'searchWorkflows' is defined but never used. Allowed unused vars must match /^_/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           @typescript-eslint/no-unused-vars
+  111:9   warning  'navigate' is assigned a value but never used. Allowed unused vars must match /^_/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         @typescript-eslint/no-unused-vars
+  161:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\settings\sections\WorkflowsSection.tsx:161:10
+  159 |
+  160 |   useEffect(() => {
+> 161 |     void loadWorkflows();
+      |          ^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  162 |   }, [loadWorkflows]);
+  163 |
+  164 |   // 鍔犺浇宸叉坊鍔犵殑棰勭疆宸ヤ綔娴?ID                                                                                            react-hooks/set-state-in-effect
+  167:5   warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\settings\sections\WorkflowsSection.tsx:167:5
+  165 |   useEffect(() => {
+  166 |     const ids = new Set(workflows.filter((w) => w.id.startsWith('preset-')).map((w) => w.id));
+> 167 |     setAddedPresetIds(ids);
+      |     ^^^^^^^^^^^^^^^^^ Avoid calling setState() directly within an effect
+  168 |   }, [workflows]);
+  169 |
+  170 |   // 娣诲姞棰勭疆宸ヤ綔娴佸埌鎴戠殑鑷姩鍖? react-hooks/set-state-in-effect
+  530:21  warning  'isExample' is assigned a value but never used. Allowed unused vars must match /^_/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\components\settings\workflows\WorkflowEditor.tsx
+  13:3  warning  'Plus' is defined but never used. Allowed unused vars must match /^_/u                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               @typescript-eslint/no-unused-vars
+  67:7  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\settings\workflows\WorkflowEditor.tsx:67:7
+  65 |   useEffect(() => {
+  66 |     if (open && workflow) {
+> 67 |       setName(workflow.name);
+     |       ^^^^^^^ Avoid calling setState() directly within an effect
+  68 |       setDescription(workflow.description ?? '');
+  69 |       setSteps([...workflow.steps]);
+  70 |       setTrigger(workflow.trigger ?? { type: 'manual' });  react-hooks/set-state-in-effect
+  74:6  warning  React Hook useEffect has a missing dependency: 'workflow'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          react-hooks/exhaustive-deps
+  94:6  warning  React Hook useCallback has a missing dependency: 'trigger'. Either include it or remove the dependency array                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         react-hooks/exhaustive-deps
+
+D:\Project\CebianX\Cebian\components\settings\workflows\WorkflowHistory.tsx
+  121:12  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\components\settings\workflows\WorkflowHistory.tsx:121:12
+  119 |   useEffect(() => {
+  120 |     if (open) {
+> 121 |       void loadRuns();
+      |            ^^^^^^^^ Avoid calling setState() directly within an effect
+  122 |     }
+  123 |   }, [open, loadRuns]);
+  124 |  react-hooks/set-state-in-effect
+
+D:\Project\CebianX\Cebian\components\ui\badge.tsx
+  48:17  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\Project\CebianX\Cebian\components\ui\button.tsx
+  64:18  warning  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+D:\Project\CebianX\Cebian\entrypoints\background\agent-manager.ts
+   19:8  warning  'ProviderCredentials' is defined but never used. Allowed unused vars must match /^_/u   @typescript-eslint/no-unused-vars
+   21:8  warning  'CustomProviderConfig' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+   23:8  warning  'ActiveModel' is defined but never used. Allowed unused vars must match /^_/u           @typescript-eslint/no-unused-vars
+  556:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error       no-console
+  716:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error       no-console
+
+D:\Project\CebianX\Cebian\entrypoints\background\dev-seed.ts
+  89:3  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\entrypoints\background\index.ts
+   44:3   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  197:27  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  198:25  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\entrypoints\background\oauth-refresh.ts
+  26:9  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\entrypoints\background\recorder.ts
+  631:9  warning  This assigned value is not used in subsequent statements                           no-useless-assignment
+  641:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\entrypoints\background\seed-builtin-skills.ts
+  98:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\entrypoints\background\session-store.ts
+  27:23  warning  'messages' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\entrypoints\background\web-provider-relogin.ts
+  19:10  warning  'invalidateBundle' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\entrypoints\background\web-provider-session-watcher-bg.ts
+   57:34  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  154:33  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  185:42  warning  'listener' is defined but never used      @typescript-eslint/no-unused-vars
+  185:51  warning  'owns' is defined but never used          @typescript-eslint/no-unused-vars
+  185:56  warning  'dispatch' is defined but never used      @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\entrypoints\offscreen\main.ts
+  206:19  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\entrypoints\offscreen\pdf.ts
+  295:7   warning  This assigned value is not used in subsequent statements        no-useless-assignment
+  353:53  warning  Unexpected any. Specify a different type                        @typescript-eslint/no-explicit-any
+  414:9   warning  This assigned value is not used in subsequent statements        no-useless-assignment
+  462:5   warning  There is no `cause` attached to the symptom error being thrown  preserve-caught-error
+
+D:\Project\CebianX\Cebian\entrypoints\sidepanel\pages\chat\index.tsx
+  92:3  warning  Error: Cannot access refs during render
+
+React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected (https://react.dev/reference/react/useRef).
+
+D:\Project\CebianX\Cebian\entrypoints\sidepanel\pages\chat\index.tsx:92:3
+  90 |   // would hit portUnsubscribe() and wipe the optimistic user message.
+  91 |   const activeSessionIdRef = useRef<string | null>(null);
+> 92 |   activeSessionIdRef.current = activeSessionId;
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^ Cannot update ref during render
+  93 |
+  94 |   // When an interactive tool (e.g. ask_user) is pending, the agent is blocked
+  95 |   // waiting for user input 鈥?treat as "not running" so the input is usable  react-hooks/refs
+
+D:\Project\CebianX\Cebian\entrypoints\sidepanel\pages\settings\index.tsx
+  1:10  warning  'useEffect' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\entrypoints\vfs\App.tsx
+  147:21  warning  Unexpected any. Specify a different type                                                                                                                                                                                                                           @typescript-eslint/no-explicit-any
+  162:17  warning  The ref value 'loadIdRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'loadIdRef.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+D:\Project\CebianX\Cebian\hooks\useBackgroundAgent.ts
+  354:27  warning  The ref value 'connectedWaitersRef.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'connectedWaitersRef.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+  361:6   warning  React Hook useEffect has a missing dependency: 'callbacks'. Either include it or remove the dependency array                                                                                                                                                                           react-hooks/exhaustive-deps
+
+D:\Project\CebianX\Cebian\hooks\useMCPAppResource.ts
+  44:5  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\hooks\useMCPAppResource.ts:44:5
+  42 |   useEffect(() => {
+  43 |     let cancelled = false;
+> 44 |     setState({ status: 'loading' });
+     |     ^^^^^^^^ Avoid calling setState() directly within an effect
+  45 |     mcpAppResourceChannel.fetch(serverId, resourceUri).then(
+  46 |       (resource) => {
+  47 |         if (cancelled) return;  react-hooks/set-state-in-effect
+
+D:\Project\CebianX\Cebian\hooks\useUpdateCheck.ts
+  195:10  warning  Error: Calling setState synchronously within an effect can trigger cascading renders
+
+Effects are intended to synchronize state between React and external systems such as manually updating the DOM, state management libraries, or other platform APIs. In general, the body of an effect should do one or both of the following:
+* Update external systems with the latest state from React.
+* Subscribe for updates from some external system, calling setState in a callback function when external state changes.
+
+Calling setState synchronously within an effect body causes cascading renders that can hurt performance, and is not recommended. (https://react.dev/learn/you-might-not-need-an-effect).
+
+D:\Project\CebianX\Cebian\hooks\useUpdateCheck.ts:195:10
+  193 |   useEffect(() => {
+  194 |     mountedRef.current = true;
+> 195 |     void runCheck(false);
+      |          ^^^^^^^^ Avoid calling setState() directly within an effect
+  196 |     return () => {
+  197 |       mountedRef.current = false;
+  198 |     };  react-hooks/set-state-in-effect
+
+D:\Project\CebianX\Cebian\lib\agent.ts
+  23:20  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\ai-config\skill-creator.ts
+  13:3  warning  Unused eslint-disable directive (no problems were reported from 'no-constant-condition')
+
+D:\Project\CebianX\Cebian\lib\ai-config\web-provider-content-fetch-glm.ts
+  320:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  321:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  322:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  332:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\lib\ai-config\web-provider-content-script.ts
+   92:69  warning  Unexpected any. Specify a different type                                                  @typescript-eslint/no-explicit-any
+  128:68  warning  Unexpected any. Specify a different type                                                  @typescript-eslint/no-explicit-any
+  339:5   warning  Unused eslint-disable directive (no problems were reported from 'no-constant-condition')
+  461:18  warning  Unexpected console statement. Only these console methods are allowed: warn, error         no-console
+
+D:\Project\CebianX\Cebian\lib\ai-config\web-provider-conversations.ts
+  64:71  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\ai-config\web-provider-cookie-service.ts
+  402:16  warning  'safeRemoveTab' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\lib\ai-config\web-provider-diag.ts
+  155:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  157:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\lib\ai-config\web-provider-dom-strategy.ts
+  330:7  warning  'startedAt' is never reassigned. Use 'const' instead  prefer-const
+
+D:\Project\CebianX\Cebian\lib\ai-config\web-provider-relay.ts
+   35:3   warning  'providerId' is defined but never used. Allowed unused args must match /^_/u    @typescript-eslint/no-unused-vars
+  157:17  warning  'pid' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\lib\ai-config\web-provider-stream.ts
+  349:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  513:7  warning  This assigned value is not used in subsequent statements                           no-useless-assignment
+
+D:\Project\CebianX\Cebian\lib\attachments.ts
+  222:3   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  226:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  228:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  230:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  232:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  237:42  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  239:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  244:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  246:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  248:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  250:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  255:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  258:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  260:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  262:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  275:3   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\lib\capture\analyzer.ts
+  105:7   warning  'SENSITIVE_HEADERS' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  205:25  warning  'params' is assigned a value but never used. Allowed unused vars must match /^_/u             @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\lib\capture\api-executor.ts
+  12:15  warning  'AutoSkillDefinition' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\lib\capture\capture-session.ts
+  138:9  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\lib\capture\handler.ts
+  13:3  warning  'getSkillsByHostname' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  62:3  warning  Unexpected console statement. Only these console methods are allowed: warn, error      no-console
+
+D:\Project\CebianX\Cebian\lib\capture\skill-registry.ts
+  11:36  warning  'SkillStats' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\lib\db.ts
+  16:63  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\mcp\server.ts
+  429:3  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  470:5  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  539:7  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  543:3  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\lib\mobile-emulation.ts
+  21:17  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\oauth.ts
+  262:11  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\lib\recorder\session-to-sequence.ts
+  19:3  warning  'RecordedEvent' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\lib\storage.ts
+  2:10  warning  'isValidActiveModel' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\lib\tab-helpers.ts
+  49:58  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\tools\ask-user-registry.tsx
+  11:10  warning  Fast refresh only works when a file has exports. Move your component(s) to a separate file  react-refresh/only-export-components
+
+D:\Project\CebianX\Cebian\lib\tools\bg-fetch.ts
+  126:7  warning  There is no `cause` attached to the symptom error being thrown  preserve-caught-error
+
+D:\Project\CebianX\Cebian\lib\tools\chrome-api-tool.ts
+  371:15  warning  'name' is assigned a value but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\lib\tools\execute-js.ts
+  72:21  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  80:32  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\tools\fs-save-url.ts
+  153:9  warning  There is no `cause` attached to the symptom error being thrown  preserve-caught-error
+
+D:\Project\CebianX\Cebian\lib\tools\fs-search.ts
+  70:7  warning  There is no `cause` attached to the symptom error being thrown  preserve-caught-error
+
+D:\Project\CebianX\Cebian\lib\tools\interact.ts
+  829:11  warning  There is no `cause` attached to the symptom error being thrown  preserve-caught-error
+
+D:\Project\CebianX\Cebian\lib\tools\mcp-tool.ts
+  159:11  warning  There is no `cause` attached to the symptom error being thrown  preserve-caught-error
+
+D:\Project\CebianX\Cebian\lib\tools\read-page.ts
+  189:46  warning  Unexpected any. Specify a different type                  @typescript-eslint/no-explicit-any
+  190:13  warning  This assigned value is not used in subsequent statements  no-useless-assignment
+  192:27  warning  Unexpected any. Specify a different type                  @typescript-eslint/no-explicit-any
+  809:9   warning  This assigned value is not used in subsequent statements  no-useless-assignment
+
+D:\Project\CebianX\Cebian\lib\tools\run-skill.ts
+  128:5  warning  There is no `cause` attached to the symptom error being thrown  preserve-caught-error
+
+D:\Project\CebianX\Cebian\lib\tools\sandbox-rpc.ts
+  39:57  warning  'sendResponse' is defined but never used. Allowed unused args must match /^_/u  @typescript-eslint/no-unused-vars
+
+D:\Project\CebianX\Cebian\lib\tools\smart-interact.ts
+  54:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\tools\smart-read-page.ts
+  44:37  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\tools\tab.ts
+  107:66  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\tools\tool-labels.ts
+    8:65  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   77:48  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  102:47  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  114:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  125:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\tools\ui-registry.ts
+   9:59  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  14:26  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  17:48  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\tools\url-pattern.ts
+  150:7  warning  There is no `cause` attached to the symptom error being thrown  preserve-caught-error
+
+D:\Project\CebianX\Cebian\lib\tools\vfs-whitelist.ts
+  74:22  warning  Unnecessary escape character: \/  no-useless-escape
+
+D:\Project\CebianX\Cebian\lib\utils.ts
+  16:18  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\workflow\engine.ts
+  128:3  warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\lib\workflow\repository.ts
+    9:77  warning  'WorkflowRunStepRecord' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+  178:79  warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+  200:8   warning  Unexpected any. Specify a different type                                                 @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\workflow\session-to-workflow.ts
+  165:38  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+D:\Project\CebianX\Cebian\lib\workflow\trigger-manager.ts
+   23:5   warning  'activeUrlPatterns' is never reassigned. Use 'const' instead                       prefer-const
+   24:5   warning  'activeDomSelectors' is never reassigned. Use 'const' instead                      prefer-const
+   47:9   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  146:3   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  159:5   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+  219:17  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  232:17  warning  Unexpected any. Specify a different type                                           @typescript-eslint/no-explicit-any
+  238:7   warning  Unexpected console statement. Only these console methods are allowed: warn, error  no-console
+
+D:\Project\CebianX\Cebian\wxt.config.ts
+  19:43  warning  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+鉁?541 problems (0 errors, 541 warnings)
+  0 errors and 8 warnings potentially fixable with the `--fix` option.
+

@@ -104,7 +104,7 @@ export const tabTool: AgentTool<typeof TabParameters> = {
           throw new Error('"tabId" is required for list_frames action.');
         }
         const tabId = params.tabId;
-        const results = await (chrome.scripting.executeScript as any)({
+        const results = await chrome.scripting.executeScript({
           target: { tabId, allFrames: true },
           func: () => ({
             url: window.location.href,

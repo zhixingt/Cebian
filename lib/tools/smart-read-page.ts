@@ -41,7 +41,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
             }, null, 2),
           }],
           details: {},
-        } satisfies AgentToolResult<any>;
+        } satisfies AgentToolResult<unknown>;
       } catch (err) {
         if (err instanceof NoMatchError) {
           const fallback = await readPageTool.execute(_toolCallId, { tabId, mode: 'markdown' });

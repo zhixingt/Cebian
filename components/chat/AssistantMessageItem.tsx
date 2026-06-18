@@ -105,7 +105,7 @@ export const AssistantMessageItem = memo(function AssistantMessageItem({
               args={tc.arguments}
               isPending={isPending}
               toolResult={toolResult}
-              onResolve={isPending ? (response: any) => resolveTool(tc.name, response) : undefined}
+              onResolve={isPending ? (response: unknown) => resolveTool(tc.name, response) : undefined}
             />
           );
         }

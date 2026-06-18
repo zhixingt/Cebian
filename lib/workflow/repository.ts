@@ -5,7 +5,7 @@
  * 调用方应自行处理 Dexie/DOMException。
  */
 
-import { getDb } from '../db';
+import { getDb, type FlatWorkflow } from '../db';
 import type { Workflow, WorkflowStep, WorkflowRunStatus, WorkflowRunRecord, WorkflowRunStepRecord, WorkflowRunState } from './types';
 
 // ─── 验证 ───
@@ -175,7 +175,7 @@ export async function updateWorkflow(
       }
     });
   }
-  await getDb().workflows.update(id, { ...changes, updatedAt: Date.now() } as any);
+  await getDb().workflows.update(id, { ...changes, updatedAt: Date.now() } as Partial<FlatWorkflow>);
 }
 
 export async function deleteWorkflow(id: string): Promise<void> {
@@ -197,7 +197,7 @@ export async function recordWorkflowRun(
     runCount: workflow.runCount + 1,
     lastRunAt: Date.now(),
     lastRunStatus: status,
-  } as any);
+  } as Partial<FlatWorkflow>);
 }
 
 // ─── 查询辅助 ───

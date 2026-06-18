@@ -234,7 +234,7 @@ export async function extractTextFromFile(file: File): Promise<string | null> {
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const content = await page.getTextContent();
-        text += content.items.map((item: any) => item.str).join(' ') + '\n';
+        text += content.items.map((item) => 'str' in item ? item.str : '').join(' ') + '\n';
       }
       console.log('[extract] PDF text extracted, length:', text.length);
       return text.slice(0, 50_000);

@@ -12,8 +12,8 @@ import type {
 
 // Dexie 的 EntityTable.update 会为所有属性生成 key paths，遇到递归类型（IfStep
 // 中嵌套 WorkflowStep[]）会报 TS2615 circular reference。存储层使用 FlatWorkflow
-// 将 steps 降级为 any[]，应用层仍保持 Workflow 类型的强类型约束。
-export type FlatWorkflow = Omit<Workflow, 'steps'> & { steps: any[] };
+// 将 steps 降级为 unknown[]，应用层仍保持 Workflow 类型的强类型约束。
+export type FlatWorkflow = Omit<Workflow, 'steps'> & { steps: unknown[] };
 
 // ─── Schema ───
 

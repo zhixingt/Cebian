@@ -18,9 +18,9 @@ export async function attachEmulation(tabId: number): Promise<void> {
   const target = { tabId };
   try {
     await chrome.debugger.attach(target, '1.3');
-  } catch (err: any) {
+  } catch (err: unknown) {
     // Already attached — safe to continue
-    if (!String(err?.message).includes('Already attached')) throw err;
+    if (!String((err as Error)?.message).includes('Already attached')) throw err;
   }
   await chrome.debugger.sendCommand(target, 'Emulation.setDeviceMetricsOverride', {
     width: DEVICE.width,

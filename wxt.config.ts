@@ -16,6 +16,8 @@ export default defineConfig({
       'downloads', 'notifications',
       'clipboardRead', 'contextMenus',
     ],
+    // WXT 的 ManifestOptionalPermission 类型未包含 'debugger'，但 Chrome MV3 实际支持
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     optional_permissions: ['debugger'] as any,
     host_permissions: ['<all_urls>'],
     action: {

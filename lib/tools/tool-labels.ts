@@ -5,7 +5,29 @@
 
 import { t } from '@/lib/i18n';
 
-export function getToolLabel(name: string, args: Record<string, any> = {}): string {
+/** 工具调用参数 — 覆盖所有工具可能使用的属性 */
+interface ToolArgs {
+  mode?: string;
+  selector?: string;
+  path?: string;
+  old_path?: string;
+  pattern?: string;
+  dest?: string;
+  skill?: string;
+  namespace?: string;
+  method?: string;
+  x?: number;
+  y?: number;
+  action?: string;
+  key?: string;
+  steps?: unknown[];
+  text?: string;
+  tabId?: string | number;
+  pageRange?: string | number;
+  query?: string;
+}
+
+export function getToolLabel(name: string, args: ToolArgs = {}): string {
   // MCP tools: name is `mcp__<slug>__<remoteToolName>`. Parse and prettify;
   // we don't have the original server name (slug is lossy: lowercase + `_`),
   // so we surface the slug with underscores → spaces, which is good enough
@@ -74,7 +96,7 @@ function truncPath(p?: string): string {
   return p.length > 30 ? '...' + p.slice(-27) : p;
 }
 
-function getInteractLabel(args: Record<string, any>): string {
+function getInteractLabel(args: ToolArgs): string {
   const target = args.selector
     ? ` ${args.selector}`
     : (args.x != null ? ` (${args.x}, ${args.y})` : '');
@@ -99,7 +121,7 @@ function getInteractLabel(args: Record<string, any>): string {
   }
 }
 
-function getInspectLabel(args: Record<string, any>): string {
+function getInspectLabel(args: ToolArgs): string {
   if (args.selector) {
     const sel = args.selector.length > 40 ? args.selector.slice(0, 37) + '...' : args.selector;
     return t('tools.inspect.selector', [sel]);
@@ -111,7 +133,7 @@ function getInspectLabel(args: Record<string, any>): string {
   return t('tools.inspect.page');
 }
 
-function getTabLabel(args: Record<string, any>): string {
+function getTabLabel(args: ToolArgs): string {
   switch (args.action) {
     case 'open': return t('tools.tab.open');
     case 'close': return t('tools.tab.close', [args.tabId ?? '']);
@@ -122,12 +144,12 @@ function getTabLabel(args: Record<string, any>): string {
   }
 }
 
-function getPdfLabel(args: Record<string, any>): string {
+function getPdfLabel(args: ToolArgs): string {
   switch (args.action) {
     case 'info':
       return t('tools.pdf.info');
     case 'read': {
-      const range = args.pageRange ? String(args.pageRange) : 'all pages';
+      const range = args.pageRange != null ? String(args.pageRange) : 'all pages';
       return t('tools.pdf.read', [range]);
     }
     case 'search': {

@@ -46,7 +46,7 @@ export async function executeInTab<T>(
 /**
  * Execute a function with serialized arguments in the active tab (or a specific frame).
  */
-export async function executeInTabWithArgs<TArgs extends any[], T>(
+export async function executeInTabWithArgs<TArgs extends unknown[], T>(
   tabId: number,
   func: (...args: TArgs) => T,
   args: TArgs,

@@ -51,7 +51,7 @@ export const smartInteractTool: AgentTool<typeof smartInteractSchema> = {
             }, null, 2),
           }],
           details: {},
-        } satisfies AgentToolResult<any>;
+        } satisfies AgentToolResult<unknown>;
       } catch (err) {
         if (err instanceof NoMatchError) {
           const fallbackAction = action === 'api_submit' ? 'click' : 'type';

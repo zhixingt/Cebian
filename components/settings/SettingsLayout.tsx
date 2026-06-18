@@ -68,8 +68,8 @@ export function SettingsLayout({ basePath, showBackButton = false, showOpenInTab
 
   // Open the current Settings path in the standalone tab page.
   const handleOpenInTab = useCallback(() => {
-    const url = (browser.runtime as any).getURL('/settings.html') + '#/' + relative;
-    void (browser.tabs as any).create({ url });
+    const url = (browser.runtime as unknown as { getURL: (path: string) => string }).getURL('/settings.html') + '#/' + relative;
+    void (browser.tabs as unknown as { create: (props: { url: string }) => Promise<unknown> }).create({ url });
   }, [relative]);
 
   const outletCtx: SettingsOutletContext = { basePath, breakpoint };

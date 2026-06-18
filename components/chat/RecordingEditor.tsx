@@ -30,6 +30,7 @@ type PromptDispatchResult = import('@/hooks/useBackgroundAgent').PromptDispatchR
 
 /** 获取 action 的本地化标签 */
 function getActionLabel(action: string): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return t(`chat.recordingEditor.actionLabels.${action}` as any) || action;
 }
 

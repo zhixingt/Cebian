@@ -144,12 +144,13 @@ export default function App() {
         }
 
         setView({ kind: 'file', path: p, media });
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (myId !== loadIdRef.current) return;
+        const e = err as { code?: string; message?: string };
         const message =
-          err?.code === 'ENOENT'
+          e?.code === 'ENOENT'
             ? t('vfs.pathNotFound', [p])
-            : err?.message ?? t('vfs.unknownError');
+            : e?.message ?? t('vfs.unknownError');
         setView({ kind: 'error', path: p, message });
       }
     }

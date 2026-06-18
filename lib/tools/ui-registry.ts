@@ -6,15 +6,15 @@ import type { ComponentType } from 'react';
 import type { ToolResultMessage } from '@earendil-works/pi-ai';
 
 /** Props that every interactive tool UI component receives. */
-export interface InteractiveToolComponentProps<TRequest = any> {
+export interface InteractiveToolComponentProps<TRequest = unknown> {
   toolCallId: string;
   args: TRequest;
   isPending: boolean;
   toolResult?: ToolResultMessage;
-  onResolve?: (response: any) => void;
+  onResolve?: (response: unknown) => void;
 }
 
-export interface UIToolRegistration<TRequest = any> {
+export interface UIToolRegistration<TRequest = unknown> {
   name: string;
   Component: ComponentType<InteractiveToolComponentProps<TRequest>>;
   renderResultAsUserBubble?: boolean;

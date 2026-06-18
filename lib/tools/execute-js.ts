@@ -69,15 +69,16 @@ export const executeJsTool: AgentTool<typeof ExecuteJsParameters> = {
       func: async (code: string, cspSentinel: string) => {
         try {
           return await new Function(`return (async () => { ${code} })()`)();
-        } catch (e: any) {
-          if (e.message && /unsafe-eval|Content Security Policy/i.test(e.message)) {
+        } catch (e: unknown) {
+          const msg = (e as Error)?.message;
+          if (msg && /unsafe-eval|Content Security Policy/i.test(msg)) {
             return cspSentinel;
           }
           throw e;
         }
       },
       args: [params.code, CSP_BLOCKED],
-      ...({ world: 'MAIN' } as any),
+      ...({ world: 'MAIN' } as { world: 'MAIN' }),
     });
 
     const result = results?.[0];

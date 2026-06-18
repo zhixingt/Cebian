@@ -13,7 +13,7 @@ export function cn(...inputs: ClassValue[]) {
 // By registering on globalThis here AND in sidepanel-error-boundary.js,
 // we guarantee cn() is always available regardless of chunk loading order.
 if (typeof globalThis !== 'undefined') {
-  (globalThis as any).__cebCn ??= cn;
+  (globalThis as { __cebCn?: typeof cn }).__cebCn ??= cn;
 }
 
 /** Compact character-count formatter for UI tooltips: `999`, `1.2K`, `3.4M`.

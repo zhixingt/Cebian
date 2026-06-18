@@ -350,7 +350,7 @@ async function resolveOutlineDestination(
     }
     if (!explicit || explicit.length === 0) return undefined;
     const ref = explicit[0];
-    const pageIndex = await doc.getPageIndex(ref as any);
+    const pageIndex = await doc.getPageIndex(ref as { num: number; gen: number });
     if (typeof pageIndex === 'number') return pageIndex + 1; // 0-based → 1-based
     return undefined;
   } catch {

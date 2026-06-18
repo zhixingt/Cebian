@@ -216,7 +216,7 @@ export function installDomTriggerListener(): void {
     if (typeof msg !== 'object' || msg === null) return false;
 
     // get_dom_triggers — content script queries active selectors
-    if ((msg as any).type === 'get_dom_triggers') {
+    if ((msg as { type?: string }).type === 'get_dom_triggers') {
       void (async () => {
         // Lazy-load if empty (SW restart)
         if (activeDomSelectors.size === 0) {
@@ -229,7 +229,7 @@ export function installDomTriggerListener(): void {
     }
 
     // dom_trigger_fired — content script reports element appearance
-    if ((msg as any).type === 'dom_trigger_fired') {
+    if ((msg as { type?: string }).type === 'dom_trigger_fired') {
       const { workflowId, selector, url } = msg as {
         workflowId: string;
         selector: string;

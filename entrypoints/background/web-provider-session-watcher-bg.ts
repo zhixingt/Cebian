@@ -54,7 +54,7 @@ export interface InstallDeps {
   /** addListener injection. Production: chrome.cookies.onChanged.addListener. */
   addCookieListener: (cb: (event: unknown) => void) => void;
   /** addListener injection. Production: chrome.runtime.onMessage.addListener. */
-  addMessageListener: (cb: (msg: any) => void) => void;
+  addMessageListener: (cb: (msg: unknown) => void) => void;
   /**
    * Per-providerId broadcast dedup window in ms. Default 5000. When the
    * session watcher detects session loss and fires the relogin broadcast,
@@ -151,11 +151,12 @@ export function installSessionWatcher(deps: InstallDeps): void {
   // Re-login handler: restart the watcher for that provider so the
   // new (post-relogin) cookies are picked up and the next periodic
   // probe doesn't immediately re-fire NEEDS_RELOGIN.
-  deps.addMessageListener((msg: any) => {
-    if (msg?.type !== 'relogin_success') return;
-    const providerId = msg.providerId;
-    if (typeof providerId !== 'string') return;
-    const preset = presets.find((p) => p.id === providerId);
+  deps.addMessageListener((msg: unknown) => {
+    if (typeof msg !== 'object' || msg === null) return;
+    const m = msg as { type?: unknown; providerId?: unknown };
+    if (m.type !== 'relogin_success') return;
+    if (typeof m.providerId !== 'string') return;
+    const preset = presets.find((p) => p.id === m.providerId);
     if (!preset) return;
     _startForPreset(preset, startW, dedupWindowMs, now);
   });

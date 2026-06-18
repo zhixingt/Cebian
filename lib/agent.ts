@@ -20,6 +20,7 @@ export interface CreateAgentOptions {
   maxRounds: number;
   messages?: AgentMessage[];
   /** Session-specific tools array (includes per-session ask_user). */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools: AgentTool<any>[];
 }
 

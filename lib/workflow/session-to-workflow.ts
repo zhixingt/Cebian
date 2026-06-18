@@ -162,7 +162,7 @@ function generateWorkflowId(): string {
 function deriveWorkflowName(session: RecordedSession): string {
   // 优先取第一个导航事件的 URL hostname
   const navEvent = session.events.find(
-    (e) => e.kind === 'tab' && (e as any).event === 'navigated',
+    (e) => e.kind === 'tab' && e.event === 'navigated',
   );
   if (navEvent) {
     try {

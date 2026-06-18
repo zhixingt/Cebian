@@ -186,10 +186,10 @@ function extractOutline(selector: string | null): string {
     function topAtPoint(x: number, y: number): Element | null {
       let el = document.elementFromPoint(x, y);
       // Hard cap on shadow piercing to defend against pathological host-A → host-B → host-A cycles.
-      for (let i = 0; i < 16 && el && (el as any).shadowRoot; i++) {
+      for (let i = 0; i < 16 && el && el.shadowRoot; i++) {
         let inner: Element | null = null;
         try {
-          inner = ((el as any).shadowRoot as ShadowRoot).elementFromPoint?.(x, y) ?? null;
+          inner = el.shadowRoot?.elementFromPoint(x, y) ?? null;
         } catch {
           inner = null;
         }

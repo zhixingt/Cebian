@@ -61,7 +61,7 @@ export async function setConversation(
   state: WebProviderConversationState,
 ): Promise<void> {
   const key = makeKey(state.providerId, state.modelId);
-  await getDb().webProviderConversations.put({ ...state, id: key } as any);
+  await getDb().webProviderConversations.put({ ...state, id: key } as WebProviderConversationRecord);
 }
 
 /**

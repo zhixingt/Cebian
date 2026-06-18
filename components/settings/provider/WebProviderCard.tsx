@@ -123,6 +123,7 @@ export function WebProviderCard({
             <p className="text-sm font-medium" data-testid="provider-name">
               {/* preset.displayNameKey is dynamic per-preset, so the WXT
                   i18n literal-type doesn't accept it. Cast is required. */}
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {t(preset.displayNameKey as any)}
             </p>
             {isLoggedIn && (
@@ -155,6 +156,7 @@ export function WebProviderCard({
           </div>
           {preset.descriptionKey ? (
             <p className="text-xs text-muted-foreground mt-0.5">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
               {t(preset.descriptionKey as any)}
             </p>
           ) : null}
