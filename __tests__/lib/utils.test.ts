@@ -16,7 +16,8 @@ describe('cn', () => {
   });
 
   it('handles conditional classes', () => {
-    expect(cn('base', false && 'hidden', 'block')).toBe('base block');
+    const isHidden = false as boolean;
+    expect(cn('base', isHidden && 'hidden', 'block')).toBe('base block');
   });
 });
 

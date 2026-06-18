@@ -71,6 +71,18 @@ export default tseslint.config(
   // Prettier 兼容（禁用与 Prettier 冲突的规则）
   prettierConfig,
 
+  // Skill 脚本运行环境（assets/skills/**）
+  // 这些脚本在沙箱中执行，bgFetch/args 等由运行时注入
+  {
+    files: ['assets/skills/**/*.{js,ts}'],
+    languageOptions: {
+      globals: {
+        bgFetch: 'readonly',
+        args: 'readonly',
+      },
+    },
+  },
+
   // 项目自定义规则
   {
     languageOptions: {
