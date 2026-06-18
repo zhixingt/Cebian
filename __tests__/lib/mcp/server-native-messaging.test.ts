@@ -317,6 +317,85 @@ describe('installNativeMessagingListener', () => {
     warnSpy.mockRestore();
   });
 
+  it('ignores null message without throwing or posting', async () => {
+    installNativeMessagingListener();
+    const port = createMockPort('cebianx-mcp-host');
+    onConnectCallback!(port);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    port._fireMessage!(null);
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(port.postMessage).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Invalid Native Messaging message'),
+      null,
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('ignores undefined message without throwing', async () => {
+    installNativeMessagingListener();
+    const port = createMockPort('cebianx-mcp-host');
+    onConnectCallback!(port);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    expect(() => port._fireMessage!(undefined)).not.toThrow();
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(port.postMessage).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('ignores message missing requestId', async () => {
+    installNativeMessagingListener();
+    const port = createMockPort('cebianx-mcp-host');
+    onConnectCallback!(port);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    port._fireMessage!({ mcpRequest: { method: 'tools/list' } });
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(port.postMessage).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('ignores message missing mcpRequest', async () => {
+    installNativeMessagingListener();
+    const port = createMockPort('cebianx-mcp-host');
+    onConnectCallback!(port);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    port._fireMessage!({ requestId: 'r1' });
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(port.postMessage).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('ignores message with non-string requestId', async () => {
+    installNativeMessagingListener();
+    const port = createMockPort('cebianx-mcp-host');
+    onConnectCallback!(port);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    port._fireMessage!({ requestId: 123, mcpRequest: { method: 'tools/list' } });
+
+    await new Promise((r) => setTimeout(r, 10));
+
+    expect(port.postMessage).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
   it('can be called multiple times (idempotent registration)', () => {
     installNativeMessagingListener();
     installNativeMessagingListener();

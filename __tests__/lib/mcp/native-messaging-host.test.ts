@@ -358,6 +358,29 @@ describe('createHttpHandler', () => {
     expect(body.error.code).toBe(-32000);
     expect(body.error.message).toMatch(/timeout/i);
   });
+
+  it('POST /mcp returns error response immediately when send throws', async () => {
+    const router = new RequestRouter(5000);
+    // 模拟 stdout 已关闭，send 抛错
+    const send = () => {
+      throw new Error('stdout closed');
+    };
+    const { port } = await startTestHandler(router, send);
+
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: 1, method: 'tools/list' }),
+    });
+
+    // 应立即返回错误响应（而非等待 5s 超时）
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.error.code).toBe(-32000);
+    expect(body.error.message).toContain('Failed to send to Chrome');
+    expect(body.error.message).toContain('stdout closed');
+    expect(router.size()).toBe(0); // pending 请求已被清理
+  });
 });
 
 // ─── startNativeHost 集成测试 ───
@@ -451,6 +474,63 @@ describe('startNativeHost', () => {
       const respBody = await res.json();
       expect(respBody.id).toBe(1);
       expect(respBody.result.tools).toHaveLength(1);
+    } finally {
+      await shutdown();
+    }
+  });
+
+  it('recovers from stdin parse errors and processes subsequent valid messages', async () => {
+    const port = testPort++;
+    const stdin = createMockStdin();
+    const stdout = createMockStdout();
+
+    const sentMessages: Buffer[] = [];
+    stdout.on('data', (chunk) => sentMessages.push(chunk));
+
+    const { shutdown } = startNativeHost({
+      port,
+      stdin: stdin as any,
+      stdout: stdout as any,
+      timeoutMs: 5000,
+    });
+
+    try {
+      await new Promise((r) => setTimeout(r, 50));
+
+      // 发起 HTTP 请求
+      const fetchPromise = fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 1, method: 'tools/list' }),
+      });
+
+      // 等待 stdout 发送请求
+      await new Promise((r) => setTimeout(r, 50));
+      const combined = Buffer.concat(sentMessages);
+      const length = combined.readUInt32LE(0);
+      const body = combined.subarray(4, 4 + length);
+      const nativeMsg = JSON.parse(body.toString('utf8'));
+
+      // 发送损坏数据（长度前缀超过 10MB），触发 parser.feed 抛错
+      const corruptedHeader = Buffer.alloc(4);
+      corruptedHeader.writeUInt32LE(11 * 1024 * 1024, 0);
+      stdin.write(corruptedHeader);
+
+      // 等待错误处理完成
+      await new Promise((r) => setTimeout(r, 50));
+
+      // 发送有效响应（parser 应已通过 reset() 恢复）
+      const response = encodeNativeMessage({
+        requestId: nativeMsg.requestId,
+        mcpResponse: { id: 1, result: { tools: [{ name: 'recovered' }] } },
+      });
+      stdin.write(response);
+
+      const res = await fetchPromise;
+      expect(res.status).toBe(200);
+      const respBody = await res.json();
+      expect(respBody.result.tools).toHaveLength(1);
+      expect(respBody.result.tools[0].name).toBe('recovered');
     } finally {
       await shutdown();
     }

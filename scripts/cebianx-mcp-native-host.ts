@@ -219,7 +219,15 @@ export function createHttpHandler(deps: HostDeps) {
       }
 
       const { requestId, promise } = deps.router.register();
-      deps.send({ requestId, mcpRequest });
+      try {
+        deps.send({ requestId, mcpRequest });
+      } catch (err) {
+        // send 失败（如 stdout 已关闭）→ 立即拒绝 pending 请求，避免等待超时
+        deps.router.routeResponse(requestId, {
+          id: undefined,
+          error: { code: -32000, message: `Failed to send to Chrome: ${(err as Error).message}` },
+        });
+      }
 
       try {
         const mcpResponse = await promise;
@@ -282,6 +290,7 @@ export function startNativeHost(options: MainOptions = {}): {
       }
     } catch (err) {
       console.error('[NativeHost] stdin parse error:', err);
+      parser.reset(); // 重置 buffer，避免损坏数据残留导致永久失效
     }
   };
 

@@ -442,6 +442,11 @@ export function installNativeMessagingListener(): void {
     console.log('[MCP Server] Native Messaging host connected');
 
     port.onMessage.addListener(async (msg) => {
+      // 验证消息格式，避免 null/undefined 或缺少字段导致后续抛 TypeError
+      if (!msg || typeof msg !== 'object' || typeof msg.requestId !== 'string' || !msg.mcpRequest) {
+        console.warn('[MCP Server] Invalid Native Messaging message:', msg);
+        return;
+      }
       const { requestId, mcpRequest } = msg as { requestId: string; mcpRequest: MCPRequest };
       const mcpResponse = await handleRequest(mcpRequest);
       try {
