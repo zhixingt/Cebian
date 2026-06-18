@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useMemo, useCallback, type KeyboardEvent } from 'react';
-import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film } from 'lucide-react';
+import { useState, useRef, useEffect, useMemo, useCallback, useImperativeHandle, forwardRef, type KeyboardEvent } from 'react';
+import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film, Play, Pencil, BookOpen, Scissors, MousePointerClick, FileInput, Eye, Loader2 } from 'lucide-react';
 import { showDialog } from '@/lib/dialog';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -15,23 +15,37 @@ import { getModel } from '@earendil-works/pi-ai';
 import { isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { startElementPicker, cancelElementPicker } from '@/lib/element-picker';
 import { scanPrompts, type PromptMeta } from '@/lib/ai-config/scanner';
-import { replaceTemplateVars, gatherTemplateVars } from '@/lib/ai-config/template';
-import { vfs } from '@/lib/vfs';
-import { parseFrontmatter } from '@/lib/frontmatter';
-import { CEBIAN_PROMPTS_DIR } from '@/lib/constants';
+import { makeTriggerSlashPrompt } from '@/lib/chat/trigger-slash-prompt';
 import {
   MAX_ATTACHMENT_COUNT, MAX_IMAGE_SIZE, MAX_TEXT_FILE_SIZE,
   RECORDING_MIME,
   isImageFile, isTextFile, formatFileSize,
+  isExtractableFile, extractTextFromFile,
+  ACCEPT_EXTENSIONS,
   type Attachment,
 } from '@/lib/attachments';
 import { recordingToAttachment } from '@/lib/recorder/to-attachment';
+import { sessionToSequence } from '@/lib/recorder/session-to-sequence';
+import type { RecordedSession } from '@/lib/recorder/types';
+import type { SequenceStep } from '@/lib/recorder/session-to-sequence';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
+import { RecordingEditor } from '@/components/chat/RecordingEditor';
 import { useRecorder } from '@/hooks/useRecorder';
+import { useWebProviders } from '@/hooks/useWebProviders';
 import { useMobileEmulation } from '@/hooks/useMobileEmulation';
 import { downloadFile, formatDuration, formatCharCount } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 import type { PromptDispatchResult } from '@/hooks/useBackgroundAgent';
+import type { QuickToolId } from '@/components/chat/QuickActionsBar';
+
+/** 页面操作快速工具定义（与 QuickActionsBar 原先的一致） */
+const QUICK_TOOLS = [
+  { id: 'read-page' as QuickToolId, icon: BookOpen, labelKey: 'chat.quickActions.toolReadPage' },
+  { id: 'screenshot-analyze' as QuickToolId, icon: Scissors, labelKey: 'chat.quickActions.toolScreenshotAnalyze' },
+  { id: 'operate-page' as QuickToolId, icon: MousePointerClick, labelKey: 'chat.quickActions.toolOperatePage' },
+  { id: 'fill-form' as QuickToolId, icon: FileInput, labelKey: 'chat.quickActions.toolFillForm' },
+  { id: 'watch-page' as QuickToolId, icon: Eye, labelKey: 'chat.quickActions.toolWatchPage' },
+] as const;
 
 interface ChatInputProps {
   onSend: (
@@ -46,9 +60,69 @@ interface ChatInputProps {
   userHistory?: string[];
   /** Conversation id; changing it resets history navigation state. */
   sessionId?: string | null;
+  /** Called when a page-operation quick tool button is clicked. */
+  onQuickTool?: (toolId: QuickToolId) => void;
+  /** Whether page watcher is currently active (for watch-page button state). */
+  isWatching?: boolean;
 }
 
-export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId }: ChatInputProps) {
+/**
+ * Imperative handle exposed via `forwardRef`. The chat page uses this to
+ * trigger a prompt from the QuickActionsBar without re-mounting the composer
+ * or mirroring `value` state in the parent.
+ */
+export interface ChatInputHandle {
+  /**
+   * Resolve the prompt at the given filename via the same `triggerSlashPrompt`
+   * factory the slash menu uses, and write the resolved text into the
+   * composer. Returns when the text is in the textarea.
+   */
+  handleQuickAction: (fileName: string) => Promise<void>;
+}
+
+// ─── ReplayButton：打开录制编辑器 ───
+
+function ReplayButton({ disabled, attachments, onOpenEditor }: {
+  disabled?: boolean;
+  attachments: Attachment[];
+  onOpenEditor: (recording: Attachment) => void;
+}) {
+  // 找到最近的录制附件
+  const lastRecording = useMemo(() => {
+    for (let i = attachments.length - 1; i >= 0; i--) {
+      if (attachments[i].type === 'recording') return attachments[i];
+    }
+    return null;
+  }, [attachments]);
+
+  const hasRecording = lastRecording !== null;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="inline-flex">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => lastRecording && onOpenEditor(lastRecording)}
+            disabled={disabled || !hasRecording}
+            aria-label={hasRecording ? t('chat.recorder.editAndReplay') : t('chat.recorder.none')}
+          >
+            <Play className="size-3.5" />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        {hasRecording ? t('chat.recorder.editAndReplay') : t('chat.recorder.none')}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
+  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId, onQuickTool, isWatching },
+  ref,
+) {
   const [value, setValue] = useState('');
   const [showSlash, setShowSlash] = useState(false);
   const [prompts, setPrompts] = useState<PromptMeta[]>([]);
@@ -75,8 +149,10 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
 
   const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
   const [currentThinkingLevel, setCurrentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
-  const [providers] = useStorageItem(providerCredentials, {});
-  const [customProviderList] = useStorageItem(customProvidersStorage, []);
+const [providers] = useStorageItem(providerCredentials, {});
+const [customProviderList] = useStorageItem(customProvidersStorage, []);
+// ③+④: feed Web (Browser Session) providers into the model selector
+const { providers: webProvidersList } = useWebProviders();
 
   const isReasoningModel = useMemo(() => {
     if (!currentModel) return false;
@@ -134,6 +210,22 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
     setCurrentThinkingLevel(level);
   };
 
+  // ── Page-operation quick tools (moved from QuickActionsBar) ──
+  const [pendingTool, setPendingTool] = useState<QuickToolId | null>(null);
+  const handleToolClick = useCallback(
+    (toolId: QuickToolId) => {
+      if (pendingTool) return;
+      if (toolId === 'watch-page') {
+        onQuickTool?.(toolId);
+        return;
+      }
+      setPendingTool(toolId);
+      onQuickTool?.(toolId);
+      setTimeout(() => setPendingTool(null), 2000);
+    },
+    [onQuickTool, pendingTool],
+  );
+
   // Auto-resize textarea. When the value is empty (initial mount, after
   // send) we clear the inline height entirely and let CSS `min-h-11 /
   // max-h-37.5` drive sizing. This avoids a first-paint race in the
@@ -182,6 +274,8 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   // the composer becomes editable again while the agent replies.
   const isDispatchingRef = useRef(false);
   const [isDispatching, setIsDispatching] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorRecording, setEditorRecording] = useState<Attachment | null>(null);
 
   // Keep the ref in sync with state so any post-await reader sees the
   // most-recent attachments without depending on a re-render.
@@ -427,23 +521,51 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedPromptIndex, isSlashMenuVisible]);
 
-  // Handle prompt selection from slash menu
+  // Build a stable trigger instance once per mount. `toast` is the
+  // module-scope sonner import; `setValue` / `setShowSlash` / the
+  // textarea ref are stable for the component's lifetime — the closure
+  // captures them once and reuses the same vfs / template chain for
+  // every prompt the user picks.
+  const triggerSlashPrompt = useMemo(
+    () =>
+      makeTriggerSlashPrompt({
+        toast,
+        onLoaded: (text) => {
+          setValue(text);
+          setShowSlash(false);
+          textareaRef.current?.focus();
+        },
+      }),
+    [],
+  );
+
+  // Handle prompt selection from slash menu. The factory does the heavy
+  // lifting (vfs read → parseFrontmatter → gatherTemplateVars →
+  // replaceTemplateVars); we keep the dispatching-guard around it so
+  // concurrent handleSend / handlePromptSelect calls don't double-write
+  // the textarea.
   const handlePromptSelect = async (prompt: PromptMeta) => {
     if (isDispatchingRef.current) return;
-    try {
-      const raw = await vfs.readFile(`${CEBIAN_PROMPTS_DIR}/${prompt.fileName}`, 'utf8');
-      const content = typeof raw === 'string' ? raw : new TextDecoder().decode(raw as Uint8Array);
-      const { body } = parseFrontmatter(content);
-      const vars = await gatherTemplateVars();
-      const replaced = replaceTemplateVars(body.trim(), vars);
-      if (isDispatchingRef.current) return;
-      setValue(replaced);
-      setShowSlash(false);
-      textareaRef.current?.focus();
-    } catch {
-      toast.error(t('chat.composer.readPromptFailed'));
-    }
+    await triggerSlashPrompt(prompt);
+    if (isDispatchingRef.current) return;
   };
+
+  // Quick Actions Bar trigger — called by the parent via ref. Looks up the
+  // prompt by filename and runs it through the same factory the slash menu
+  // uses, so behavior is identical regardless of how the user picked the
+  // prompt. Re-uses the dispatching guard for symmetry with the slash path.
+  const handleQuickAction = useCallback(
+    async (fileName: string) => {
+      if (isDispatchingRef.current) return;
+      const all = await scanPrompts();
+      const prompt = all.find((p) => p.fileName === fileName);
+      if (!prompt) return;
+      await triggerSlashPrompt(prompt);
+    },
+    [triggerSlashPrompt],
+  );
+
+  useImperativeHandle(ref, () => ({ handleQuickAction }), [handleQuickAction]);
 
   const handlePickElement = async () => {
     if (isDispatchingRef.current) return;
@@ -519,7 +641,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isDispatchingRef.current) {
       e.target.value = '';
       return;
@@ -540,47 +662,78 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
     }
 
     for (const file of filesToProcess) {
-      if (isImageFile(file)) {
-        // 当前模型不支持多模态时，跳过图片文件（文本文件仍照常处理）。
-        if (!supportsImage) {
-          toast.warning(t('chat.composer.modelNoImage'));
-          continue;
+      const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+      console.log('[upload] processing file:', file.name, 'size:', file.size, 'type:', file.type, 'ext:', ext);
+
+      // Legacy .doc is not extractable in browser — prompt conversion
+      if (ext === '.doc') {
+        toast.info(t('chat.upload.docConvertHint'));
+        continue;
+      }
+
+      try {
+        if (isImageFile(file)) {
+          // 当前模型不支持多模态时，跳过图片文件（文本文件仍照常处理）。
+          if (!supportsImage) {
+            toast.warning(t('chat.composer.modelNoImage'));
+            continue;
+          }
+          if (file.size > MAX_IMAGE_SIZE) {
+            toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_IMAGE_SIZE)]));
+            continue;
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (isDispatchingRef.current) return;
+            if (!supportsImageRef.current) return;
+            const dataUrl = reader.result as string;
+            const base64 = dataUrl.split(',', 2)[1] ?? '';
+            const mimeType = file.type || 'image/png';
+            setAttachments((prev) => {
+              if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
+              return [...prev, { type: 'image', source: 'upload', data: base64, mimeType, name: file.name }];
+            });
+          };
+          reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
+          reader.readAsDataURL(file);
+        } else if (isExtractableFile(file.name)) {
+          // PDF / DOCX / XLSX — extract plain text in browser
+          if (file.size > MAX_TEXT_FILE_SIZE * 10) {
+            toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE * 10)]));
+            continue;
+          }
+          console.log('[upload] extracting text from', file.name);
+          const extracted = await extractTextFromFile(file);
+          console.log('[upload] extracted result for', file.name, ':', extracted ? `length=${extracted.length}` : 'null');
+          if (extracted != null) {
+            setAttachments((prev) => {
+              if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
+              return [...prev, { type: 'file', content: extracted, name: file.name, mimeType: file.type || 'application/octet-stream', size: file.size }];
+            });
+          } else {
+            toast.error(t('chat.composer.readFileFailed', [file.name]));
+          }
+        } else if (isTextFile(file.name)) {
+          if (file.size > MAX_TEXT_FILE_SIZE) {
+            toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE)]));
+            continue;
+          }
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (isDispatchingRef.current) return;
+            setAttachments((prev) => {
+              if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
+              return [...prev, { type: 'file', content: reader.result as string, name: file.name, mimeType: file.type || 'text/plain', size: file.size }];
+            });
+          };
+          reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
+          reader.readAsText(file);
+        } else {
+          toast.error(t('chat.composer.unsupportedFileType', [file.name]));
         }
-        if (file.size > MAX_IMAGE_SIZE) {
-          toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_IMAGE_SIZE)]));
-          continue;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (isDispatchingRef.current) return;
-          if (!supportsImageRef.current) return;
-          const dataUrl = reader.result as string;
-          const base64 = dataUrl.split(',', 2)[1] ?? '';
-          const mimeType = file.type || 'image/png';
-          setAttachments((prev) => {
-            if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
-            return [...prev, { type: 'image', source: 'upload', data: base64, mimeType, name: file.name }];
-          });
-        };
-        reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
-        reader.readAsDataURL(file);
-      } else if (isTextFile(file.name)) {
-        if (file.size > MAX_TEXT_FILE_SIZE) {
-          toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE)]));
-          continue;
-        }
-        const reader = new FileReader();
-        reader.onload = () => {
-          if (isDispatchingRef.current) return;
-          setAttachments((prev) => {
-            if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
-            return [...prev, { type: 'file', content: reader.result as string, name: file.name, mimeType: file.type || 'text/plain', size: file.size }];
-          });
-        };
-        reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
-        reader.readAsText(file);
-      } else {
-        toast.error(t('chat.composer.unsupportedFileType', [file.name]));
+      } catch (err) {
+        console.error('[upload] unexpected error processing', file.name, err);
+        toast.error(t('chat.composer.readFileFailed', [file.name]));
       }
     }
 
@@ -656,7 +809,8 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
   };
 
   return (
-    <footer className="px-4 py-4 border-t border-border bg-background relative">
+    <>
+    <footer className="px-4 py-4 bg-background relative">
       {/* Slash menu — dynamic VFS prompts */}
       {isSlashMenuVisible && (
         <div
@@ -695,14 +849,15 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
         </div>
       )}
 
-      <div className="border border-border rounded-xl bg-card focus-within:border-border/80 focus-within:ring-2 focus-within:ring-primary/10 transition-all">
+      <div className="border border-border rounded-xl bg-card focus-within:border-border/80 focus-within:ring-2 focus-within:ring-primary/25 focus-within:ring-offset-1 focus-within:ring-offset-background transition-all">
         {/* Top row: tools + attachments */}
-        <div className="flex items-center gap-1 px-2 pt-2 pb-2">
+        <div className="flex items-center gap-1 px-2 pt-2 pb-2 border-b border-border/40">
           {/* Tool icons */}
           <Button
             variant="ghost"
             size="icon-xs"
             title={isPicking ? t('chat.composer.cancelPick') : t('chat.composer.pickElement')}
+            aria-label={isPicking ? t('chat.composer.cancelPick') : t('chat.composer.pickElement')}
             onClick={handlePickElement}
             disabled={isDispatching}
             className={isPicking ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
@@ -710,6 +865,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
             <MousePointer2 className="size-3.5" />
           </Button>
           <RecordButton disabled={isDispatching} />
+          <ReplayButton disabled={isDispatching} attachments={attachments} onOpenEditor={(rec) => { setEditorRecording(rec); setEditorOpen(true); }} />
           <Tooltip>
             <TooltipTrigger asChild>
               <span
@@ -721,6 +877,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
                   size="icon-xs"
                   onClick={handleScreenshot}
                   disabled={isDispatching || !supportsImage}
+                  aria-label={supportsImage ? t('chat.composer.screenshot') : t('chat.composer.modelNoImage')}
                 >
                   <Camera className="size-3.5" />
                 </Button>
@@ -730,14 +887,14 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
               {supportsImage ? t('chat.composer.screenshot') : t('chat.composer.modelNoImage')}
             </TooltipContent>
           </Tooltip>
-          <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()} disabled={isDispatching}>
+          <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} aria-label={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()} disabled={isDispatching}>
             <Paperclip className="size-3.5" />
           </Button>
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            accept={`${supportsImage ? 'image/*,' : ''}.txt,.md,.csv,.tsv,.log,.js,.ts,.jsx,.tsx,.mjs,.cjs,.py,.java,.c,.cpp,.h,.hpp,.go,.rs,.rb,.php,.sh,.bash,.sql,.yaml,.yml,.toml,.ini,.cfg,.json,.xml,.html,.htm,.css,.scss,.less,.env,.gitignore,.editorconfig`}
+            accept={`${supportsImage ? 'image/*,' : ''}${Array.from(ACCEPT_EXTENSIONS).join(',')}`}
             className="hidden"
             disabled={isDispatching}
             onChange={handleFileUpload}
@@ -746,12 +903,59 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
             variant="ghost"
             size="icon-xs"
             title={t('chat.composer.mobileMode')}
+            aria-label={t('chat.composer.mobileMode')}
             className={isActiveTabMobile ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
             onClick={toggleMobile}
             disabled={isDispatching}
           >
             <Smartphone className="size-3.5" />
           </Button>
+
+          {/* Divider + Page-operation quick tools (merged from QuickActionsBar) */}
+          {onQuickTool && (
+            <>
+              <Separator orientation="vertical" className="h-4! mx-1 bg-border" />
+              {QUICK_TOOLS.map((tool) => {
+                const Icon = tool.icon;
+                const active = tool.id === 'watch-page' && isWatching;
+                const isPending = pendingTool === tool.id;
+                return (
+                  <Tooltip key={tool.id}>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex relative">
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          data-quick-tool={tool.id}
+                          disabled={!!pendingTool || isDispatching}
+                          onClick={() => handleToolClick(tool.id)}
+                          className={[
+                            'relative',
+                            active && 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary',
+                            isPending && 'opacity-60 scale-95',
+                            !!pendingTool && !isPending && 'opacity-40 cursor-not-allowed',
+                          ].join(' ')}
+                          aria-label={t(tool.labelKey)}
+                        >
+                          {isPending ? (
+                            <Loader2 className="size-3.5 animate-spin" />
+                          ) : (
+                            <Icon className="size-3.5" />
+                          )}
+                        </Button>
+                        {active && (
+                          <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-green-400 animate-pulse" />
+                        )}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {active ? t('chat.quickActions.toolWatchPageStop') : t(tool.labelKey)}
+                    </TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </>
+          )}
 
           {attachments.length > 0 && (
             <>
@@ -783,6 +987,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
                         className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
                         disabled={isDispatching}
                         onClick={() => removeAttachment(i)}
+                        aria-label={t('chat.attachments.delete')}
                       >
                         <X className="size-2.5" />
                       </button>
@@ -808,7 +1013,19 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
                       <button
                         className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
                         disabled={isDispatching}
+                        onClick={() => {
+                          setEditorRecording(att);
+                          setEditorOpen(true);
+                        }}
+                        aria-label={t('chat.recorder.editAndReplay')}
+                      >
+                        <Pencil className="size-2.5" />
+                      </button>
+                      <button
+                        className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                        disabled={isDispatching}
                         onClick={() => removeAttachment(i)}
+                        aria-label={t('chat.attachments.delete')}
                       >
                         <X className="size-2.5" />
                       </button>
@@ -836,6 +1053,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
                         className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
                         disabled={isDispatching}
                         onClick={() => removeAttachment(i)}
+                        aria-label={t('chat.attachments.delete')}
                       >
                         <X className="size-2.5" />
                       </button>
@@ -850,6 +1068,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
         {/* Textarea */}
         <textarea
           ref={textareaRef}
+          data-chat-input
           rows={1}
           value={value}
           onChange={(e) => handleInput(e.target.value)}
@@ -867,6 +1086,7 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
               activeModel={currentModel}
               configuredProviders={providers}
               customProviders={customProviderList}
+              webProviders={webProvidersList}
               onSelect={handleModelSelect}
               onOpenSettings={onOpenSettings ?? (() => {})}
             />
@@ -904,5 +1124,18 @@ export function ChatInput({ onSend, onOpenSettings, isAgentRunning, onCancel, us
         </div>
       </div>
     </footer>
+
+    <RecordingEditor
+      open={editorOpen}
+      onOpenChange={setEditorOpen}
+      recording={editorRecording}
+      onReplay={(steps) => {
+        if (steps.length === 0) return;
+        const stepsJson = JSON.stringify(steps, null, 2);
+        const prompt = t('chat.recorder.replayPrompt', [stepsJson]);
+        void onSend(prompt, undefined, null);
+      }}
+    />
+    </>
   );
-}
+});

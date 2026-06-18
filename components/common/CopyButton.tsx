@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { copyText } from '@/lib/clipboard';
 import { t } from '@/lib/i18n';
+import { cn } from '@/lib/utils';
 
 /**
  * Icon-only copy button with a brief check-mark confirmation swap.
@@ -27,7 +28,7 @@ export function CopyButton({ text }: { text: string }) {
     timerRef.current = setTimeout(() => {
       setCopied(false);
       timerRef.current = null;
-    }, 1500);
+    }, 800);
   }
 
   const label = copied ? t('common.copied') : t('common.copy');
@@ -38,7 +39,7 @@ export function CopyButton({ text }: { text: string }) {
         <Button
           variant="ghost"
           size="icon"
-          className="size-7 text-muted-foreground hover:text-foreground"
+          className={cn("size-7 transition-colors duration-200", copied ? "text-success" : "text-muted-foreground hover:text-foreground")}
           onClick={onClick}
           aria-label={label}
         >

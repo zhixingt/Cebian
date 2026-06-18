@@ -1,0 +1,8 @@
+allowBuilds:
+  '@google/genai': true
+  classic-level: set this to true or false
+  esbuild: true
+  msw: true
+  protobufjs: true
+  simple-git-hooks: true
+  spawn-sync: true

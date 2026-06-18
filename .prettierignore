@@ -1,0 +1,6 @@
+.output/
+.wxt/
+node_modules/
+dist/
+*.cjs
+pnpm-lock.yaml

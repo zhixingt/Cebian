@@ -1,4 +1,5 @@
 import { storage } from '#imports';
+import { isValidActiveModel } from './ai-config/web-provider-active-model-validation';
 
 // ─── Provider credential types ───
 
@@ -111,7 +112,17 @@ export const providerCredentials = storage.defineItem<ProviderCredentials>(
 
 export const activeModel = storage.defineItem<ActiveModel | null>(
   'local:activeModel',
-  { fallback: null },
+  {
+    fallback: null,
+    // Stale-value cleanup is performed at startup in
+    // `entrypoints/background/index.ts` (see `cleanupStaleActiveModel`)
+    // and at runtime in `agent-manager.resolveModelObj` (self-heal).
+    // WXT's `migrations` (version-bump + map) is not used here because
+    // migrations only run when the version number is bumped, and a
+    // single bump cleans up at most one user cohort. The startup pass
+    // is idempotent and runs on every load — guaranteed to catch
+    // any future stale values without a code change.
+  },
 );
 
 export const customProviders = storage.defineItem<CustomProviderConfig[]>(
@@ -169,4 +180,45 @@ export interface UpdateNoticeState {
 export const updateNoticeState = storage.defineItem<UpdateNoticeState>(
   'local:updateNoticeState',
   { fallback: { skippedVersion: null, lastPromptedAt: 0 } },
+);
+
+// ─── Favorite prompts (Quick Actions Bar) ───
+
+/**
+ * Ordered list of prompt filenames the user has marked as "favorites".
+ * - Key: filename (e.g. "translate.md"), not the frontmatter `name`. Filenames
+ *   are stable across renames-of-frontmatter and survive frontmatter edits.
+ * - Order: user-controlled, used to render the chat QuickActionsBar in
+ *   display order. Manual drag-to-reorder in settings (Phase 1).
+ * - Empty: the chat QuickActionsBar MUST NOT be rendered (zero height).
+ */
+export const favoritePrompts = storage.defineItem<string[]>(
+  'local:favoritePrompts',
+  { fallback: [] },
+);
+
+/** 上次活跃的聊天会话 ID，用于重新打开 sidepanel 时自动恢复。 */
+export const lastSessionId = storage.defineItem<string | null>(
+  'local:lastSessionId',
+  { fallback: null },
+);
+
+/** 侧边栏是否处于折叠状态（sidepanel 已关闭，页面显示展开按钮）。 */
+export const sidebarCollapsedFlag = storage.defineItem<boolean>(
+  'local:sidebarCollapsedFlag',
+  { fallback: false },
+);
+
+/** 折叠时是否完全隐藏侧边栏（极客模式）。 */
+export const sidebarCollapsedHide = storage.defineItem<boolean>(
+  'local:sidebarCollapsedHide',
+  { fallback: false },
+);
+
+// ─── API Discovery ───
+
+/** API Discovery 功能是否已启用（默认关闭，用户知情同意后开启） */
+export const apiDiscoveryEnabled = storage.defineItem<boolean>(
+  'local:apiDiscoveryEnabled',
+  { fallback: false },
 );

@@ -1,4 +1,4 @@
-import { Sun, Moon, Monitor, Settings, SquarePen, History } from 'lucide-react';
+import { Sun, Moon, Monitor, Settings, SquarePen, History, PanelRightClose } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -17,13 +17,19 @@ interface HeaderProps {
 }
 
 export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat, onOpenHistory }: HeaderProps) {
+  const handleCollapse = () => {
+    chrome.runtime.sendMessage({ type: 'collapse-sidebar' }).catch(() => {});
+    setTimeout(() => window.close(), 100);
+  };
+
   return (
-    <header className="flex items-center justify-between px-5 py-4 border-b border-border bg-background/80 backdrop-blur-xl z-10">
-      <div className="flex items-center gap-2">
+    <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-background/80 backdrop-blur-xl z-10 shrink-0">
+      {/* 左侧：导航类 */}
+      <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon-xs" onClick={onNewChat}>
-              <SquarePen className="size-4.5" />
+              <SquarePen className="size-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t('common.newChat')}</TooltipContent>
@@ -32,7 +38,7 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat,
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon-xs" onClick={onOpenHistory}>
-              <History className="size-4.5" />
+              <History className="size-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t('common.history')}</TooltipContent>
@@ -43,15 +49,12 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat,
         {title}
       </span>
 
-      <div className="flex gap-2">
+      {/* 右侧：操作类，折叠按钮用分隔线隔开 */}
+      <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={onToggleTheme}
-            >
-              {theme === 'system' ? <Monitor className="size-4.5" /> : theme === 'dark' ? <Moon className="size-4.5" /> : <Sun className="size-4.5" />}
+            <Button variant="ghost" size="icon-xs" onClick={onToggleTheme}>
+              {theme === 'system' ? <Monitor className="size-4" /> : theme === 'dark' ? <Moon className="size-4" /> : <Sun className="size-4" />}
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t('common.toggleTheme')}</TooltipContent>
@@ -59,15 +62,29 @@ export function Header({ title, theme, onToggleTheme, onOpenSettings, onNewChat,
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              onClick={onOpenSettings}
-            >
-              <Settings className="size-4.5" />
+            <Button variant="ghost" size="icon-xs" onClick={onOpenSettings}>
+              <Settings className="size-4" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>{t('common.settings')}</TooltipContent>
+        </Tooltip>
+
+        {/* 分隔线：区分功能操作和面板控制 */}
+        <div className="w-px h-4 bg-border/60 mx-0.5" />
+
+        {/* 折叠按钮：微妙的视觉区分 */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              onClick={handleCollapse}
+              className="text-muted-foreground/60 hover:text-foreground hover:bg-muted/60"
+            >
+              <PanelRightClose className="size-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">{t('common.sidebarCollapse')}</TooltipContent>
         </Tooltip>
       </div>
     </header>

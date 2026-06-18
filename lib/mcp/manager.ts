@@ -1,4 +1,4 @@
-﻿import { mcpServers, type MCPServerConfig } from '@/lib/storage';
+import { mcpServers, type MCPServerConfig } from '@/lib/storage';
 import {
   MCPClient,
   type MCPResourceContents,
@@ -25,6 +25,8 @@ interface ServerEntry {
   toolCache?: { tools: MCPTool[]; fetchedAt: number };
   connecting?: Promise<void>;
   refreshingTools?: Promise<MCPTool[]>;
+  reconnectTimer?: ReturnType<typeof setTimeout>;
+  reconnectAttempts: number;
 }
 
 export class ThrottleError extends Error {
@@ -46,6 +48,10 @@ export interface ServerToolsResult {
 }
 
 class MCPManager {
+  private static readonly MAX_RECONNECT_ATTEMPTS = 5;
+  private static readonly RECONNECT_BASE_MS = 1000;
+  private static readonly RECONNECT_MAX_MS = 30000;
+
   private entries = new Map<string, ServerEntry>();
   private unwatch?: () => void;
   private initPromise?: Promise<void>;
@@ -223,8 +229,9 @@ class MCPManager {
     if (!existing) {
       this.entries.set(config.id, {
         config,
-        client: new MCPClient(config),
+        client: new MCPClient(config, { onDisconnect: () => this.handleDisconnect(config.id) }),
         throttle: new ServerThrottle(),
+        reconnectAttempts: 0,
       });
       return;
     }
@@ -234,12 +241,14 @@ class MCPManager {
       // Material change OR any enabled flip: drop the connection + cache so
       // the next discover/use reconnects with current config and fetches
       // fresh tools. Critical for "enable a server" → tools appear instantly.
+      this.clearReconnect(existing);
       void this.closeEntry(existing);
-      existing.client = new MCPClient(config);
+      existing.client = new MCPClient(config, { onDisconnect: () => this.handleDisconnect(config.id) });
       existing.throttle = new ServerThrottle();
       existing.toolCache = undefined;
       existing.connecting = undefined;
       existing.refreshingTools = undefined;
+      existing.reconnectAttempts = 0;
     }
     existing.config = config;
   }
@@ -249,6 +258,7 @@ class MCPManager {
     for (const [id, entry] of this.entries) {
       if (!nextIds.has(id)) {
         this.entries.delete(id);
+        this.clearReconnect(entry);
         void this.closeEntry(entry);
       }
     }
@@ -278,6 +288,7 @@ class MCPManager {
       try {
         await client.connect();
         throttle.recordSuccess();
+        entry.reconnectAttempts = 0;
       } catch (err) {
         throttle.recordFailure(err);
         throw err;
@@ -309,10 +320,47 @@ class MCPManager {
   }
 
   private async closeEntry(entry: ServerEntry): Promise<void> {
+    this.clearReconnect(entry);
     try {
       await entry.client.close();
     } catch {
       // best-effort cleanup; errors during close are non-actionable
+    }
+  }
+
+  private handleDisconnect(serverId: string): void {
+    const entry = this.entries.get(serverId);
+    if (!entry) return;
+    if (!entry.config.enabled) return;
+    entry.toolCache = undefined;
+    entry.connecting = undefined;
+    this.notify();
+    this.scheduleReconnect(entry);
+  }
+
+  private scheduleReconnect(entry: ServerEntry): void {
+    this.clearReconnect(entry);
+    if (entry.reconnectAttempts >= MCPManager.MAX_RECONNECT_ATTEMPTS) return;
+    const delay = Math.min(
+      MCPManager.RECONNECT_BASE_MS * Math.pow(2, entry.reconnectAttempts),
+      MCPManager.RECONNECT_MAX_MS,
+    );
+    entry.reconnectTimer = setTimeout(() => {
+      entry.reconnectTimer = undefined;
+      entry.reconnectAttempts += 1;
+      void this.ensureConnected(entry).then(() => {
+        entry.reconnectAttempts = 0;
+        this.notify();
+      }).catch(() => {
+        this.scheduleReconnect(entry);
+      });
+    }, delay);
+  }
+
+  private clearReconnect(entry: ServerEntry): void {
+    if (entry.reconnectTimer) {
+      clearTimeout(entry.reconnectTimer);
+      entry.reconnectTimer = undefined;
     }
   }
 }

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { Key, MessageSquare, FileText, Blocks, Plug, Sliders, Info } from 'lucide-react';
+import { Key, MessageSquare, FileText, Blocks, Plug, Sliders, Info, Workflow, Radar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { t } from '@/lib/i18n';
 
@@ -20,7 +20,9 @@ export const SETTINGS_SECTIONS: SectionNavItem[] = [
   { path: 'instructions', getLabel: () => t('settings.nav.instructions'), icon: MessageSquare },
   { path: 'prompts', getLabel: () => t('settings.nav.prompts'), icon: FileText },
   { path: 'skills', getLabel: () => t('settings.nav.skills'), icon: Blocks },
+  { path: 'workflows', getLabel: () => t('settings.nav.workflows'), icon: Workflow },
   { path: 'mcp', getLabel: () => t('settings.nav.mcp'), icon: Plug },
+  { path: 'api-discovery', getLabel: () => t('settings.apiDiscovery.title'), icon: Radar },
   { path: 'advanced', getLabel: () => t('settings.nav.advanced'), icon: Sliders },
   { path: 'about', getLabel: () => t('settings.nav.about'), icon: Info },
 ];
@@ -123,12 +125,12 @@ export function SectionNav({ basePath, variant = 'labels' }: SectionNavProps) {
               to={`${basePath}/${path}`}
               replace
               className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors',
-                  isActive
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
-                )
+                  cn(
+                    'flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors border-l-2 border-transparent',
+                    isActive
+                      ? 'bg-accent text-foreground font-medium border-l-primary'
+                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+                  )
               }
             >
               <Icon className="size-4" />

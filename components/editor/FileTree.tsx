@@ -6,9 +6,9 @@
  *
  * Create flow: VFS placeholder → scan → auto-enter edit mode → rename confirms / cancel deletes.
  */
-import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef, createContext, useContext } from 'react';
 import { Tree, type NodeRendererProps, type NodeApi, type TreeApi } from 'react-arborist';
-import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileType, Trash2, FilePlus, FolderPlus, Pencil } from 'lucide-react';
+import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, FileCode, FileType, Trash2, FilePlus, FolderPlus, Pencil, Star } from 'lucide-react';
 import {
   ContextMenu, ContextMenuTrigger, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 } from '@/components/ui/context-menu';
@@ -37,15 +37,37 @@ interface FileTreeProps {
   /** VFS root directory to display. */
   root: string;
   /** Currently selected file path. */
-  selectedFile: string | null;
+  selectedFile?: string | null;
   /** Called when a file is selected. */
-  onSelect: (filePath: string) => void;
+  onSelect?: (filePath: string) => void;
   /** Incremented to trigger re-scan. */
   refreshKey?: number;
   /** Filter tree nodes by name. */
   searchTerm?: string;
   /** Allow creating subfolders. false = flat file list. */
   allowNewFolder?: boolean;
+  /** Render a favorite-toggle star on every file row. Default: false. */
+  showFavoriteButton?: boolean;
+  /** Return the current favorite state for a given filename. */
+  isFavorite?: (fileName: string) => boolean;
+  /** Called when the user clicks the star. `willFavorite` is the next state. */
+  onToggleFavorite?: (fileName: string, willFavorite: boolean) => void;
+}
+
+// ─── Favorite-button context ───
+// Passes the optional favorite props from FileTree down to NodeRenderer
+// without relying on the (test-mocked) react-arborist `tree.props` channel.
+const FavoritePropsContext = createContext<{
+  showFavoriteButton: boolean;
+  isFavorite?: (fileName: string) => boolean;
+  onToggleFavorite?: (fileName: string, willFavorite: boolean) => void;
+}>({ showFavoriteButton: false });
+
+// ─── Custom props passed through react-arborist's Tree → tree.props ───
+interface FileTreeCustomProps {
+  allowNewFolder?: boolean;
+  onCreateFile?: (parentId: string) => void;
+  onCreateFolder?: (parentId: string) => void;
 }
 
 // ─── VFS → tree data builder ───
@@ -100,7 +122,8 @@ function FileIcon({ name, className }: { name: string; className?: string }) {
 // ─── Custom node renderer ───
 
 function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeNodeData>) {
-  const allowNewFolder = (tree.props as any).allowNewFolder ?? true;
+  const allowNewFolder = (tree.props as FileTreeCustomProps | undefined)?.allowNewFolder ?? true;
+  const { showFavoriteButton, isFavorite, onToggleFavorite } = useContext(FavoritePropsContext);
   const editStartRef = useRef<number>(0);
 
   const handleClick = (e: React.MouseEvent) => {
@@ -184,6 +207,31 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
         <span className="truncate flex-1">{node.data.name}</span>
       )}
 
+      {/* Favorite toggle (Phase 1 of Quick Actions Bar). Hidden unless
+          showFavoriteButton is true. Uses react-arborist's `node.isInternal`
+          (true for folders, false for files) so the check is correct without
+          depending on `TreeNodeData.isDir`, which the builder doesn't set.
+          Click is stopped from reaching the row's onClick handler so the
+          file is not selected. */}
+      {showFavoriteButton && !node.isInternal && (
+        <button
+          type="button"
+          aria-label={isFavorite?.(node.data.name) ? t('chat.fileTree.unfavorite') : t('chat.fileTree.favorite')}
+          title={isFavorite?.(node.data.name) ? t('chat.fileTree.unfavoriteShortcut') : t('chat.fileTree.favoriteShortcut')}
+          className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-yellow-400"
+          onClick={(e) => {
+            e.stopPropagation();
+            const currentlyFav = isFavorite?.(node.data.name) ?? false;
+            onToggleFavorite?.(node.data.name, !currentlyFav);
+          }}
+        >
+          <Star
+            className="size-3.5"
+            fill={isFavorite?.(node.data.name) ? 'currentColor' : 'none'}
+          />
+        </button>
+      )}
+
     </div>
   );
 
@@ -192,11 +240,11 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
   if (node.isInternal) {
     menuItems = (
       <>
-        <ContextMenuItem onClick={() => (tree.props as any).onCreateFile?.(node.id)}>
+        <ContextMenuItem onClick={() => (tree.props as FileTreeCustomProps | undefined)?.onCreateFile?.(node.id)}>
           <FilePlus className="size-3.5 mr-2" /> {t('common.newFile')}
         </ContextMenuItem>
         {allowNewFolder && (
-          <ContextMenuItem onClick={() => (tree.props as any).onCreateFolder?.(node.id)}>
+          <ContextMenuItem onClick={() => (tree.props as FileTreeCustomProps | undefined)?.onCreateFolder?.(node.id)}>
             <FolderPlus className="size-3.5 mr-2" /> {t('common.newFolder')}
           </ContextMenuItem>
         )}
@@ -239,7 +287,11 @@ function NodeRenderer({ node, style, dragHandle, tree }: NodeRendererProps<TreeN
 // ─── Main component ───
 
 export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
-  function FileTree({ root, selectedFile, onSelect, refreshKey, searchTerm, allowNewFolder = true }, ref) {
+  function FileTree(
+    { root, selectedFile, onSelect, refreshKey, searchTerm, allowNewFolder = true,
+      showFavoriteButton = false, isFavorite, onToggleFavorite },
+    ref,
+  ) {
   const [data, setData] = useState<TreeNodeData[]>([]);
   const treeRef = useRef<TreeApi<TreeNodeData>>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -371,7 +423,7 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     if (newPath === id) {
       if (isPlaceholder) {
         const node = treeRef.current?.get(id);
-        if (node?.isLeaf) onSelect(id);
+        if (node?.isLeaf) onSelect?.(id);
       }
       return;
     }
@@ -380,12 +432,12 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     try {
       await vfs.rename(id, newPath);
       await scan();
-      if (selectedFile === id) onSelect(newPath);
-      else if (selectedFile?.startsWith(id + '/')) onSelect(selectedFile.replace(id, newPath));
+      if (selectedFile === id) onSelect?.(newPath);
+      else if (selectedFile?.startsWith(id + '/')) onSelect?.(selectedFile.replace(id, newPath));
       else if (isPlaceholder) {
         // Newly created file — select it after rename
         const stat = await vfs.stat(newPath).catch(() => null);
-        if (stat && !stat.isDirectory()) onSelect(newPath);
+        if (stat && !stat.isDirectory()) onSelect?.(newPath);
       }
     } catch { /* ignore rename errors */ }
   };
@@ -398,8 +450,8 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
       if (destPath === srcPath) continue;
       try {
         await vfs.rename(srcPath, destPath);
-        if (selectedFile === srcPath) onSelect(destPath);
-        else if (selectedFile?.startsWith(srcPath + '/')) onSelect(selectedFile.replace(srcPath, destPath));
+        if (selectedFile === srcPath) onSelect?.(destPath);
+        else if (selectedFile?.startsWith(srcPath + '/')) onSelect?.(selectedFile.replace(srcPath, destPath));
       } catch { /* ignore */ }
     }
     await scan();
@@ -416,61 +468,63 @@ export const FileTree = forwardRef<FileTreeHandle, FileTreeProps>(
     }
     await scan();
     if (selectedFile && ids.some((id) => selectedFile === id || selectedFile.startsWith(id + '/'))) {
-      onSelect('');
+      onSelect?.('');
     }
   };
 
   const onActivate = (node: NodeApi<TreeNodeData>) => {
     if (node.isEditing) return; // Don't navigate while inline-renaming
-    if (node.isLeaf) onSelect(node.id);
+    if (node.isLeaf) onSelect?.(node.id);
   };
 
   const showEmptyOverlay = data.length === 0 && !pendingEditId;
 
   return (
-    <div
-      ref={containerRef}
-      className="h-full w-full relative"
-      onKeyDown={(e) => {
-        if (e.key === 'Delete') {
-          const tree = treeRef.current;
-          if (!tree || tree.isEditing) return;
-          const ids = Array.from(tree.selectedIds);
-          if (ids.length > 0) {
-            e.preventDefault();
-            tree.delete(ids);
+    <FavoritePropsContext.Provider value={{ showFavoriteButton, isFavorite, onToggleFavorite }}>
+      <div
+        ref={containerRef}
+        className="h-full w-full relative"
+        onKeyDown={(e) => {
+          if (e.key === 'Delete') {
+            const tree = treeRef.current;
+            if (!tree || tree.isEditing) return;
+            const ids = Array.from(tree.selectedIds);
+            if (ids.length > 0) {
+              e.preventDefault();
+              tree.delete(ids);
+            }
           }
-        }
-      }}
-    >
-      <Tree<TreeNodeData>
-        ref={treeRef}
-        data={data}
-        onRename={onRename}
-        onMove={onMove}
-        onDelete={onDelete}
-        onActivate={onActivate}
-        selection={selectedFile ?? undefined}
-        openByDefault={true}
-        disableMultiSelection
-        searchTerm={searchTerm}
-        searchMatch={(node, term) => node.data.name.toLowerCase().includes(term.toLowerCase())}
-        width={dims.width}
-        height={dims.height}
-        indent={16}
-        rowHeight={30}
-        paddingTop={6}
-        paddingBottom={6}
-        // Pass through custom props for NodeRenderer to read
-        {...{ allowNewFolder, onCreateFile: doCreateFile, onCreateFolder: doCreateFolder } as any}
+        }}
       >
-        {NodeRenderer}
-      </Tree>
-      {showEmptyOverlay && (
-        <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground pointer-events-none">
-          {t('common.empty.folder')}
-        </div>
-      )}
-    </div>
+        <Tree<TreeNodeData>
+          ref={treeRef}
+          data={data}
+          onRename={onRename}
+          onMove={onMove}
+          onDelete={onDelete}
+          onActivate={onActivate}
+          selection={selectedFile ?? undefined}
+          openByDefault={true}
+          disableMultiSelection
+          searchTerm={searchTerm}
+          searchMatch={(node, term) => node.data.name.toLowerCase().includes(term.toLowerCase())}
+          width={dims.width}
+          height={dims.height}
+          indent={16}
+          rowHeight={30}
+          paddingTop={6}
+          paddingBottom={6}
+          // Pass through custom props for NodeRenderer to read
+          {...{ allowNewFolder, onCreateFile: doCreateFile, onCreateFolder: doCreateFolder } as FileTreeCustomProps}
+        >
+          {NodeRenderer}
+        </Tree>
+        {showEmptyOverlay && (
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground pointer-events-none">
+            {t('common.empty.folder')}
+          </div>
+        )}
+      </div>
+    </FavoritePropsContext.Provider>
   );
 });

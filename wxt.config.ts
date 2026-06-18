@@ -11,14 +11,23 @@ export default defineConfig({
     description: '__MSG_extDescription__',
     permissions: [
       'sidePanel', 'activeTab', 'tabs', 'scripting', 'storage', 'alarms',
-      'offscreen', 'debugger', 'webNavigation',
+      'offscreen', 'webNavigation',
       'bookmarks', 'history', 'cookies', 'topSites', 'sessions',
       'downloads', 'notifications',
-      'clipboardRead',
+      'clipboardRead', 'contextMenus',
     ],
+    optional_permissions: ['debugger'] as any,
     host_permissions: ['<all_urls>'],
     action: {
       default_title: '__MSG_actionTitle__',
+    },
+    commands: {
+      'toggle-sidebar-collapse': {
+        suggested_key: {
+          default: 'Ctrl+Shift+X',
+        },
+        description: '__MSG_toggleSidebarCollapse__',
+      },
     },
     // Override the MV3 sandbox-page CSP. Chrome's default is restrictive
     // (`script-src 'self' 'unsafe-inline' 'unsafe-eval'; child-src 'self'`),
@@ -74,7 +83,63 @@ export default defineConfig({
     },
   },
   vite: () => ({
+    // Mitigate Rolldown mangle producing cross-chunk ReferenceError:
+    // When code-splitting creates lazy chunks (e.g. Settings, skill-transfer),
+    // the minifier may merge semantic tokens from different scopes into a
+    // single mangled name (e.g. "fetcherandom" = fetch + random context).
+    // If the definition lands in a different chunk than the usage, a
+    // `ReferenceError` at global scope crashes the sidepanel.
+    //
+    // Setting mangle.cache to a shared path ensures deterministic naming
+    // across builds, and keeping names slightly longer reduces collision
+    // probability. The true fix is IIFE-self-containment for executeScript
+    // targets (see web-provider-content-fetch-glm.ts), but this reduces
+    // the blast radius for any remaining edge cases.
+    build: {
+      rollupOptions: {
+        output: {
+          // 保持 code-splitting 启用（WXT 多入口需要，background 用 IIFE 格式）
+          // 注意：manualChunks 不可用（会触发 code-splitting 与 IIFE 冲突）
+          codeSplitting: true,
+        },
+      },
+      // 彻底禁用 mangle。
+      // 原因：Rolldown code-splitting 将 sidepanel 拆为 sidepanel + tailwind/browser 等多个 chunk，
+      // mangle 后的短变量名（如 f）在跨 chunk 引用时产生 TDZ 错误：
+      // ReferenceError: Cannot access 'f' before initialization。
+      // 注意：必须用 rollupOptions 而非 rolldownOptions——WXT 只读 rollupOptions。
+      minify: false,
+    },
     plugins: [
+      // ─── Fix cross-chunk ReferenceError for `cn` utility ───
+      //
+      // BUG: Rolldown code-splitting separates lib/utils.ts into its own
+      // chunk (utils-*.js). Consumer chunks (MarkdownRenderer, tailwind) that
+      // call cn() lose the ES module import during optimization while the
+      // call site remains → "ReferenceError: cn is not defined".
+      //
+      // FIX (2-pronged):
+      //   A) lib/utils.ts registers cn as globalThis.__cebCn at module load
+      //   B) This plugin rewrites every `cn(` call site to try the global
+      //      fallback first: `(__cebCn||cn)(...)`. If the ES module import
+      //      is available, `cn` is used (zero overhead). If lost due to
+      //      chunk-splitting, `__cebCn` from the error boundary or utils.ts
+      //      catches the call.
+      {
+        name: 'cebian:fix-cn-cross-chunk',
+        transform(code: string, id: string) {
+          if (id.includes('node_modules') || id.includes('.output/')) return null;
+          if (!code.includes('cn(')) return null;
+
+          // Only rewrite files that have cn( calls but DON'T define cn themselves
+          if (/export\s+function\s+cn\b/.test(code)) return null;
+
+          // Replace cn( with (__cebCn||cn)(
+          const newCode = code.replace(/\bcn\(/g, '(__cebCn||cn)(');
+          if (newCode === code) return null;
+          return { code: newCode, map: null };
+        },
+      },
       // 把 pi-ai 内部 `./anthropic.js` 的相对导入重定向到本地 shim，
       // 让 Anthropic OAuth 模块（包含一段 base64 字面量 → atob 解码
       // 的 client ID，会被 Chrome Web Store 审核判定为代码混淆）从
@@ -145,6 +210,23 @@ export default defineConfig({
         },
       },
       tailwindcss(),
+      // Inject an external error-boundary script into sidepanel.html BEFORE
+      // any module scripts. Chrome extension CSP blocks inline scripts
+      // ("script-src 'self'"), so we use a classic (non-module) external
+      // script from public/. It registers window.onerror before module
+      // evaluation begins, catching minifier-induced ReferenceError that
+      // would otherwise cause a white-screen-of-death.
+      {
+        name: 'cebian:sidepanel-error-boundary',
+        transformIndexHtml: {
+          order: 'pre' as const,
+          handler(html: string, ctx: { path: string }) {
+            if (!ctx.path.includes('sidepanel')) return html;
+            const tag = '<script src="/sidepanel-error-boundary.js"></script>';
+            return html.replace('<head>', '<head>' + tag);
+          },
+        },
+      },
     ],
     server: {
       // Sandbox pages have origin: null — allow CORS from any origin in dev mode

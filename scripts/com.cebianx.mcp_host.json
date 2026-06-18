@@ -1,0 +1,7 @@
+{
+  "name": "com.cebianx.mcp_host",
+  "description": "CebianX MCP Native Messaging Host - exposes browser automation to Hermes",
+  "path": "__CEBIANX_NATIVE_HOST_LAUNCHER__",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://__CEBIANX_EXTENSION_ID__/"]
+}

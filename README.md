@@ -1,10 +1,12 @@
 <div align="center">
 
-<img src="./public/icon/128.png" alt="Cebian" width="96" height="96" />
+<img src="./public/icon/128.png" alt="CebianX" width="96" height="96" />
 
-# Cebian
+# CebianX
 
 **An AI assistant that lives in your browser side panel**
+
+> *Modified fork of [maotoumao/Cebian](https://github.com/maotoumao/Cebian) maintained by [@zhixingt](https://github.com/zhixingt)*
 
 English | **[简体中文](./README.zh-CN.md)**
 

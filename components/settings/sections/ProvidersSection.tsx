@@ -4,6 +4,7 @@ import { Separator } from '@/components/ui/separator';
 import { ProviderOAuthItem, type OAuthPhase } from '@/components/settings/provider/ProviderOAuthItem';
 import { ProviderApiKeyItem } from '@/components/settings/provider/ProviderApiKeyItem';
 import { CustomProviderForm, CustomProviderCard } from '@/components/settings/provider/CustomProviderForm';
+import { WebProvidersSubSection } from './WebProvidersSubSection';
 import { useStorageItem } from '@/hooks/useStorageItem';
 import {
   providerCredentials,
@@ -254,6 +255,8 @@ export function ProvidersSection() {
 
         <CustomProviderForm onAdd={handleAddCustomProvider} />
       </div>
+
+      <WebProvidersSubSection />
     </div>
   );
 }

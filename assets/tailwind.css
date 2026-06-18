@@ -17,6 +17,7 @@
 @theme inline {
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, 'Courier New', ui-monospace, monospace;
+  --font-serif: 'Noto Serif CJK SC', 'Source Han Serif SC', 'SimSun', '宋体', 'Songti SC', serif;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -163,7 +164,16 @@
   }
 }
 
-/* Scrollbar styling */
+/* Scrollbar-none utility — hides scrollbar while keeping scroll functionality */
+.scrollbar-none {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Scrollbar styling (default — used when .scrollbar-none is NOT applied) */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -185,4 +195,14 @@
 }
 .animate-spin-slow {
   animation: spin 1s linear infinite;
+}
+
+/* Sidepanel: hide native scrollbars on html/body — our app handles scrolling internally */
+html, body {
+  overflow: hidden;
+  scrollbar-width: none;
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  display: none;
 }

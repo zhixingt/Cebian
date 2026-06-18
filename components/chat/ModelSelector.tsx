@@ -17,11 +17,77 @@ import {
 } from '@/components/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { t } from '@/lib/i18n';
+import { getAvailableWebModels } from '@/lib/ai-config/web-provider-models';
+import type { WebProvider } from '@/lib/types';
+
+/** Shape of one provider group in the selector dropdown. */
+export interface ProviderGroup {
+  provider: string;
+  label: string;
+  models: Model<Api>[];
+}
+
+/**
+ * Pure function: build the list of provider groups shown in the selector.
+ * Extracted from ModelSelector for unit-testability (no React/render needed).
+ *
+ * Order: Web (Logged in) first (most prominent — free, already-authenticated),
+ * then custom providers, then built-in pi-ai providers.
+ */
+export function buildProviderGroups(
+  configuredProviders: ProviderCredentials,
+  customProviders: CustomProviderConfig[],
+  webProviders: WebProvider[],
+): ProviderGroup[] {
+  const groups: ProviderGroup[] = [];
+  const seen = new Set<string>();
+
+  // 1. Web (Browser Session) — first, if any provider is logged in
+  const webModels = getAvailableWebModels(webProviders);
+  if (webModels.length > 0) {
+    groups.push({
+      provider: 'web',
+      label: 'webProviders.selector.groupLabel',  // resolved by Component via t()
+      models: webModels as unknown as Model<Api>[],
+    });
+    seen.add('web');
+  }
+
+  // 2. 自定义 provider：直接来自 customProviders 列表，不依赖是否配置/验证了
+  // API key（key 是可选的，未配置也应该可见可选。这是 issue #3 的修复）。
+  for (const config of customProviders) {
+    const providerKey = customProviderKey(config.id);
+    const models = getCustomModels(config);
+    if (models.length > 0) {
+      groups.push({ provider: providerKey, label: config.name, models });
+      seen.add(providerKey);
+    }
+  }
+
+  // 3. 内置 pi-ai provider：仍按已验证的凭据来门控。
+  for (const [provider, cred] of Object.entries(configuredProviders)) {
+    if (!cred.verified) continue;
+    // 自定义的已在上面处理
+    if (isCustomProvider(provider)) continue;
+    if (seen.has(provider)) continue;
+    try {
+      const models = getModels(provider as KnownProvider) as Model<Api>[];
+      if (models.length > 0) {
+        groups.push({ provider, label: provider, models });
+      }
+    } catch {
+      // Unknown provider, skip
+    }
+  }
+
+  return groups;
+}
 
 interface ModelSelectorProps {
   activeModel: ActiveModel | null;
   configuredProviders: ProviderCredentials;
   customProviders: CustomProviderConfig[];
+  webProviders?: WebProvider[];
   onSelect: (provider: string, modelId: string) => void;
   onOpenSettings: () => void;
 }
@@ -30,45 +96,17 @@ export function ModelSelector({
   activeModel,
   configuredProviders,
   customProviders,
+  webProviders = [],
   onSelect,
   onOpenSettings,
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [commandValue, setCommandValue] = useState('');
 
-  const providerModels = useMemo(() => {
-    const groups: { provider: string; label: string; models: Model<Api>[] }[] = [];
-    const seen = new Set<string>();
-
-    // 自定义 provider：直接来自 customProviders 列表，不依赖是否配置/验证了
-    // API key（key 是可选的，未配置也应该可见可选。这是 issue #3 的修复）。
-    for (const config of customProviders) {
-      const providerKey = customProviderKey(config.id);
-      const models = getCustomModels(config);
-      if (models.length > 0) {
-        groups.push({ provider: providerKey, label: config.name, models });
-        seen.add(providerKey);
-      }
-    }
-
-    // 内置 pi-ai provider：仍按已验证的凭据来门控。
-    for (const [provider, cred] of Object.entries(configuredProviders)) {
-      if (!cred.verified) continue;
-      // 自定义的已在上面处理
-      if (isCustomProvider(provider)) continue;
-      if (seen.has(provider)) continue;
-      try {
-        const models = getModels(provider as KnownProvider) as Model<Api>[];
-        if (models.length > 0) {
-          groups.push({ provider, label: provider, models });
-        }
-      } catch {
-        // Unknown provider, skip
-      }
-    }
-
-    return groups;
-  }, [configuredProviders, customProviders]);
+  const providerModels = useMemo(
+    () => buildProviderGroups(configuredProviders, customProviders, webProviders),
+    [configuredProviders, customProviders, webProviders],
+  );
 
   // Auto-select first available model when none is selected
   useEffect(() => {
@@ -90,6 +128,16 @@ export function ModelSelector({
         return md?.name ?? activeModel.modelId;
       }
       return null;
+    }
+
+    // Web-session model
+    if (activeModel.provider === 'web') {
+      // Model id format: web:<presetId>:<modelId>
+      const id = activeModel.modelId;  // this is the full model id
+      const colonIdx = id.indexOf(':');
+      const presetId = colonIdx > 0 ? id.slice(0, colonIdx) : '';
+      // For display, return the model id (component shows model.name in dropdown)
+      return id;
     }
 
     // Built-in provider
@@ -125,7 +173,7 @@ export function ModelSelector({
             {providerModels.map((group, i) => (
               <div key={group.provider}>
                 {i > 0 && <CommandSeparator />}
-                <CommandGroup heading={group.label}>
+                <CommandGroup heading={group.label.startsWith('webProviders.') ? t('webProviders.selector.groupLabel' as any) : group.label}>
                   {group.models.map(model => (
                     <CommandItem
                       key={model.id}

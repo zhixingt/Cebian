@@ -7,6 +7,8 @@ import { InstructionsSection } from '@/components/settings/sections/Instructions
 import { PromptsSection } from '@/components/settings/sections/PromptsSection';
 import { SkillsSection } from '@/components/settings/sections/SkillsSection';
 import { MCPSection } from '@/components/settings/sections/MCPSection';
+import { ApiDiscoverySection } from '@/components/settings/sections/ApiDiscoverySection';
+import { WorkflowsSection } from '@/components/settings/sections/WorkflowsSection';
 import { AdvancedSection } from '@/components/settings/sections/AdvancedSection';
 import { AboutSection } from '@/components/settings/sections/AboutSection';
 import { lastSettingsSection } from '@/lib/storage';
@@ -37,7 +39,9 @@ export function SettingsRoutes({ basePath, showBackButton = false, showOpenInTab
         <Route path="instructions" element={<InstructionsSection />} />
         <Route path="prompts/*" element={<PromptsSection />} />
         <Route path="skills/*" element={<SkillsSection />} />
+        <Route path="workflows" element={<WorkflowsSection />} />
         <Route path="mcp" element={<MCPSection />} />
+        <Route path="api-discovery" element={<ApiDiscoverySection />} />
         <Route path="advanced" element={<AdvancedSection />} />
         <Route path="about" element={<AboutSection />} />
         <Route path="*" element={<Navigate to="." replace />} />

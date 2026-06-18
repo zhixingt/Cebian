@@ -1,42 +1,29 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
 node_modules
 .output
-stats.html
-stats-*.json
-.wxt
-web-ext.config.ts
-.worktrees/
-
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+*.wasm
+ds-pow.wasm
+.vscode
 .idea
+*.log
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.wxt/
 
-# Local environment overrides (may contain dev API keys, etc.)
-# `.env` / `.env.example` are committed; `*.local` are personal overrides.
-.env.local
-.env.*.local
-
-# Astro site build output / cache
+# Site (Astro) build output
 site/.astro/
 site/dist/
+site/package-lock.json
 
-# Private notes folder, never committed
-docs/
-# Exception: superpowers design specs are committed artifacts, not private notes
-!docs/superpowers/
-!docs/superpowers/**
+
+# Build artifacts
+coverage/
+e2e/.userdata/
+e2e/e2e/report/
+e2e/e2e/test-results/
+e2e/automation/dist/
+*.zip
+
+# Debug files
+debug-*.md
+
+# Agents skills (local)
+.agents/

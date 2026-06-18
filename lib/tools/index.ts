@@ -18,6 +18,8 @@ import { fsSearchTool } from './fs-search';
 import { fsSaveUrlTool } from './fs-save-url';
 import { createSessionRunSkillTool } from './run-skill';
 import { chromeApiTool } from './chrome-api-tool';
+import { smartReadPageTool } from './smart-read-page';
+import { smartInteractTool } from './smart-interact';
 import { SessionToolContext } from './session-context';
 import { TOOL_ASK_USER } from '@/lib/types';
 import { getMCPManager } from '@/lib/mcp/manager';
@@ -26,11 +28,12 @@ import { createMCPAgentTool } from './mcp-tool';
 /** Non-interactive tools shared by all sessions. `runSkillTool` is intentionally
  *  NOT here —— 每个 session 用 `createSessionRunSkillTool(sessionId)` 拿到
  *  绑定到该 session workspace 的实例，避免 vfs 写入丢失会话上下文。 */
-const sharedTools: AgentTool<any>[] = [
+const sharedTools: AgentTool[] = [
   executeJsTool, readPageTool, interactTool, inspectTool, tabTool, screenshotTool, pdfTool,
   fsCreateFileTool, fsEditFileTool, fsMkdirTool, fsRenameTool, fsDeleteTool,
   fsReadFileTool, fsListTool, fsSearchTool, fsSaveUrlTool,
   chromeApiTool,
+  smartReadPageTool, smartInteractTool,
 ];
 
 /**
@@ -47,9 +50,9 @@ const sharedTools: AgentTool<any>[] = [
  * them from the agent's list to honour the spec and avoid polluting the
  * LLM with unreachable options.
  */
-export async function discoverMCPTools(): Promise<AgentTool<any>[]> {
+export async function discoverMCPTools(): Promise<AgentTool[]> {
   const mcpResults = await getMCPManager().getAllTools();
-  const out: AgentTool<any>[] = [];
+  const out: AgentTool[] = [];
   for (const result of mcpResults) {
     if (result.error) {
       console.warn(`[mcp] failed to load tools from "${result.server.name}":`, result.error);
@@ -79,7 +82,7 @@ export async function discoverMCPTools(): Promise<AgentTool<any>[]> {
  */
 export async function buildSessionToolArray(
   ctx: SessionToolContext,
-): Promise<AgentTool<any>[]> {
+): Promise<AgentTool[]> {
   const mcpTools = await discoverMCPTools();
   const runSkill = createSessionRunSkillTool(ctx.sessionId);
   return [...ctx.getInteractiveTools(), ...sharedTools, runSkill, ...mcpTools];
@@ -93,7 +96,7 @@ export async function buildSessionToolArray(
  * (cached by the manager so subsequent sessions are fast).
  */
 export async function createSessionTools(sessionId: string): Promise<{
-  tools: AgentTool<any>[];
+  tools: AgentTool[];
   ctx: SessionToolContext;
 }> {
   const ctx = new SessionToolContext(sessionId);

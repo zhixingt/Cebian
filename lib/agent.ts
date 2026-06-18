@@ -3,6 +3,7 @@ import type { Api, Model, Message } from '@earendil-works/pi-ai';
 import { providerCredentials, type OAuthCredential } from './storage';
 import { getValidOAuthToken } from './oauth';
 import { DEFAULT_SYSTEM_PROMPT } from './constants';
+import { buildMemoryPrompt } from './memory/prompt-builder';
 
 // ─── Agent factory ───
 
@@ -22,7 +23,7 @@ export interface CreateAgentOptions {
   tools: AgentTool<any>[];
 }
 
-export function createCebianAgent(options: CreateAgentOptions): Agent {
+export async function createCebianAgent(options: CreateAgentOptions): Promise<Agent> {
   const {
     model,
     sessionId,
@@ -40,9 +41,31 @@ export function createCebianAgent(options: CreateAgentOptions): Agent {
     ? `${basePrompt}\n\n<user-instructions>\n${trimmedInstructions}\n</user-instructions>`
     : basePrompt;
 
+  // 分层记忆注入：检索用户画像 + 会话摘要 + Agent 记忆，追加到 system prompt。
+  // 失败时不阻塞 Agent 创建（返回空字符串，使用 effectivePrompt 兜底）。
+  // 用最近用户消息作为检索查询，而非 sessionId（UUID 会导致关键词匹配失效）。
+  const lastUserMessage = [...messages].reverse().find(
+    (m): m is AgentMessage => 'role' in m && (m as { role?: string }).role === 'user',
+  );
+  const queryText = lastUserMessage
+    ? (typeof (lastUserMessage as { content?: unknown }).content === 'string'
+        ? ((lastUserMessage as { content: string }).content)
+        : JSON.stringify((lastUserMessage as { content?: unknown }).content ?? ''))
+    : '';
+
+  let memoryPrompt = '';
+  try {
+    memoryPrompt = await buildMemoryPrompt(queryText);
+  } catch (err) {
+    console.warn('[Agent] Failed to build memory prompt:', err);
+  }
+  const finalPrompt = memoryPrompt
+    ? `${effectivePrompt}\n\n${memoryPrompt}`
+    : effectivePrompt;
+
   const agentOptions: AgentOptions = {
     initialState: {
-      systemPrompt: effectivePrompt,
+      systemPrompt: finalPrompt,
       model,
       thinkingLevel,
       tools: agentTools,

@@ -4,7 +4,7 @@ import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { browser } from 'wxt/browser';
 import { Button } from '@/components/ui/button';
 import { SectionNav } from './SectionNav';
-import { lastSettingsSection } from '@/lib/storage';
+import { lastSettingsSection, lastSessionId } from '@/lib/storage';
 import { useContainerWidth } from '@/hooks/useContainerWidth';
 import { t } from '@/lib/i18n';
 
@@ -56,15 +56,20 @@ export function SettingsLayout({ basePath, showBackButton = false, showOpenInTab
     if (section && showBackButton) lastSettingsSection.setValue(section);
   }, [section, showBackButton]);
 
-  // Back button always exits Settings entirely - single-step escape.
-  const handleBack = useCallback(() => {
-    navigate('/chat/new', { replace: true });
+  // Back button returns to the last active session instead of always creating a new chat.
+  const handleBack = useCallback(async () => {
+    const savedId = await lastSessionId.getValue();
+    if (savedId) {
+      navigate(`/chat/${savedId}`, { replace: true });
+    } else {
+      navigate('/chat/new', { replace: true });
+    }
   }, [navigate]);
 
   // Open the current Settings path in the standalone tab page.
   const handleOpenInTab = useCallback(() => {
-    const url = browser.runtime.getURL('/settings.html') + '#/' + relative;
-    void browser.tabs.create({ url });
+    const url = (browser.runtime as any).getURL('/settings.html') + '#/' + relative;
+    void (browser.tabs as any).create({ url });
   }, [relative]);
 
   const outletCtx: SettingsOutletContext = { basePath, breakpoint };

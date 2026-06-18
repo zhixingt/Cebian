@@ -139,12 +139,14 @@ const typeboxSchemaValidator: jsonSchemaValidator = {
  */
 export class MCPClient {
   private readonly config: MCPServerConfig;
+  private readonly onDisconnect?: () => void;
   private client?: Client;
   private transport?: Transport;
   private connected = false;
 
-  constructor(config: MCPServerConfig) {
+  constructor(config: MCPServerConfig, opts?: { onDisconnect?: () => void }) {
     this.config = config;
+    this.onDisconnect = opts?.onDisconnect;
   }
 
   isConnected(): boolean {
@@ -179,6 +181,15 @@ export class MCPClient {
     try {
       await this.client.connect(this.transport);
       this.connected = true;
+      // 监听断开事件：transport 断开时 SDK 会调用 onclose
+      this.client.onclose = () => {
+        if (this.connected) {
+          this.connected = false;
+          this.client = undefined;
+          this.transport = undefined;
+          this.onDisconnect?.();
+        }
+      };
     } catch (err) {
       try { await this.transport.close?.(); } catch { /* swallow */ }
       this.client = undefined;
@@ -245,10 +256,10 @@ export class MCPClient {
 
   async close(): Promise<void> {
     if (!this.connected) return;
+    this.connected = false; // 先设 false，防止 onclose 触发重连
     try {
       await this.client?.close();
     } finally {
-      this.connected = false;
       this.client = undefined;
       this.transport = undefined;
     }

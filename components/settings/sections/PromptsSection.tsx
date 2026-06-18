@@ -1,9 +1,12 @@
 import { useCallback } from 'react';
 import { useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { FileWorkspace } from './FileWorkspace';
+import { FavoritesList } from './FavoritesList';
 import { encodeRelPath } from '@/lib/vfs';
 import { CEBIAN_PROMPTS_DIR } from '@/lib/constants';
-import { settingsFilePanelWidth } from '@/lib/storage';
+import { settingsFilePanelWidth, favoritePrompts } from '@/lib/storage';
+import { useStorageItem } from '@/hooks/useStorageItem';
 import type { SettingsOutletContext } from '@/components/settings/SettingsLayout';
 import { t } from '@/lib/i18n';
 
@@ -38,6 +41,25 @@ export function PromptsSection() {
     }
   }, [basePath, navigate]);
 
+  const [favorites, setFavorites] = useStorageItem(favoritePrompts, []);
+  const isFavorite = useCallback((name: string) => favorites.includes(name), [favorites]);
+  const handleToggleFavorite = useCallback(
+    async (fileName: string, willFavorite: boolean) => {
+      if (willFavorite) {
+        if (!favorites.includes(fileName)) {
+          await setFavorites([...favorites, fileName]);
+          toast.success(t('settings.prompts.favoriteAdded'));
+        }
+      } else {
+        if (favorites.includes(fileName)) {
+          await setFavorites(favorites.filter((f) => f !== fileName));
+          toast.info(t('settings.prompts.favoriteRemoved'));
+        }
+      }
+    },
+    [favorites, setFavorites],
+  );
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="px-6 pt-6 pb-4 shrink-0 border-b border-border">
@@ -54,6 +76,7 @@ export function PromptsSection() {
           })()}
         </p>
       </div>
+      <FavoritesList />
       <FileWorkspace
         root={CEBIAN_PROMPTS_DIR}
         relativePath={relativePath}
@@ -62,6 +85,9 @@ export function PromptsSection() {
         enableTemplateVars
         panelWidthStorage={settingsFilePanelWidth}
         compactMode={breakpoint === 'compact'}
+        showFavoriteButton
+        isFavorite={isFavorite}
+        onToggleFavorite={handleToggleFavorite}
         className="flex-1"
       />
     </div>

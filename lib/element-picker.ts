@@ -2,6 +2,15 @@ import type { ElementAttachment } from './attachments';
 import { getActiveTabId } from '@/lib/tab-helpers';
 import { t } from '@/lib/i18n';
 
+// Type augmentation for the in-page cleanup hook. This is a compile-time
+// declaration only (erased in JS output), so it doesn't interfere with
+// executeScript({ func }) injection semantics.
+declare global {
+  interface Window {
+    __cebianPickerCleanup?: () => void;
+  }
+}
+
 // ─── Injected picker script (self-contained, runs in content-script isolated world) ───
 // IMPORTANT: This function must be fully self-contained — no closures over external variables.
 // Translated strings must be passed via the executeScript `args` array.
@@ -307,7 +316,7 @@ function createPickerInPage(iframeEnterHint: string) {
   function cleanupPicker() {
     // Delete the global hook first so any racing external cancel falls through
     // to its DOM-removal fallback instead of calling a half-dismantled picker.
-    try { delete (window as any).__cebianPickerCleanup; } catch { /* non-configurable */ }
+    try { delete window.__cebianPickerCleanup; } catch { /* non-configurable */ }
     window.removeEventListener('keydown', onKeyDown, true);
     try { cursorStyle.remove(); } catch { /* detached */ }
     try { host.remove(); } catch { /* detached */ }
@@ -330,7 +339,7 @@ function createPickerInPage(iframeEnterHint: string) {
 
   // Expose cleanup so the extension side can tear down the picker on cancel
   // (e.g. user navigates tabs or calls startElementPicker again).
-  (window as any).__cebianPickerCleanup = cleanupPicker;
+  window.__cebianPickerCleanup = cleanupPicker;
 }
 
 // ─── Extension-side orchestration (runs in sidepanel) ───
@@ -406,10 +415,12 @@ export async function startElementPicker(): Promise<PickerResult> {
       }
     }
 
-    function messageListener(msg: any, sender: chrome.runtime.MessageSender) {
+    function messageListener(msg: unknown, sender: chrome.runtime.MessageSender) {
       if (sender.tab?.id !== tabId) return;
+      if (typeof msg !== 'object' || msg === null) return;
+      const m = msg as { type: string; selector: string; tagName: string; path: string; attributes: Record<string, string>; textContent?: string; rect?: { x: number; y: number; width: number; height: number }; iframeSrc: string; iframeIndex: number };
 
-      switch (msg.type) {
+      switch (m.type) {
         case 'cebian:picker-result': {
           const frameId = sender.frameId ?? 0;
           cleanup();
@@ -417,12 +428,12 @@ export async function startElementPicker(): Promise<PickerResult> {
             status: 'ok',
             attachment: {
               type: 'element',
-              selector: msg.selector,
-              tagName: msg.tagName,
-              path: msg.path,
-              attributes: msg.attributes,
-              textContent: msg.textContent || undefined,
-              rect: msg.rect,
+              selector: m.selector,
+              tagName: m.tagName,
+              path: m.path,
+              attributes: m.attributes,
+              textContent: m.textContent || undefined,
+              rect: m.rect,
               tabId: sender.tab?.id,
               tabUrl: sender.tab?.url,
               windowId: sender.tab?.windowId,
@@ -439,7 +450,7 @@ export async function startElementPicker(): Promise<PickerResult> {
           break;
 
         case 'cebian:picker-enter-iframe':
-          enterIframe(tabId, msg, sender.frameId ?? 0).catch((err) => {
+          enterIframe(tabId, { iframeSrc: m.iframeSrc, iframeIndex: m.iframeIndex }, sender.frameId ?? 0).catch((err) => {
             console.warn('[Element Picker] Failed to enter iframe:', err);
           });
           break;
@@ -456,9 +467,8 @@ export async function startElementPicker(): Promise<PickerResult> {
       chrome.scripting.executeScript({
         target: { tabId, allFrames: true },
         func: () => {
-          const w = window as any;
-          if (typeof w.__cebianPickerCleanup === 'function') {
-            w.__cebianPickerCleanup();
+          if (typeof window.__cebianPickerCleanup === 'function') {
+            window.__cebianPickerCleanup();
             return;
           }
           document.getElementById('cebian-picker-host')?.remove();
