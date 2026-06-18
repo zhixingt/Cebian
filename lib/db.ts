@@ -2,6 +2,18 @@ import Dexie, { type EntityTable } from 'dexie';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { WebProvider } from './types';
 import type { WebProviderConversationState } from './ai-config/web-provider-conversations';
+import type { Workflow, WorkflowRunRecord, WorkflowRunState } from './workflow/types';
+import type { AutoSkillDefinition } from './capture/types';
+import type {
+  UserProfileRecord,
+  AgentMemoryRecord,
+  SessionSummaryRecord,
+} from './memory/types';
+
+// Dexie 的 EntityTable.update 会为所有属性生成 key paths，遇到递归类型（IfStep
+// 中嵌套 WorkflowStep[]）会报 TS2615 circular reference。存储层使用 FlatWorkflow
+// 将 steps 降级为 any[]，应用层仍保持 Workflow 类型的强类型约束。
+export type FlatWorkflow = Omit<Workflow, 'steps'> & { steps: any[] };
 
 // ─── Schema ───
 
@@ -36,6 +48,13 @@ const db = new Dexie('cebian') as Dexie & {
   sessions: EntityTable<SessionRecord, 'id'>;
   webProviders: EntityTable<WebProvider, 'presetId'>;
   webProviderConversations: EntityTable<WebProviderConversationRecord, 'id'>;
+  workflows: EntityTable<FlatWorkflow, 'id'>;
+  workflowRuns: EntityTable<WorkflowRunRecord, 'id'>;
+  workflowRunStates: EntityTable<WorkflowRunState, 'runId'>;
+  autoSkills: EntityTable<AutoSkillDefinition, 'name'>;
+  userProfile: EntityTable<UserProfileRecord, 'key'>;
+  agentMemory: EntityTable<AgentMemoryRecord, 'id'>;
+  sessionSummary: EntityTable<SessionSummaryRecord, 'id'>;
 };
 
 db.version(1).stores({
@@ -61,6 +80,70 @@ db.version(3).stores({
   sessions: 'id, updatedAt',
   webProviders: 'presetId, enabled, updatedAt',
   webProviderConversations: 'id, providerId, modelId, lastUpdated',
+});
+
+// version(4) is strictly additive — introduces workflows table for the
+// RPA/Workflow Engine foundation. Stores reusable automation workflows
+// composed of browser-action steps. Indexed on updatedAt and runCount
+// for efficient listing and sorting.
+db.version(4).stores({
+  sessions: 'id, updatedAt',
+  webProviders: 'presetId, enabled, updatedAt',
+  webProviderConversations: 'id, providerId, modelId, lastUpdated',
+  workflows: 'id, updatedAt, runCount',
+});
+
+// version(5) is strictly additive — introduces workflowRuns table for
+// per-execution history. Stores detailed step results for each workflow run.
+// Indexed on workflowId and startedAt for efficient history queries.
+db.version(5).stores({
+  sessions: 'id, updatedAt',
+  webProviders: 'presetId, enabled, updatedAt',
+  webProviderConversations: 'id, providerId, modelId, lastUpdated',
+  workflows: 'id, updatedAt, runCount',
+  workflowRuns: 'id, workflowId, startedAt',
+});
+
+// version(6) is strictly additive — introduces workflowRunStates table for
+// resumable execution. Stores intermediate run state so that MV3 SW
+// termination does not lose progress. Indexed on workflowId and status for
+// fast recovery queries.
+db.version(6).stores({
+  sessions: 'id, updatedAt',
+  webProviders: 'presetId, enabled, updatedAt',
+  webProviderConversations: 'id, providerId, modelId, lastUpdated',
+  workflows: 'id, updatedAt, runCount',
+  workflowRuns: 'id, workflowId, startedAt',
+  workflowRunStates: 'runId, workflowId, status',
+});
+
+// version(7) is strictly additive — introduces autoSkills table for the
+// API Discovery feature. Stores auto-generated API skills indexed by name
+// and hostname for efficient lookup.
+db.version(7).stores({
+  sessions: 'id, updatedAt',
+  webProviders: 'presetId, enabled, updatedAt',
+  webProviderConversations: 'id, providerId, modelId, lastUpdated',
+  workflows: 'id, updatedAt, runCount',
+  workflowRuns: 'id, workflowId, startedAt',
+  workflowRunStates: 'runId, workflowId, status',
+  autoSkills: 'name, hostname, endpointId, enabled',
+});
+
+// version(8) is strictly additive — introduces three memory tables for
+// the layered memory system (cross-session context accumulation).
+// See openspec/changes/2026-06-18-layered-memory-system/design.md.
+db.version(8).stores({
+  sessions: 'id, updatedAt',
+  webProviders: 'presetId, enabled, updatedAt',
+  webProviderConversations: 'id, providerId, modelId, lastUpdated',
+  workflows: 'id, updatedAt, runCount',
+  workflowRuns: 'id, workflowId, startedAt',
+  workflowRunStates: 'runId, workflowId, status',
+  autoSkills: 'name, hostname, endpointId, enabled',
+  userProfile: 'key, updatedAt',
+  agentMemory: 'id, type, createdAt',
+  sessionSummary: 'id, sessionId, createdAt',
 });
 
 /**

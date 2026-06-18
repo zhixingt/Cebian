@@ -16,8 +16,11 @@ import type { SessionRecord } from '@/lib/db';
 import { truncateForRetry } from '@/lib/message-helpers';
 import {
   providerCredentials,
+  type ProviderCredentials,
   customProviders as customProvidersStorage,
+  type CustomProviderConfig,
   activeModel as activeModelStorage,
+  type ActiveModel,
   thinkingLevel as thinkingLevelStorage,
   userInstructions as userInstructionsStorage,
   maxRounds as maxRoundsStorage,
@@ -121,6 +124,17 @@ class AgentManager {
   /** Subscription to MCPManager change notifications; pushes refreshed tools into every live session. */
   private mcpUnsubscribe?: () => void;
 
+  // 模型解析缓存（使用序列化字符串比较，因为 WXT storage 每次返回新对象）
+  private cachedModelObj: {
+    key: string;
+    result: { model: Model<Api>; provider: string; modelId: string } | null;
+  } | null = null;
+
+  /** 清除模型解析缓存（storage 变更时调用） */
+  clearModelCache(): void {
+    this.cachedModelObj = null;
+  }
+
   setBroadcast(fn: BroadcastFn): void {
     this.broadcast = fn;
     // Subscribe to MCPManager so we react AFTER its internal entries map is
@@ -132,7 +146,7 @@ class AgentManager {
     }
   }
 
-  private getPendingToolSnapshot(managed: ManagedSession): { toolName: string; toolCallId: string; args: any }[] {
+  private getPendingToolSnapshot(managed: ManagedSession): { toolName: string; toolCallId: string; args: unknown }[] {
     return managed.toolCtx.getPendingRequests().map(({ toolName, pending }) => ({
       toolName,
       toolCallId: pending.toolCallId,
@@ -190,7 +204,23 @@ class AgentManager {
       providerCredentials.getValue(),
       customProvidersStorage.getValue(),
     ]);
-    if (!modelCfg) return null;
+
+    // 缓存命中：使用序列化字符串比较（WXT storage 每次返回新对象，引用比较无效）
+    const cacheKey = JSON.stringify([modelCfg, creds, customProvs]);
+    if (this.cachedModelObj
+      && this.cachedModelObj.key === cacheKey
+      && this.cachedModelObj.result !== null) {
+      return this.cachedModelObj.result;
+    }
+
+    const saveCache = (result: { model: Model<Api>; provider: string; modelId: string } | null) => {
+      this.cachedModelObj = { key: cacheKey, result };
+    };
+
+    if (!modelCfg) {
+      saveCache(null);
+      return null;
+    }
 
     // Web (Browser Session) models are stored as:
     //   provider = 'web'
@@ -206,13 +236,16 @@ class AgentManager {
         // prompted to pick a fresh model instead of staying stuck on a
         // ghost reference. Idempotent; safe to call repeatedly.
         await activeModelStorage.setValue(null);
+        saveCache(null);
         return null;
       }
-      return {
+      const result = {
         model: webModel as unknown as Model<Api>,
         provider: modelCfg.provider,
         modelId: modelCfg.modelId,
       };
+      saveCache(result);
+      return result;
     }
 
     let model: Model<Api> | undefined;
@@ -224,10 +257,14 @@ class AgentManager {
         const models = getModels(modelCfg.provider as KnownProvider) as Model<Api>[];
         model = models.find(m => m.id === modelCfg.modelId);
       } catch {
+        saveCache(null);
         return null;
       }
     }
-    if (!model) return null;
+    if (!model) {
+      saveCache(null);
+      return null;
+    }
 
     if (modelCfg.provider === 'github-copilot') {
       const cred = creds[modelCfg.provider];
@@ -236,7 +273,9 @@ class AgentManager {
       }
     }
 
-    return { model, provider: modelCfg.provider, modelId: modelCfg.modelId };
+    const result = { model, provider: modelCfg.provider, modelId: modelCfg.modelId };
+    saveCache(result);
+    return result;
   }
 
   /** Get or create a managed agent for a session */
@@ -321,11 +360,11 @@ class AgentManager {
     // Create per-session tools with isolated bridges
     const { tools: sessionTools, ctx: toolCtx } = await createSessionTools(sessionId);
 
-    const agent = createCebianAgent({
+    const agent = await createCebianAgent({
       model: resolved.model,
       sessionId,
       userInstructions: instructions || '',
-      thinkingLevel: (thinkingLvl || 'medium') as any,
+      thinkingLevel: thinkingLvl || 'medium',
       maxRounds: rounds || 200,
       messages,
       tools: sessionTools,
@@ -494,11 +533,11 @@ class AgentManager {
             sessionId,
             title: session.title,
           });
-        } catch (err: any) {
+        } catch (err: unknown) {
           // Race: another concurrent prompt() for the same brand-new id won
           // the create. Re-throw anything that isn't a duplicate-key violation;
           // the winning call has already broadcast 'session_created'.
-          if (err?.name !== 'ConstraintError') throw err;
+          if ((err as { name?: string })?.name !== 'ConstraintError') throw err;
         }
       }
     }
@@ -617,7 +656,7 @@ class AgentManager {
 
     // If any interactive tool is pending, steer the agent instead of prompting
     if (managed.toolCtx.hasPending()) {
-      const content: any[] = [{ type: 'text', text: enriched }];
+      const content: unknown[] = [{ type: 'text', text: enriched }];
       if (images.length > 0) content.push(...images);
       const userMessage: AgentMessage = {
         role: 'user',
@@ -1042,7 +1081,7 @@ class AgentManager {
   }
 
   /** Resolve an interactive tool's pending request */
-  resolveTool(sessionId: string, toolName: string, response: any): void {
+  resolveTool(sessionId: string, toolName: string, response: unknown): void {
     const managed = this.sessions.get(sessionId);
     // ctx subscription handles broadcasting tool_resolved
     managed?.toolCtx.resolve(toolName, response);
@@ -1065,7 +1104,7 @@ class AgentManager {
   getSessionState(sessionId: string): {
     messages: AgentMessage[];
     isRunning: boolean;
-    pendingTools: { toolName: string; toolCallId: string; args: any }[];
+    pendingTools: { toolName: string; toolCallId: string; args: unknown }[];
   } | null {
     const managed = this.sessions.get(sessionId);
     if (!managed) return null;
@@ -1074,6 +1113,62 @@ class AgentManager {
       isRunning: managed.phase !== 'idle',
       pendingTools: this.getPendingToolSnapshot(managed),
     };
+  }
+
+  /** Delete a message and all subsequent messages from a session.
+   *
+   *  Removing a message from the middle of a transcript breaks the
+   *  conversation context (an assistant reply may reference the deleted
+   *  user message, or vice-versa). Therefore we truncate *from* the
+   *  deleted index to the end, preserving the prefix up to (but not
+   *  including) the target message.
+   *
+   *  No-op if the session is not found or the index is out of range.
+   *  Rejects if the agent is currently running — the caller must cancel
+   *  or wait for completion first. */
+  async deleteMessage(sessionId: string, messageIndex: number): Promise<void> {
+    const managed = this.sessions.get(sessionId);
+    if (!managed) {
+      // Session not in memory — load from DB, mutate, persist, and return.
+      const session = await sessionStore.load(sessionId);
+      if (!session) return;
+      if (messageIndex < 0 || messageIndex >= session.messages.length) return;
+      const truncated = session.messages.slice(0, messageIndex);
+      await sessionStore.scheduleWrite(sessionId, truncated);
+      await sessionStore.flush(sessionId);
+      this.broadcast(sessionId, {
+        type: 'session_loaded',
+        sessionId,
+        session: { ...session, messages: truncated },
+      });
+      return;
+    }
+
+    if (managed.phase !== 'idle') {
+      throw new Error('Cannot delete messages while the agent is running');
+    }
+
+    const messages = managed.agent.state.messages;
+    if (messageIndex < 0 || messageIndex >= messages.length) return;
+
+    const truncated = messages.slice(0, messageIndex);
+    // pi-agent-core's Agent state.messages is mutable — replace it directly.
+    managed.agent.state.messages = truncated;
+
+    // Persist and broadcast so all subscribers refresh.
+    sessionStore.scheduleWrite(sessionId, truncated);
+    try {
+      await sessionStore.flush(sessionId);
+    } catch (err) {
+      console.warn(`[agent-manager] flush after delete failed for ${sessionId}:`, err);
+    }
+    this.broadcast(sessionId, {
+      type: 'session_state',
+      sessionId,
+      messages: truncated,
+      isRunning: false,
+      pendingTools: this.getPendingToolSnapshot(managed),
+    });
   }
 
   /** Destroy a managed session entirely */
