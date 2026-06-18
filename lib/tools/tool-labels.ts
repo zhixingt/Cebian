@@ -24,7 +24,7 @@ interface ToolArgs {
   text?: string;
   tabId?: string | number;
   pageRange?: string | number;
-  query?: string;
+  query?: string | number;
 }
 
 export function getToolLabel(name: string, args: ToolArgs = {}): string {
@@ -155,7 +155,7 @@ function getPdfLabel(args: ToolArgs): string {
     case 'search': {
       const q = typeof args.query === 'string' && args.query.length > 30
         ? args.query.slice(0, 27) + '...'
-        : (args.query ?? '');
+        : (args.query != null ? String(args.query) : '');
       return t('tools.pdf.search', [q]);
     }
     default:
