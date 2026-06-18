@@ -1,8 +1,10 @@
+import { t } from '@/lib/i18n';
 import { setupOAuthRefresh } from './oauth-refresh';
 import { agentManager } from './agent-manager';
 import { sessionStore } from './session-store';
 import { recorder } from './recorder';
 import { seedDevStorage } from './dev-seed';
+import { seedBuiltinSkills } from './seed-builtin-skills';
 import { getMCPManager } from '@/lib/mcp/manager';
 import { AGENT_PORT_NAME, type ClientMessage, type ServerMessage } from '@/lib/protocol';
 import { isRecorderRuntimeMessage, RECORDER_MSG_KIND, type RecorderControlMessage } from '@/lib/recorder/protocol';
@@ -15,7 +17,17 @@ import { installSessionWatcher } from './web-provider-session-watcher-bg';
 import { startSessionWatcher as realStartSessionWatcher } from '@/lib/ai-config/web-provider-session-watcher';
 import { invalidateBundle } from '@/lib/ai-config/web-provider-bundle';
 import { isValidActiveModel } from '@/lib/ai-config/web-provider-active-model-validation';
-import { activeModel as activeModelStorage } from '@/lib/storage';
+import { activeModel as activeModelStorage, providerCredentials, customProviders, sidebarCollapsedFlag } from '@/lib/storage';
+import {
+  installUrlTriggerListener,
+  installCronTriggerListener,
+  reloadCronAlarms,
+  installDomTriggerListener,
+  reloadDomTriggers,
+} from '@/lib/workflow/trigger-manager';
+import { recoverRunningWorkflows } from '@/lib/workflow/engine';
+import { installMcpServerListener, installNativeMessagingListener } from '@/lib/mcp/server';
+import { registerApiDiscoveryHandlers, initApiDiscovery } from '@/lib/capture/handler';
 
 /**
  * Grace period after the last subscribed port disconnects before the agent
@@ -34,6 +46,88 @@ export default defineBackground(() => {
   chrome.sidePanel
     .setPanelBehavior({ openPanelOnActionClick: true })
     .catch((error) => console.error(error));
+
+  // ─── 右键上下文菜单 ───
+
+  const CONTEXT_MENU_ITEMS: chrome.contextMenus.CreateProperties[] = [
+    { id: 'cebian-read-page', title: t('background.contextMenu.readPage'), contexts: ['page'] },
+    { id: 'cebian-summarize', title: t('background.contextMenu.summarize'), contexts: ['page'] },
+    { id: 'cebian-interact-selection', title: t('background.contextMenu.operateSelection'), contexts: ['selection'] },
+    { id: 'cebian-interact-link', title: t('background.contextMenu.openLink'), contexts: ['link'] },
+    { id: 'cebian-screenshot', title: t('background.contextMenu.screenshot'), contexts: ['page'] },
+  ];
+
+  for (const item of CONTEXT_MENU_ITEMS) {
+    chrome.contextMenus.create(item);
+  }
+
+  /** 根据右键菜单项构建 prompt 文本 */
+  function buildContextMenuPrompt(itemId: string, info: chrome.contextMenus.OnClickData): string {
+    switch (itemId) {
+      case 'cebian-read-page':
+        return t('background.contextMenuPrompts.readPage');
+      case 'cebian-summarize':
+        return t('background.contextMenuPrompts.summarize');
+      case 'cebian-interact-selection':
+        return t('background.contextMenuPrompts.operateSelection', [info.selectionText ?? '']);
+      case 'cebian-interact-link':
+        return t('background.contextMenuPrompts.openLink', [info.linkUrl ?? '']);
+      case 'cebian-screenshot':
+        return t('background.contextMenuPrompts.screenshot');
+      default:
+        return t('background.contextMenuPrompts.default');
+    }
+  }
+
+  chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+    if (!tab?.id) return;
+
+    // 打开 sidepanel
+    try {
+      await chrome.sidePanel.open({ tabId: tab.id });
+    } catch (err) {
+      console.warn('[context-menu] failed to open sidepanel:', err);
+    }
+
+    // 通过 chrome.runtime.sendMessage 传递 prompt，sidepanel 接收后自动发送
+    const promptText = buildContextMenuPrompt(info.menuItemId as string, info);
+    // 延迟发送，等待 sidepanel 连接建立
+    setTimeout(() => {
+      chrome.runtime.sendMessage({
+        type: 'context_menu_prompt',
+        text: promptText,
+      }).catch(() => {
+        // sidepanel 可能还没准备好，忽略
+        console.warn('[context-menu] failed to send prompt to sidepanel');
+      });
+    }, 500);
+  });
+
+  // ─── 侧边栏折叠/展开 ───
+
+  /** 向所有标签页发送展开按钮的显示/隐藏消息 */
+  async function notifyAllTabsToggle(show: boolean): Promise<void> {
+    const msg = { type: show ? 'cebianx:show-toggle' : 'cebianx:hide-toggle' };
+    try {
+      const tabs = await chrome.tabs.query({});
+      for (const tab of tabs) {
+        if (tab.id != null && tab.url && isInjectablePage(tab.url)) {
+          chrome.tabs.sendMessage(tab.id, msg).catch(() => {});
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
+  /** 向指定标签页注入展开按钮脚本 */
+  async function injectToggleScript(tabId: number): Promise<void> {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId, allFrames: false },
+        files: ['/content-scripts/sidebar-toggle.js'],
+        world: 'ISOLATED',
+      });
+    } catch { /* 页面可能不支持注入 */ }
+  }
 
   // 2026-06: cleanup stale activeModel values left over from removed web
   // providers (Kimi / DeepSeek) or corrupted values (e.g. {}). Idempotent
@@ -61,10 +155,10 @@ export default defineBackground(() => {
   registerWebProviderReloginHandler({
     broadcast: (msg: WebProviderNeedsReloginMessage) => {
       // Reuse the per-port safePost path (handles disconnected ports).
-      // Cast: WebProviderNeedsReloginMessage is the new variant; we add
-      // it to ServerMessage below.
+      // WebProviderNeedsReloginMessage is structurally compatible with
+      // the 'web_provider_needs_relogin' variant of ServerMessage.
       for (const [port] of ports) {
-        safePost(port, msg as any);
+        safePost(port, msg);
       }
     },
     invalidateBundle,
@@ -82,18 +176,47 @@ export default defineBackground(() => {
     startSessionWatcher: (providerId, deps) => realStartSessionWatcher(providerId, {
       ...deps,
       broadcast: (msg) => {
+        // NeedsReloginBroadcast.providerId is `string` (watcher is
+        // provider-agnostic), but ServerMessage narrows it to 'glm'.
+        // At runtime only 'glm' preset is watched, so the cast is safe.
         for (const [port] of ports) {
-          safePost(port, msg as any);
+          safePost(port, msg as unknown as ServerMessage);
         }
       },
     }),
-    addCookieListener: (cb) => chrome.cookies.onChanged.addListener(cb as any),
-    addMessageListener: (cb) => chrome.runtime.onMessage.addListener(cb as any),
+    addCookieListener: (cb) => chrome.cookies.onChanged.addListener(cb),
+    addMessageListener: (cb) => chrome.runtime.onMessage.addListener(cb),
   });
 
   // Dev-only: seed a custom provider from .env.local if configured.
   // No-op in production builds and when WXT_DEV_API_KEY is empty.
   void seedDevStorage().catch(err => console.warn('[dev-seed] failed:', err));
+
+  // 部署内置默认 skill（如 browserwing）。幂等：已存在则跳过。
+  void seedBuiltinSkills().then(({ installed, skipped, errors }) => {
+    if (installed.length) console.log('[bg] built-in skills installed:', installed);
+    if (skipped.length) console.log('[bg] built-in skills already present:', skipped);
+    if (errors.length) console.warn('[bg] built-in skills errors:', errors);
+  });
+
+  // 安装工作流触发器监听器
+  installUrlTriggerListener();
+  installCronTriggerListener();
+  installDomTriggerListener();
+  void reloadCronAlarms();
+  void reloadDomTriggers();
+
+  // 恢复因 MV3 SW 终止而中断的工作流运行
+  void recoverRunningWorkflows();
+
+  // 安装 MCP Server 外部消息监听器
+  installMcpServerListener();
+  // 安装 Native Messaging 监听器（Hermes → Native Host → 扩展）
+  installNativeMessagingListener();
+
+  // 注册 API Discovery handler
+  registerApiDiscoveryHandlers();
+  void initApiDiscovery();
 
   // ─── Port management ───
 
@@ -160,6 +283,11 @@ export default defineBackground(() => {
   }
 
   agentManager.setBroadcast(broadcast);
+
+  // 模型相关 storage 变更时清除缓存
+  activeModelStorage.watch(() => agentManager.clearModelCache());
+  providerCredentials.watch(() => agentManager.clearModelCache());
+  customProviders.watch(() => agentManager.clearModelCache());
 
   // ─── Recorder broadcast ───
 
@@ -332,12 +460,12 @@ export default defineBackground(() => {
     port.onMessage.addListener(async (msg: ClientMessage) => {
       try {
         await handleClientMessage(port, msg);
-      } catch (err: any) {
+      } catch (err: unknown) {
         const sessionId = 'sessionId' in msg ? msg.sessionId : null;
         safePost(port, {
           type: 'error',
           sessionId,
-          error: err.message ?? String(err),
+          error: err instanceof Error ? err.message : String(err),
         });
       }
     });
@@ -500,6 +628,22 @@ export default defineBackground(() => {
         break;
       }
 
+      case 'delete_message': {
+        const dmSessionId = msg.sessionId;
+        const dmIndex = msg.messageIndex;
+        if (!dmSessionId || typeof dmIndex !== 'number') break;
+        try {
+          await agentManager.deleteMessage(dmSessionId, dmIndex);
+        } catch (err: unknown) {
+          safePost(port, {
+            type: 'error',
+            sessionId: dmSessionId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+        break;
+      }
+
       case 'session_delete': {
         // Validate sessionId before any path construction. The handler is a
         // message boundary that must not trust client input — interpolating
@@ -641,8 +785,8 @@ export default defineBackground(() => {
           }
           const result = await manager.readResource(serverId, uri);
           safePost(port, { type: 'mcp_resource_result', requestId, result });
-        } catch (err: any) {
-          const message = err?.message ?? String(err);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
           // Re-map the narrow race where the user disables / removes the
           // server between the pre-check and `readResource`. The MCPManager
           // throws `MCP server disabled: ...` / `MCP server not registered: ...`
@@ -665,7 +809,33 @@ export default defineBackground(() => {
     }
   }
 
-  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    // 侧边栏折叠：sidepanel 自己 window.close()，background 只需注入展开按钮
+    if (msg?.type === 'collapse-sidebar') {
+      (async () => {
+        await sidebarCollapsedFlag.setValue(true);
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (tab?.id != null) {
+          await injectToggleScript(tab.id);
+          chrome.tabs.sendMessage(tab.id, { type: 'cebianx:show-toggle' }).catch(() => {});
+        }
+      })();
+      return false;
+    }
+
+    // 页面展开按钮点击：打开 sidepanel + 隐藏按钮
+    if (msg?.type === 'expand-sidebar') {
+      (async () => {
+        await sidebarCollapsedFlag.setValue(false);
+        const currentWindow = await chrome.windows.getCurrent();
+        if (currentWindow.id != null) {
+          chrome.sidePanel.open({ windowId: currentWindow.id }).catch((err) => console.warn('[expand] open sidePanel failed:', err));
+        }
+        notifyAllTabsToggle(false);
+      })();
+      return false;
+    }
+
     if (msg?.type === 'mcp_status') {
       // One-shot status query for the Settings UI. Returns a map keyed by
       // server id, only for currently-enabled servers (disabled ones never
