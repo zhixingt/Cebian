@@ -206,6 +206,17 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
     case 'cebian_navigate': {
       const url = String(args.url);
       await chrome.tabs.update(tabId, { url });
+      // 异步学习常用网站（不阻塞导航，失败时静默）。
+      // 动态导入避免循环依赖：preference-learner.ts → user-profile.ts → db.ts
+      void import('../memory/preference-learner')
+        .then(({ learnFromNavigation }) =>
+          learnFromNavigation(url).catch(() => {
+            /* ignore learning errors */
+          }),
+        )
+        .catch(() => {
+          /* ignore import errors */
+        });
       return { success: true, url };
     }
 

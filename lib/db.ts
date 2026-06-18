@@ -236,6 +236,17 @@ export class ThrottledSessionWriter {
         .catch(() => {
           /* ignore import errors */
         });
+      // 异步学习用户偏好（语言检测，不阻塞 flush，失败时静默）。
+      // 动态导入避免循环依赖：preference-learner.ts → user-profile.ts → db.ts
+      void import('./memory/preference-learner')
+        .then(({ learnFromMessage }) =>
+          learnFromMessage(id, messages).catch((err) => {
+            console.warn('[DB] Failed to learn preferences:', err);
+          }),
+        )
+        .catch(() => {
+          /* ignore import errors */
+        });
     }
   }
 
