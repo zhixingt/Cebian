@@ -52,13 +52,18 @@ function contentToText(content: unknown): string {
 
 /**
  * 保存会话摘要：从 db.sessions 读取会话，生成摘要，提取关键词，写入 db.sessionSummary。
+ * 去重：同一会话只保留一条摘要（先删除旧摘要再添加新摘要）。
  * @returns 新摘要记录的 id
  */
 export async function saveSessionSummary(sessionId: string): Promise<string> {
-  const session = await getDb().sessions.get(sessionId);
+  const db = getDb();
+  const session = await db.sessions.get(sessionId);
   if (!session) {
     throw new Error(`Session not found: ${sessionId}`);
   }
+
+  // 去重：先删除该会话的旧摘要，再添加新摘要
+  await deleteSessionSummaryBySessionId(sessionId);
 
   const firstUser = firstUserMessageText(session.messages).slice(0, MESSAGE_EXCERPT_LEN);
   const lastAssistant = lastAssistantMessageText(session.messages).slice(0, MESSAGE_EXCERPT_LEN);
@@ -82,7 +87,7 @@ export async function saveSessionSummary(sessionId: string): Promise<string> {
     keywords,
     createdAt,
   };
-  await getDb().sessionSummary.add(record);
+  await db.sessionSummary.add(record);
   return id;
 }
 

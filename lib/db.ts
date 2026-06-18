@@ -190,6 +190,16 @@ export async function updateSessionTitle(id: string, title: string): Promise<voi
 
 export async function deleteSession(id: string): Promise<void> {
   await db.sessions.delete(id);
+  // 级联删除会话摘要（动态导入避免循环依赖：session-history.ts → db.ts）
+  void import('./memory/session-history')
+    .then(({ deleteSessionSummaryBySessionId }) =>
+      deleteSessionSummaryBySessionId(id).catch((err) => {
+        console.warn('[DB] Failed to delete session summary:', err);
+      }),
+    )
+    .catch(() => {
+      /* ignore import errors */
+    });
 }
 
 // ─── Throttled writer ───
@@ -215,6 +225,17 @@ export class ThrottledSessionWriter {
       const { id, messages } = this.pending;
       this.pending = null;
       await updateSessionMessages(id, messages);
+      // 异步保存会话摘要（不阻塞 flush，失败时静默）。
+      // 动态导入避免循环依赖：session-history.ts → db.ts
+      void import('./memory/session-history')
+        .then(({ saveSessionSummary }) =>
+          saveSessionSummary(id).catch((err) => {
+            console.warn('[DB] Failed to save session summary:', err);
+          }),
+        )
+        .catch(() => {
+          /* ignore import errors */
+        });
     }
   }
 

@@ -43,9 +43,19 @@ export async function createCebianAgent(options: CreateAgentOptions): Promise<Ag
 
   // 分层记忆注入：检索用户画像 + 会话摘要 + Agent 记忆，追加到 system prompt。
   // 失败时不阻塞 Agent 创建（返回空字符串，使用 effectivePrompt 兜底）。
+  // 用最近用户消息作为检索查询，而非 sessionId（UUID 会导致关键词匹配失效）。
+  const lastUserMessage = [...messages].reverse().find(
+    (m): m is AgentMessage => 'role' in m && (m as { role?: string }).role === 'user',
+  );
+  const queryText = lastUserMessage
+    ? (typeof (lastUserMessage as { content?: unknown }).content === 'string'
+        ? ((lastUserMessage as { content: string }).content)
+        : JSON.stringify((lastUserMessage as { content?: unknown }).content ?? ''))
+    : '';
+
   let memoryPrompt = '';
   try {
-    memoryPrompt = await buildMemoryPrompt(sessionId);
+    memoryPrompt = await buildMemoryPrompt(queryText);
   } catch (err) {
     console.warn('[Agent] Failed to build memory prompt:', err);
   }

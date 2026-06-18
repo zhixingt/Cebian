@@ -104,14 +104,30 @@ describe('session-history CRUD', () => {
 
   it('deleteSessionSummaryBySessionId 删除该会话所有摘要', async () => {
     await seedSession('s1');
-    await saveSessionSummary('s1');
-    await saveSessionSummary('s1');
     await seedSession('s2');
-    await saveSessionSummary('s2');
+    // 直接插入多条 s1 摘要（绕过 saveSessionSummary 的去重逻辑）
+    const now = Date.now();
+    await getDb().sessionSummary.bulkAdd([
+      { id: 'sum-1', sessionId: 's1', title: 't', summary: 's', keywords: [], createdAt: now },
+      { id: 'sum-2', sessionId: 's1', title: 't', summary: 's', keywords: [], createdAt: now },
+      { id: 'sum-3', sessionId: 's2', title: 't', summary: 's', keywords: [], createdAt: now },
+    ]);
     expect(await listSessionSummaries()).toHaveLength(3);
     await deleteSessionSummaryBySessionId('s1');
     const remaining = await listSessionSummaries();
     expect(remaining).toHaveLength(1);
     expect(remaining[0].sessionId).toBe('s2');
+  });
+
+  it('saveSessionSummary 同一 sessionId 多次调用只保留一条（去重）', async () => {
+    await seedSession('s1');
+    const id1 = await saveSessionSummary('s1');
+    const id2 = await saveSessionSummary('s1');
+    expect(id1).not.toBe(id2);
+    const list = await listSessionSummaries();
+    expect(list).toHaveLength(1);
+    expect(list[0].id).toBe(id2);
+    // 旧摘要应已被删除
+    expect(await getSessionSummary(id1)).toBeUndefined();
   });
 });
