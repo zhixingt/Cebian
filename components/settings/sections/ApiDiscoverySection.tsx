@@ -69,12 +69,23 @@ export function ApiDiscoverySection() {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) {
-        toast.error('No active tab');
+        toast.error(t('settings.apiDiscovery.noActiveTab'));
         return;
       }
+
+      // debugger 是 optional_permissions，必须在用户手势触发的前台上下文中请求权限，
+      // 否则 background 中的 chrome.permissions.request() 无法弹出授权弹窗。
+      if (!(await chrome.permissions.contains({ permissions: ['debugger'] }))) {
+        const granted = await chrome.permissions.request({ permissions: ['debugger'] });
+        if (!granted) {
+          toast.error(t('settings.apiDiscovery.permissionDenied'));
+          return;
+        }
+      }
+
       const result = await sendApiDiscoveryMessage({ type: 'start_capture', tabId: tab.id }) as { ok: boolean; error?: string };
       if (!result.ok) {
-        toast.error(result.error ?? 'Failed to start capture');
+        toast.error(result.error ?? t('settings.apiDiscovery.startFailed'));
       } else {
         toast.success(t('settings.apiDiscovery.captureStarted'));
       }
