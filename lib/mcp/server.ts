@@ -210,8 +210,8 @@ async function executeTool(name: string, args: Record<string, unknown>): Promise
       // 动态导入避免循环依赖：preference-learner.ts → user-profile.ts → db.ts
       void import('../memory/preference-learner')
         .then(({ learnFromNavigation }) =>
-          learnFromNavigation(url).catch(() => {
-            /* ignore learning errors */
+          learnFromNavigation(url).catch((err) => {
+            console.warn('[MCP Server] Failed to learn navigation preference:', err);
           }),
         )
         .catch(() => {
