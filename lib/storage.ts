@@ -222,3 +222,32 @@ export const apiDiscoveryEnabled = storage.defineItem<boolean>(
   'local:apiDiscoveryEnabled',
   { fallback: false },
 );
+
+// ─── Hermes Integration (Native Messaging) ───
+
+/** Hermes 是否被授权通过 Native Messaging 调用 CebianX 浏览器能力 */
+export const hermesEnabled = storage.defineItem<boolean>(
+  'local:hermesEnabled',
+  { fallback: false },
+);
+
+/** Hermes 调用模式：readonly 仅允许读取类工具；readwrite 允许所有工具 */
+export type HermesMode = 'readonly' | 'readwrite';
+export const hermesMode = storage.defineItem<HermesMode>(
+  'local:hermesMode',
+  { fallback: 'readonly' },
+);
+
+/** Hermes 调用审计日志条目 */
+export interface HermesAuditEntry {
+  id: string;
+  timestamp: number;
+  tool: string;
+  args: unknown;
+  success: boolean;
+  error?: string;
+}
+export const hermesAuditLog = storage.defineItem<HermesAuditEntry[]>(
+  'local:hermesAuditLog',
+  { fallback: [] },
+);

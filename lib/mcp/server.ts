@@ -21,6 +21,7 @@ import { readPageTool } from '@/lib/tools/read-page';
 import { screenshotTool } from '@/lib/tools/screenshot';
 import { startWorkflowRun } from '@/lib/workflow/engine';
 import { getWorkflow } from '@/lib/workflow/repository';
+import { hermesEnabled, hermesMode, hermesAuditLog, type HermesAuditEntry } from '@/lib/storage';
 
 // ─── 类型 ───
 
@@ -438,6 +439,17 @@ export function getMCPServerTools(): MCPToolDefinition[] {
 /** Native Messaging Port 名称，与 Native Host 约定一致 */
 const NATIVE_HOST_PORT_NAME = 'cebianx-mcp-host';
 
+/** 只读工具集合 — hermesMode='readonly' 时仅允许调用这些工具 */
+const READONLY_TOOLS = new Set([
+  'cebian_extract',
+  'cebian_read_page',
+  'cebian_screenshot',
+  'cebian_wait',
+]);
+
+/** 审计日志最大保留条数 */
+const AUDIT_LOG_MAX = 200;
+
 /**
  * 安装 Native Messaging 监听器。应在 background service worker 初始化时调用一次。
  *
@@ -445,6 +457,11 @@ const NATIVE_HOST_PORT_NAME = 'cebianx-mcp-host';
  * Native Host 通过 `chrome.runtime.connectNative('cebianx-mcp-host')` 建立连接，
  * 每条消息格式：`{ requestId: string, mcpRequest: MCPRequest }`，
  * 扩展处理后回传：`{ requestId: string, mcpResponse: MCPResponse }`。
+ *
+ * 安全控制：
+ * - 授权开关：`hermesEnabled` 为 false 时拒绝所有请求
+ * - 模式过滤：`hermesMode='readonly'` 时仅允许只读工具
+ * - 审计日志：每次调用记录到 `hermesAuditLog`
  */
 export function installNativeMessagingListener(): void {
   chrome.runtime.onConnect.addListener((port) => {
@@ -459,7 +476,57 @@ export function installNativeMessagingListener(): void {
         return;
       }
       const { requestId, mcpRequest } = msg as { requestId: string; mcpRequest: MCPRequest };
+
+      // 授权检查
+      const enabled = await hermesEnabled.getValue();
+      if (!enabled) {
+        const mcpResponse = {
+          id: mcpRequest.id,
+          error: { code: -32001, message: 'Hermes integration is disabled. Enable it in CebianX settings.' },
+        };
+        try { port.postMessage({ requestId, mcpResponse }); } catch { /* port closed */ }
+        return;
+      }
+
+      // 模式过滤：readonly 模式下拒绝读写工具
+      const mode = await hermesMode.getValue();
+      if (mode === 'readonly' && mcpRequest.method === 'tools/call') {
+        const toolName = String(mcpRequest.params?.name ?? '');
+        if (toolName && !READONLY_TOOLS.has(toolName)) {
+          const mcpResponse = {
+            id: mcpRequest.id,
+            error: { code: -32602, message: `Tool "${toolName}" is not allowed in readonly mode. Switch to readwrite mode in CebianX settings.` },
+          };
+          await appendAuditLog({
+            id: requestId,
+            timestamp: Date.now(),
+            tool: toolName,
+            args: mcpRequest.params?.arguments,
+            success: false,
+            error: 'Blocked by readonly mode',
+          });
+          try { port.postMessage({ requestId, mcpResponse }); } catch { /* port closed */ }
+          return;
+        }
+      }
+
+      // 处理请求
       const mcpResponse = await handleRequest(mcpRequest);
+
+      // 记录审计日志（仅对 tools/call）
+      if (mcpRequest.method === 'tools/call') {
+        const toolName = String(mcpRequest.params?.name ?? '');
+        const success = !mcpResponse.error;
+        await appendAuditLog({
+          id: requestId,
+          timestamp: Date.now(),
+          tool: toolName,
+          args: mcpRequest.params?.arguments,
+          success,
+          error: mcpResponse.error?.message,
+        });
+      }
+
       try {
         port.postMessage({ requestId, mcpResponse });
       } catch (err) {
@@ -474,4 +541,19 @@ export function installNativeMessagingListener(): void {
   });
 
   console.log('[MCP Server] Native Messaging listener installed');
+}
+
+/** 追加审计日志条目，自动裁剪到 AUDIT_LOG_MAX 条 */
+async function appendAuditLog(entry: HermesAuditEntry): Promise<void> {
+  try {
+    const log = await hermesAuditLog.getValue();
+    log.push(entry);
+    // 裁剪：保留最新的 AUDIT_LOG_MAX 条
+    if (log.length > AUDIT_LOG_MAX) {
+      log.splice(0, log.length - AUDIT_LOG_MAX);
+    }
+    await hermesAuditLog.setValue(log);
+  } catch (err) {
+    console.warn('[MCP Server] Failed to append Hermes audit log:', err);
+  }
 }
