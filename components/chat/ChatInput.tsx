@@ -1,33 +1,69 @@
-import { useState, useRef, useEffect, useMemo, useCallback, useImperativeHandle, forwardRef, type KeyboardEvent } from 'react';
-import { Send, Square, MousePointer2, Camera, Paperclip, Smartphone, Crosshair, FileText, X, FileType, Film, Play, Pencil, BookOpen, Scissors, MousePointerClick, FileInput, Eye, Loader2 } from 'lucide-react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+  useImperativeHandle,
+  forwardRef,
+  type KeyboardEvent,
+} from 'react';
+import {
+  Send,
+  Square,
+  MousePointer2,
+  Camera,
+  Paperclip,
+  Smartphone,
+  Crosshair,
+  FileText,
+  X,
+  FileType,
+  Film,
+  Play,
+  Pencil,
+  BookOpen,
+  Scissors,
+  MousePointerClick,
+  FileInput,
+  Eye,
+  Loader2,
+} from 'lucide-react';
 import { showDialog } from '@/lib/dialog';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ModelSelector } from '@/components/chat/ModelSelector';
 import { ThinkingLevelSelector } from '@/components/chat/ThinkingLevelSelector';
 import { RecordButton } from '@/components/chat/RecordButton';
 import { useStorageItem } from '@/hooks/useStorageItem';
-import { activeModel, thinkingLevel, providerCredentials, customProviders as customProvidersStorage, type ThinkingLevel } from '@/lib/storage';
+import {
+  activeModel,
+  thinkingLevel,
+  providerCredentials,
+  customProviders as customProvidersStorage,
+  type ThinkingLevel,
+} from '@/lib/storage';
 import { getModel } from '@earendil-works/pi-ai';
 import { isCustomProvider, findCustomModel } from '@/lib/custom-models';
 import { startElementPicker, cancelElementPicker } from '@/lib/element-picker';
 import { scanPrompts, type PromptMeta } from '@/lib/ai-config/scanner';
 import { makeTriggerSlashPrompt } from '@/lib/chat/trigger-slash-prompt';
 import {
-  MAX_ATTACHMENT_COUNT, MAX_IMAGE_SIZE, MAX_TEXT_FILE_SIZE,
+  MAX_ATTACHMENT_COUNT,
+  MAX_IMAGE_SIZE,
+  MAX_TEXT_FILE_SIZE,
   RECORDING_MIME,
-  isImageFile, isTextFile, formatFileSize,
-  isExtractableFile, extractTextFromFile,
+  isImageFile,
+  isTextFile,
+  formatFileSize,
+  isExtractableFile,
+  extractTextFromFile,
   ACCEPT_EXTENSIONS,
   type Attachment,
 } from '@/lib/attachments';
 import { recordingToAttachment } from '@/lib/recorder/to-attachment';
-import { sessionToSequence } from '@/lib/recorder/session-to-sequence';
-import type { RecordedSession } from '@/lib/recorder/types';
-import type { SequenceStep } from '@/lib/recorder/session-to-sequence';
 import { recorderChannel } from '@/lib/recorder/sidepanel-channel';
 import { RecordingEditor } from '@/components/chat/RecordingEditor';
 import { useRecorder } from '@/hooks/useRecorder';
@@ -41,8 +77,16 @@ import type { QuickToolId } from '@/components/chat/QuickActionsBar';
 /** 页面操作快速工具定义（与 QuickActionsBar 原先的一致） */
 const QUICK_TOOLS = [
   { id: 'read-page' as QuickToolId, icon: BookOpen, labelKey: 'chat.quickActions.toolReadPage' },
-  { id: 'screenshot-analyze' as QuickToolId, icon: Scissors, labelKey: 'chat.quickActions.toolScreenshotAnalyze' },
-  { id: 'operate-page' as QuickToolId, icon: MousePointerClick, labelKey: 'chat.quickActions.toolOperatePage' },
+  {
+    id: 'screenshot-analyze' as QuickToolId,
+    icon: Scissors,
+    labelKey: 'chat.quickActions.toolScreenshotAnalyze',
+  },
+  {
+    id: 'operate-page' as QuickToolId,
+    icon: MousePointerClick,
+    labelKey: 'chat.quickActions.toolOperatePage',
+  },
   { id: 'fill-form' as QuickToolId, icon: FileInput, labelKey: 'chat.quickActions.toolFillForm' },
   { id: 'watch-page' as QuickToolId, icon: Eye, labelKey: 'chat.quickActions.toolWatchPage' },
 ] as const;
@@ -82,7 +126,11 @@ export interface ChatInputHandle {
 
 // ─── ReplayButton：打开录制编辑器 ───
 
-function ReplayButton({ disabled, attachments, onOpenEditor }: {
+function ReplayButton({
+  disabled,
+  attachments,
+  onOpenEditor,
+}: {
   disabled?: boolean;
   attachments: Attachment[];
   onOpenEditor: (recording: Attachment) => void;
@@ -120,7 +168,16 @@ function ReplayButton({ disabled, attachments, onOpenEditor }: {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, onOpenSettings, isAgentRunning, onCancel, userHistory, sessionId, onQuickTool, isWatching },
+  {
+    onSend,
+    onOpenSettings,
+    isAgentRunning,
+    onCancel,
+    userHistory,
+    sessionId,
+    onQuickTool,
+    isWatching,
+  },
   ref,
 ) {
   const [value, setValue] = useState('');
@@ -145,20 +202,25 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const fileInputRef = useRef<HTMLInputElement>(null);
   const slashMenuRef = useRef<HTMLDivElement>(null);
   const sessionIdRef = useRef<string | null>(sessionId ?? null);
-  sessionIdRef.current = sessionId ?? null;
+  useEffect(() => {
+    sessionIdRef.current = sessionId ?? null;
+  }, [sessionId]);
 
   const [currentModel, setCurrentModel] = useStorageItem(activeModel, null);
   const [currentThinkingLevel, setCurrentThinkingLevel] = useStorageItem(thinkingLevel, 'medium');
-const [providers] = useStorageItem(providerCredentials, {});
-const [customProviderList] = useStorageItem(customProvidersStorage, []);
-// ③+④: feed Web (Browser Session) providers into the model selector
-const { providers: webProvidersList } = useWebProviders();
+  const [providers] = useStorageItem(providerCredentials, {});
+  const [customProviderList] = useStorageItem(customProvidersStorage, []);
+  // ③+④: feed Web (Browser Session) providers into the model selector
+  const { providers: webProvidersList } = useWebProviders();
 
   const isReasoningModel = useMemo(() => {
     if (!currentModel) return false;
 
     if (isCustomProvider(currentModel.provider)) {
-      return findCustomModel(customProviderList, currentModel.provider, currentModel.modelId)?.reasoning ?? false;
+      return (
+        findCustomModel(customProviderList, currentModel.provider, currentModel.modelId)
+          ?.reasoning ?? false
+      );
     }
 
     try {
@@ -175,12 +237,21 @@ const { providers: webProvidersList } = useWebProviders();
     if (!currentModel) return false;
 
     if (isCustomProvider(currentModel.provider)) {
-      return findCustomModel(customProviderList, currentModel.provider, currentModel.modelId)?.input?.includes('image') ?? false;
+      return (
+        findCustomModel(
+          customProviderList,
+          currentModel.provider,
+          currentModel.modelId,
+        )?.input?.includes('image') ?? false
+      );
     }
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- modelId is dynamic, pi-ai expects string literal
-      return (getModel as any)(currentModel.provider, currentModel.modelId)?.input?.includes('image') ?? false;
+      return (
+        (getModel as any)(currentModel.provider, currentModel.modelId)?.input?.includes('image') ??
+        false
+      );
     } catch {
       return false;
     }
@@ -189,7 +260,9 @@ const { providers: webProvidersList } = useWebProviders();
   // 异步图片生产者（截图 await、FileReader.onload）可能在用户切换到纯文本
   // 模型之后才回调，用 ref 同步读取最新的 supportsImage，避免迟到的图片被追加。
   const supportsImageRef = useRef(supportsImage);
-  supportsImageRef.current = supportsImage;
+  useEffect(() => {
+    supportsImageRef.current = supportsImage;
+  }, [supportsImage]);
 
   // 切换到不支持图片的模型时，自动剥离已有的图片附件（保留文件附件），
   // 避免把图片发给纯文本模型导致请求异常。
@@ -202,9 +275,12 @@ const { providers: webProvidersList } = useWebProviders();
     });
   }, [supportsImage]);
 
-  const handleModelSelect = useCallback((provider: string, modelId: string) => {
-    setCurrentModel({ provider, modelId });
-  }, [setCurrentModel]);
+  const handleModelSelect = useCallback(
+    (provider: string, modelId: string) => {
+      setCurrentModel({ provider, modelId });
+    },
+    [setCurrentModel],
+  );
 
   const handleThinkingSelect = (level: ThinkingLevel) => {
     setCurrentThinkingLevel(level);
@@ -247,7 +323,9 @@ const { providers: webProvidersList } = useWebProviders();
 
   // Cancel picker on unmount
   useEffect(() => {
-    return () => { cancelElementPicker(); };
+    return () => {
+      cancelElementPicker();
+    };
   }, []);
 
   // Cancel picker on Esc key (sidepanel has focus, not the page)
@@ -262,7 +340,7 @@ const { providers: webProvidersList } = useWebProviders();
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [isPicking]);
 
-  const canSend = value.trim().length > 0;
+  const canSend = value.trim().length > 0 || attachments.length > 0;
 
   // Recorder integration. The captured session lands in attachments via
   // the channel subscription below — NOT via `recorder.stop()`'s return
@@ -297,14 +375,13 @@ const { providers: webProvidersList } = useWebProviders();
   // sees the new chip before dispatching `onSend`.
   useEffect(() => {
     return recorderChannel.subscribeSession((session) => {
-      console.log('[recorder] session finalized', {
+      console.debug('[recorder] session finalized', {
         eventCount: session.events.length,
         durationMs: session.durationMs,
         truncated: session.truncated,
         windowId: session.windowId,
         startedAt: session.startedAt,
         endedAt: session.endedAt,
-        session,
       });
       const current = attachmentsRef.current;
       if (current.length >= MAX_ATTACHMENT_COUNT) {
@@ -322,7 +399,9 @@ const { providers: webProvidersList } = useWebProviders();
     if (isDispatchingRef.current) return;
     if (!currentModel) {
       toast.error(t('chat.composer.needModel'), {
-        action: onOpenSettings ? { label: t('chat.composer.goToSettings'), onClick: onOpenSettings } : undefined,
+        action: onOpenSettings
+          ? { label: t('chat.composer.goToSettings'), onClick: onOpenSettings }
+          : undefined,
       });
       return;
     }
@@ -352,7 +431,11 @@ const { providers: webProvidersList } = useWebProviders();
       if (sessionIdRef.current !== dispatchSessionId) return;
 
       const outgoing = attachmentsRef.current;
-      const result = await onSend(text, outgoing.length > 0 ? outgoing : undefined, dispatchSessionId);
+      const result = await onSend(
+        text,
+        outgoing.length > 0 ? outgoing : undefined,
+        dispatchSessionId,
+      );
       if (result.status !== 'dispatched') return;
       if (sessionIdRef.current !== dispatchSessionId) return;
 
@@ -411,7 +494,12 @@ const { providers: webProvidersList } = useWebProviders();
     // editing is never disturbed. The slash command menu (when visible)
     // reserves these keys for its own use; once it's hidden — including the
     // "no match" case — history navigation resumes.
-    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && !isSlashMenuVisible && userHistory && userHistory.length > 0) {
+    if (
+      (e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
+      !isSlashMenuVisible &&
+      userHistory &&
+      userHistory.length > 0
+    ) {
       const ta = textareaRef.current;
       if (ta) {
         // After history navigation, place the caret to keep further presses
@@ -449,10 +537,10 @@ const { providers: webProvidersList } = useWebProviders();
         }
 
         if (
-          e.key === 'ArrowDown'
-          && historyIndex !== null
-          && ta.selectionStart === ta.value.length
-          && ta.selectionEnd === ta.value.length
+          e.key === 'ArrowDown' &&
+          historyIndex !== null &&
+          ta.selectionStart === ta.value.length &&
+          ta.selectionEnd === ta.value.length
         ) {
           e.preventDefault();
           if (historyIndex < userHistory.length - 1) {
@@ -485,13 +573,19 @@ const { providers: webProvidersList } = useWebProviders();
   // Scan prompts when slash menu opens
   useEffect(() => {
     if (!showSlash) return;
-    scanPrompts().then(setPrompts).catch(() => setPrompts([]));
+    scanPrompts()
+      .then(setPrompts)
+      .catch(() => setPrompts([]));
   }, [showSlash]);
 
   // Filter prompts by typed search (after '/')
   const slashFilter = value.startsWith('/') ? value.slice(1).toLowerCase() : '';
   const filteredPrompts = slashFilter
-    ? prompts.filter((p) => p.name.toLowerCase().includes(slashFilter) || p.description.toLowerCase().includes(slashFilter))
+    ? prompts.filter(
+        (p) =>
+          p.name.toLowerCase().includes(slashFilter) ||
+          p.description.toLowerCase().includes(slashFilter),
+      )
     : prompts;
 
   // Menu hides when the user has typed a search term that matches nothing —
@@ -517,7 +611,9 @@ const { providers: webProvidersList } = useWebProviders();
   // Keep the highlighted item in view when navigating with the keyboard.
   useEffect(() => {
     if (!isSlashMenuVisible) return;
-    const el = slashMenuRef.current?.querySelector<HTMLElement>(`[data-prompt-index="${selectedPromptIndex}"]`);
+    const el = slashMenuRef.current?.querySelector<HTMLElement>(
+      `[data-prompt-index="${selectedPromptIndex}"]`,
+    );
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedPromptIndex, isSlashMenuVisible]);
 
@@ -581,12 +677,13 @@ const { providers: webProvidersList } = useWebProviders();
         case 'ok': {
           const att = result.attachment;
           // Deduplicate: same selector + same frameId
-          const isDuplicate = attachments.some(
+          const current = attachmentsRef.current;
+          const isDuplicate = current.some(
             (a) => a.type === 'element' && a.selector === att.selector && a.frameId === att.frameId,
           );
           if (isDuplicate) {
             toast.info(t('chat.composer.elementAdded'));
-          } else if (attachments.length >= MAX_ATTACHMENT_COUNT) {
+          } else if (current.length >= MAX_ATTACHMENT_COUNT) {
             toast.warning(t('chat.composer.maxAttachments', [MAX_ATTACHMENT_COUNT]));
           } else {
             setAttachments((prev) => [...prev, att]);
@@ -663,7 +760,16 @@ const { providers: webProvidersList } = useWebProviders();
 
     for (const file of filesToProcess) {
       const ext = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
-      console.log('[upload] processing file:', file.name, 'size:', file.size, 'type:', file.type, 'ext:', ext);
+      console.debug(
+        '[upload] processing file:',
+        file.name,
+        'size:',
+        file.size,
+        'type:',
+        file.type,
+        'ext:',
+        ext,
+      );
 
       // Legacy .doc is not extractable in browser — prompt conversion
       if (ext === '.doc') {
@@ -679,7 +785,9 @@ const { providers: webProvidersList } = useWebProviders();
             continue;
           }
           if (file.size > MAX_IMAGE_SIZE) {
-            toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_IMAGE_SIZE)]));
+            toast.error(
+              t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_IMAGE_SIZE)]),
+            );
             continue;
           }
           const reader = new FileReader();
@@ -691,7 +799,10 @@ const { providers: webProvidersList } = useWebProviders();
             const mimeType = file.type || 'image/png';
             setAttachments((prev) => {
               if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
-              return [...prev, { type: 'image', source: 'upload', data: base64, mimeType, name: file.name }];
+              return [
+                ...prev,
+                { type: 'image', source: 'upload', data: base64, mimeType, name: file.name },
+              ];
             });
           };
           reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
@@ -699,23 +810,41 @@ const { providers: webProvidersList } = useWebProviders();
         } else if (isExtractableFile(file.name)) {
           // PDF / DOCX / XLSX — extract plain text in browser
           if (file.size > MAX_TEXT_FILE_SIZE * 10) {
-            toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE * 10)]));
+            toast.error(
+              t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE * 10)]),
+            );
             continue;
           }
-          console.log('[upload] extracting text from', file.name);
+          console.debug('[upload] extracting text from', file.name);
           const extracted = await extractTextFromFile(file);
-          console.log('[upload] extracted result for', file.name, ':', extracted ? `length=${extracted.length}` : 'null');
+          console.debug(
+            '[upload] extracted result for',
+            file.name,
+            ':',
+            extracted ? `length=${extracted.length}` : 'null',
+          );
           if (extracted != null) {
             setAttachments((prev) => {
               if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
-              return [...prev, { type: 'file', content: extracted, name: file.name, mimeType: file.type || 'application/octet-stream', size: file.size }];
+              return [
+                ...prev,
+                {
+                  type: 'file',
+                  content: extracted,
+                  name: file.name,
+                  mimeType: file.type || 'application/octet-stream',
+                  size: file.size,
+                },
+              ];
             });
           } else {
             toast.error(t('chat.composer.readFileFailed', [file.name]));
           }
         } else if (isTextFile(file.name)) {
           if (file.size > MAX_TEXT_FILE_SIZE) {
-            toast.error(t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE)]));
+            toast.error(
+              t('chat.composer.fileTooLarge', [file.name, formatFileSize(MAX_TEXT_FILE_SIZE)]),
+            );
             continue;
           }
           const reader = new FileReader();
@@ -723,7 +852,16 @@ const { providers: webProvidersList } = useWebProviders();
             if (isDispatchingRef.current) return;
             setAttachments((prev) => {
               if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
-              return [...prev, { type: 'file', content: reader.result as string, name: file.name, mimeType: file.type || 'text/plain', size: file.size }];
+              return [
+                ...prev,
+                {
+                  type: 'file',
+                  content: reader.result as string,
+                  name: file.name,
+                  mimeType: file.type || 'text/plain',
+                  size: file.size,
+                },
+              ];
             });
           };
           reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name]));
@@ -777,7 +915,9 @@ const { providers: webProvidersList } = useWebProviders();
 
     for (const file of filesToProcess) {
       if (file.size > MAX_IMAGE_SIZE) {
-        toast.error(t('chat.composer.fileTooLarge', [file.name || 'image', formatFileSize(MAX_IMAGE_SIZE)]));
+        toast.error(
+          t('chat.composer.fileTooLarge', [file.name || 'image', formatFileSize(MAX_IMAGE_SIZE)]),
+        );
         continue;
       }
       const reader = new FileReader();
@@ -795,7 +935,16 @@ const { providers: webProvidersList } = useWebProviders();
             return prev;
           }
           if (prev.length >= MAX_ATTACHMENT_COUNT) return prev;
-          return [...prev, { type: 'image', source: 'paste', data: base64, mimeType, name: file.name || undefined }];
+          return [
+            ...prev,
+            {
+              type: 'image',
+              source: 'paste',
+              data: base64,
+              mimeType,
+              name: file.name || undefined,
+            },
+          ];
         });
       };
       reader.onerror = () => toast.error(t('chat.composer.readFileFailed', [file.name || 'image']));
@@ -810,115 +959,142 @@ const { providers: webProvidersList } = useWebProviders();
 
   return (
     <>
-    <footer className="px-4 py-4 bg-background relative">
-      {/* Slash menu — dynamic VFS prompts */}
-      {isSlashMenuVisible && (
-        <div
-          ref={slashMenuRef}
-          className="absolute bottom-full left-4 right-4 mb-3 bg-popover border border-border rounded-lg shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150 max-h-60 overflow-y-auto"
-        >
-          {filteredPrompts.length === 0 ? (
-            <p className="text-xs text-muted-foreground text-center py-3 px-2.5">
-              {t('chat.composer.noPrompts')}
-            </p>
-          ) : (
-            <div className="py-1">
-              {filteredPrompts.map((p, idx) => {
-                const selected = idx === selectedPromptIndex;
-                return (
-                  <button
-                    key={p.fileName}
-                    data-prompt-index={idx}
-                    disabled={isDispatching}
-                    onClick={() => handlePromptSelect(p)}
-                    onMouseMove={() => { if (!isDispatching) setSelectedPromptIndex(idx); }}
-                    className={`w-full flex items-start gap-2.5 px-3 py-2 text-left transition-colors ${selected ? 'bg-accent' : 'hover:bg-accent/50'}`}
-                  >
-                    <FileType className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">/{p.name}</p>
-                      {p.description && (
-                        <p className="text-xs text-muted-foreground truncate">{p.description}</p>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="border border-border rounded-xl bg-card focus-within:border-border/80 focus-within:ring-2 focus-within:ring-primary/25 focus-within:ring-offset-1 focus-within:ring-offset-background transition-all">
-        {/* Top row: tools + attachments */}
-        <div className="flex items-center gap-1 px-2 pt-2 pb-2 border-b border-border/40">
-          {/* Tool icons */}
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            title={isPicking ? t('chat.composer.cancelPick') : t('chat.composer.pickElement')}
-            aria-label={isPicking ? t('chat.composer.cancelPick') : t('chat.composer.pickElement')}
-            onClick={handlePickElement}
-            disabled={isDispatching}
-            className={isPicking ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
+      <footer className="px-4 py-4 bg-background relative">
+        {/* Slash menu — dynamic VFS prompts */}
+        {isSlashMenuVisible && (
+          <div
+            ref={slashMenuRef}
+            className="absolute bottom-full left-4 right-4 mb-3 bg-popover border border-border rounded-lg shadow-xl z-50 animate-in slide-in-from-bottom-1 fade-in duration-150 max-h-60 overflow-y-auto"
           >
-            <MousePointer2 className="size-3.5" />
-          </Button>
-          <RecordButton disabled={isDispatching} />
-          <ReplayButton disabled={isDispatching} attachments={attachments} onOpenEditor={(rec) => { setEditorRecording(rec); setEditorOpen(true); }} />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                // span 包裹：按钮 disabled 时本身不接收指针事件，靠外层 span 触发 tooltip。
-                className="inline-flex"
-              >
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  onClick={handleScreenshot}
-                  disabled={isDispatching || !supportsImage}
-                  aria-label={supportsImage ? t('chat.composer.screenshot') : t('chat.composer.modelNoImage')}
+            {filteredPrompts.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-3 px-2.5">
+                {t('chat.composer.noPrompts')}
+              </p>
+            ) : (
+              <div className="py-1">
+                {filteredPrompts.map((p, idx) => {
+                  const selected = idx === selectedPromptIndex;
+                  return (
+                    <button
+                      key={p.fileName}
+                      data-prompt-index={idx}
+                      disabled={isDispatching}
+                      onClick={() => handlePromptSelect(p)}
+                      onMouseMove={() => {
+                        if (!isDispatching) setSelectedPromptIndex(idx);
+                      }}
+                      className={`w-full flex items-start gap-2.5 px-3 py-2 text-left transition-colors ${selected ? 'bg-accent' : 'hover:bg-accent/50'}`}
+                    >
+                      <FileType className="size-4 mt-0.5 shrink-0 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">/{p.name}</p>
+                        {p.description && (
+                          <p className="text-xs text-muted-foreground truncate">{p.description}</p>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="border border-border rounded-xl bg-card focus-within:border-border/80 focus-within:ring-2 focus-within:ring-primary/25 focus-within:ring-offset-1 focus-within:ring-offset-background transition-all">
+          {/* Top row: tools + attachments */}
+          <div className="flex items-center gap-1 px-2 pr-2 pt-2 pb-2 border-b border-border/40 overflow-x-auto scrollbar-none">
+            {/* Tool icons */}
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              title={isPicking ? t('chat.composer.cancelPick') : t('chat.composer.pickElement')}
+              aria-label={
+                isPicking ? t('chat.composer.cancelPick') : t('chat.composer.pickElement')
+              }
+              onClick={handlePickElement}
+              disabled={isDispatching}
+              className={
+                isPicking ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''
+              }
+            >
+              <MousePointer2 className="size-3.5" />
+            </Button>
+            <RecordButton disabled={isDispatching} />
+            <ReplayButton
+              disabled={isDispatching}
+              attachments={attachments}
+              onOpenEditor={(rec) => {
+                setEditorRecording(rec);
+                setEditorOpen(true);
+              }}
+            />
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  // span 包裹：按钮 disabled 时本身不接收指针事件，靠外层 span 触发 tooltip。
+                  className="inline-flex"
                 >
-                  <Camera className="size-3.5" />
-                </Button>
-              </span>
-            </TooltipTrigger>
-            <TooltipContent>
-              {supportsImage ? t('chat.composer.screenshot') : t('chat.composer.modelNoImage')}
-            </TooltipContent>
-          </Tooltip>
-          <Button variant="ghost" size="icon-xs" title={t('chat.composer.uploadFile')} aria-label={t('chat.composer.uploadFile')} onClick={() => fileInputRef.current?.click()} disabled={isDispatching}>
-            <Paperclip className="size-3.5" />
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept={`${supportsImage ? 'image/*,' : ''}${Array.from(ACCEPT_EXTENSIONS).join(',')}`}
-            className="hidden"
-            disabled={isDispatching}
-            onChange={handleFileUpload}
-          />
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            title={t('chat.composer.mobileMode')}
-            aria-label={t('chat.composer.mobileMode')}
-            className={isActiveTabMobile ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary' : ''}
-            onClick={toggleMobile}
-            disabled={isDispatching}
-          >
-            <Smartphone className="size-3.5" />
-          </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={handleScreenshot}
+                    disabled={isDispatching || !supportsImage}
+                    aria-label={
+                      supportsImage
+                        ? t('chat.composer.screenshot')
+                        : t('chat.composer.modelNoImage')
+                    }
+                  >
+                    <Camera className="size-3.5" />
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                {supportsImage ? t('chat.composer.screenshot') : t('chat.composer.modelNoImage')}
+              </TooltipContent>
+            </Tooltip>
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              title={t('chat.composer.uploadFile')}
+              aria-label={t('chat.composer.uploadFile')}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isDispatching}
+            >
+              <Paperclip className="size-3.5" />
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={`${supportsImage ? 'image/*,' : ''}${Array.from(ACCEPT_EXTENSIONS).join(',')}`}
+              className="hidden"
+              disabled={isDispatching}
+              onChange={handleFileUpload}
+            />
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              title={t('chat.composer.mobileMode')}
+              aria-label={t('chat.composer.mobileMode')}
+              className={
+                isActiveTabMobile
+                  ? 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary'
+                  : ''
+              }
+              onClick={toggleMobile}
+              disabled={isDispatching}
+            >
+              <Smartphone className="size-3.5" />
+            </Button>
 
-          {/* Divider + Page-operation quick tools (merged from QuickActionsBar) */}
-          {onQuickTool && (
-            <>
-              <Separator orientation="vertical" className="h-4! mx-1 bg-border" />
-              {QUICK_TOOLS.map((tool) => {
+            {/* Page-operation quick tools (merged from QuickActionsBar) */}
+            {onQuickTool &&
+              QUICK_TOOLS.map((tool, idx) => {
                 const Icon = tool.icon;
                 const active = tool.id === 'watch-page' && isWatching;
                 const isPending = pendingTool === tool.id;
+                const isLast = idx === QUICK_TOOLS.length - 1;
                 return (
                   <Tooltip key={tool.id}>
                     <TooltipTrigger asChild>
@@ -931,7 +1107,9 @@ const { providers: webProvidersList } = useWebProviders();
                           onClick={() => handleToolClick(tool.id)}
                           className={[
                             'relative',
-                            active && 'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary',
+                            isLast && 'mr-1',
+                            active &&
+                              'bg-primary/15 text-primary hover:bg-primary/25 hover:text-primary',
                             isPending && 'opacity-60 scale-95',
                             !!pendingTool && !isPending && 'opacity-40 cursor-not-allowed',
                           ].join(' ')}
@@ -954,188 +1132,198 @@ const { providers: webProvidersList } = useWebProviders();
                   </Tooltip>
                 );
               })}
-            </>
-          )}
+          </div>
 
+          {/* Attachment row between toolbar and textarea */}
           {attachments.length > 0 && (
-            <>
-              <Separator orientation="vertical" className="h-4! mx-1 bg-border" />
-
-              {/* Attachment chips */}
-              <div className="flex gap-1.5 flex-1 min-w-0 overflow-x-auto scrollbar-none items-center">
-                {attachments.map((att, i) => (
-                  att.type === 'image' ? (
-                    // Image attachment: thumbnail + label badge
-                    <Badge
-                      key={i}
-                      variant="outline"
-                      className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-0.5 pr-0.5 text-purple-400 border-purple-400/20 bg-purple-400/5 group"
-                    >
-                      <img
-                        src={`data:${att.mimeType};base64,${att.data}`}
-                        alt={att.name || t('chat.attachments.screenshot')}
-                        className="h-3.5 w-5 rounded-sm object-cover cursor-pointer"
-                        onClick={() => showDialog('image-preview', {
+            <div className="flex gap-1.5 px-2 py-1.5 overflow-x-auto scrollbar-none items-center border-b border-border/40">
+              {attachments.map((att, i) =>
+                att.type === 'image' ? (
+                  // Image attachment: thumbnail + label badge
+                  <Badge
+                    key={i}
+                    variant="outline"
+                    className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-0.5 pr-0.5 text-purple-400 border-purple-400/20 bg-purple-400/5 group"
+                  >
+                    <img
+                      src={`data:${att.mimeType};base64,${att.data}`}
+                      alt={att.name || t('chat.attachments.screenshot')}
+                      className="h-3.5 w-5 rounded-sm object-cover cursor-pointer"
+                      onClick={() =>
+                        showDialog('image-preview', {
                           src: `data:${att.mimeType};base64,${att.data}`,
                           alt: att.name || t('chat.attachments.screenshot'),
-                        })}
-                      />
-                      <span className="truncate max-w-24">
-                        {att.name || (att.source === 'screenshot' ? t('chat.attachments.screenshot') : t('chat.attachments.image'))}
-                      </span>
-                      <button
-                        className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
-                        disabled={isDispatching}
-                        onClick={() => removeAttachment(i)}
-                        aria-label={t('chat.attachments.delete')}
-                      >
-                        <X className="size-2.5" />
-                      </button>
-                    </Badge>
-                  ) : att.type === 'recording' ? (
-                    // Recording attachment: amber chip mirroring Message.tsx;
-                    // chip body downloads the JSON, X removes from the list.
-                    <Badge
-                      key={i}
-                      variant="outline"
-                      className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-0.5 text-amber-400 border-amber-400/20 bg-amber-400/5 hover:bg-amber-400/10"
-                      title={`${t('chat.attachments.recordingDownload')}\n${t('chat.attachments.recordingHover', [String(att.eventCount), formatCharCount(att.json.length)])}`}
+                        })
+                      }
+                    />
+                    <span className="truncate max-w-24">
+                      {att.name ||
+                        (att.source === 'screenshot'
+                          ? t('chat.attachments.screenshot')
+                          : t('chat.attachments.image'))}
+                    </span>
+                    <button
+                      className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                      disabled={isDispatching}
+                      onClick={() => removeAttachment(i)}
+                      aria-label={t('chat.attachments.delete')}
                     >
-                      <button
-                        className="flex items-center gap-1 cursor-pointer"
-                        onClick={() => downloadFile(att.name, att.json, RECORDING_MIME)}
-                      >
-                        <Film className="size-2.5 shrink-0" />
-                        <span className="truncate max-w-40">
-                          {att.name} · {t('chat.attachments.recordingMeta', [String(att.eventCount), formatDuration(att.durationMs)])}
-                        </span>
-                      </button>
-                      <button
-                        className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
-                        disabled={isDispatching}
-                        onClick={() => {
-                          setEditorRecording(att);
-                          setEditorOpen(true);
-                        }}
-                        aria-label={t('chat.recorder.editAndReplay')}
-                      >
-                        <Pencil className="size-2.5" />
-                      </button>
-                      <button
-                        className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
-                        disabled={isDispatching}
-                        onClick={() => removeAttachment(i)}
-                        aria-label={t('chat.attachments.delete')}
-                      >
-                        <X className="size-2.5" />
-                      </button>
-                    </Badge>
-                  ) : (
-                    // Element / file attachment: badge chip
-                    <Badge
-                      key={i}
-                      variant="outline"
-                      className={`shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-0.5 ${
-                        att.type === 'element'
-                          ? 'text-info border-info/20 bg-info/5'
-                          : 'text-emerald-400 border-emerald-400/20 bg-emerald-400/5'
-                      }`}
+                      <X className="size-2.5" />
+                    </button>
+                  </Badge>
+                ) : att.type === 'recording' ? (
+                  // Recording attachment: amber chip mirroring Message.tsx;
+                  // chip body downloads the JSON, X removes from the list.
+                  <Badge
+                    key={i}
+                    variant="outline"
+                    className="shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-0.5 text-amber-400 border-amber-400/20 bg-amber-400/5 hover:bg-amber-400/10"
+                    title={`${t('chat.attachments.recordingDownload')}\n${t('chat.attachments.recordingHover', [String(att.eventCount), formatCharCount(att.json.length)])}`}
+                  >
+                    <button
+                      className="flex items-center gap-1 cursor-pointer"
+                      onClick={() => downloadFile(att.name, att.json, RECORDING_MIME)}
                     >
-                      {att.type === 'element' && <Crosshair className="size-2.5 shrink-0" />}
-                      {att.type === 'file' && <FileText className="size-2.5 shrink-0" />}
-
-                      <span className="truncate max-w-24">
-                        {att.type === 'element' && att.selector}
-                        {att.type === 'file' && att.name}
+                      <Film className="size-2.5 shrink-0" />
+                      <span className="truncate max-w-40">
+                        {att.name} ·{' '}
+                        {t('chat.attachments.recordingMeta', [
+                          String(att.eventCount),
+                          formatDuration(att.durationMs),
+                        ])}
                       </span>
+                    </button>
+                    <button
+                      className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                      disabled={isDispatching}
+                      onClick={() => {
+                        setEditorRecording(att);
+                        setEditorOpen(true);
+                      }}
+                      aria-label={t('chat.recorder.editAndReplay')}
+                    >
+                      <Pencil className="size-2.5" />
+                    </button>
+                    <button
+                      className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                      disabled={isDispatching}
+                      onClick={() => removeAttachment(i)}
+                      aria-label={t('chat.attachments.delete')}
+                    >
+                      <X className="size-2.5" />
+                    </button>
+                  </Badge>
+                ) : (
+                  // Element / file attachment: badge chip
+                  <Badge
+                    key={i}
+                    variant="outline"
+                    className={`shrink-0 text-[0.65rem] font-mono gap-1 h-5 rounded pl-1 pr-0.5 ${
+                      att.type === 'element'
+                        ? 'text-info border-info/20 bg-info/5'
+                        : 'text-emerald-400 border-emerald-400/20 bg-emerald-400/5'
+                    }`}
+                  >
+                    {att.type === 'element' && <Crosshair className="size-2.5 shrink-0" />}
+                    {att.type === 'file' && <FileText className="size-2.5 shrink-0" />}
 
-                      <button
-                        className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
-                        disabled={isDispatching}
-                        onClick={() => removeAttachment(i)}
-                        aria-label={t('chat.attachments.delete')}
-                      >
-                        <X className="size-2.5" />
-                      </button>
-                    </Badge>
-                  )
-                ))}
-              </div>
-            </>
+                    <span className="truncate max-w-24">
+                      {att.type === 'element' && att.selector}
+                      {att.type === 'file' && att.name}
+                    </span>
+
+                    <button
+                      className="opacity-60 hover:opacity-100 p-0.5 rounded-sm hover:bg-foreground/10 cursor-pointer"
+                      disabled={isDispatching}
+                      onClick={() => removeAttachment(i)}
+                      aria-label={t('chat.attachments.delete')}
+                    >
+                      <X className="size-2.5" />
+                    </button>
+                  </Badge>
+                ),
+              )}
+            </div>
           )}
-        </div>
 
-        {/* Textarea */}
-        <textarea
-          ref={textareaRef}
-          data-chat-input
-          rows={1}
-          value={value}
-          onChange={(e) => handleInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-          placeholder={t('chat.composer.placeholder')}
-          disabled={isDispatching}
-          className="w-full bg-transparent border-none outline-none resize-none text-foreground text-[0.85rem] px-3 py-2 min-h-11 max-h-37.5 leading-relaxed placeholder:text-muted-foreground/50"
-        />
+          {/* Textarea */}
+          <textarea
+            ref={textareaRef}
+            data-chat-input
+            rows={1}
+            value={value}
+            onChange={(e) => handleInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            placeholder={t('chat.composer.placeholder')}
+            disabled={isDispatching}
+            className="w-full bg-transparent border-none outline-none resize-none text-foreground text-[0.85rem] px-3 py-2 min-h-11 max-h-37.5 leading-relaxed placeholder:text-muted-foreground/50"
+          />
 
-        {/* Bottom row: actions */}
-        <div className="flex items-center justify-between px-2 pb-1.5">
-          <div className={`flex items-center gap-0.5 ${isDispatching ? 'pointer-events-none opacity-60' : ''}`}>
-            <ModelSelector
-              activeModel={currentModel}
-              configuredProviders={providers}
-              customProviders={customProviderList}
-              webProviders={webProvidersList}
-              onSelect={handleModelSelect}
-              onOpenSettings={onOpenSettings ?? (() => {})}
-            />
-            {isReasoningModel && (
-              <ThinkingLevelSelector
-                level={currentThinkingLevel}
-                onSelect={handleThinkingSelect}
+          {/* Bottom row: actions */}
+          <div className="flex items-center justify-between px-2 pb-1.5">
+            <div
+              className={`flex items-center gap-0.5 ${isDispatching ? 'pointer-events-none opacity-60' : ''}`}
+            >
+              <ModelSelector
+                activeModel={currentModel}
+                configuredProviders={providers}
+                customProviders={customProviderList}
+                webProviders={webProvidersList}
+                onSelect={handleModelSelect}
+                onOpenSettings={onOpenSettings ?? (() => {})}
               />
-            )}
-          </div>
+              {isReasoningModel && (
+                <ThinkingLevelSelector
+                  level={currentThinkingLevel}
+                  onSelect={handleThinkingSelect}
+                />
+              )}
+            </div>
 
-          <div className="flex items-center gap-1">
-            {isAgentRunning ? (
-              <Button
-                variant="destructive"
-                size="icon-xs"
-                onClick={() => onCancel?.()}
-                className="hover:shadow-xs"
-              >
-                <Square className="size-3" fill="currentColor" />
-              </Button>
-            ) : (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={handleSend}
-                disabled={!canSend || isDispatching}
-                aria-label={t('common.send')}
-                className="bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                <Send className="size-3" />
-              </Button>
-            )}
+            <div className="flex items-center gap-1">
+              {isAgentRunning ? (
+                <Button
+                  variant="destructive"
+                  size="icon-xs"
+                  onClick={() => onCancel?.()}
+                  className="hover:shadow-xs"
+                >
+                  <Square className="size-3" fill="currentColor" />
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  onClick={handleSend}
+                  disabled={!canSend || isDispatching}
+                  aria-label={t('common.send')}
+                  className="bg-foreground text-background hover:bg-primary hover:text-primary-foreground hover:shadow-xs disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <Send className="size-3" />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
-    </footer>
+      </footer>
 
-    <RecordingEditor
-      open={editorOpen}
-      onOpenChange={setEditorOpen}
-      recording={editorRecording}
-      onReplay={(steps) => {
-        if (steps.length === 0) return;
-        const stepsJson = JSON.stringify(steps, null, 2);
-        const prompt = t('chat.recorder.replayPrompt', [stepsJson]);
-        void onSend(prompt, undefined, null);
-      }}
-    />
+      <RecordingEditor
+        open={editorOpen}
+        onOpenChange={setEditorOpen}
+        recording={editorRecording}
+        onReplay={async (steps) => {
+          if (steps.length === 0) return;
+          const stepsJson = JSON.stringify(steps, null, 2);
+          const prompt = t('chat.recorder.replayPrompt', [stepsJson]);
+          try {
+            await onSend(prompt, undefined, null);
+          } catch (err) {
+            toast.error(t('chat.recorder.replaySendFailed'));
+            console.error('[RecordingEditor] replay send failed', err);
+          }
+        }}
+      />
     </>
   );
 });

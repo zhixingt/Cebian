@@ -169,12 +169,14 @@ settings:
     title: "工作流"
     hint: "錄製、編輯和執行瀏覽器自動化工作流。"
     tabMy: "我的自動化"
-    tabDiscover: "發現"
     new: "新增工作流"
     searchPlaceholder: "搜尋工作流…"
     empty:
       title: "暫無工作流"
-      hint: "錄製一次會話或建立工作流以開始使用。"
+      hint: "新增工作流、匯入已有工作流，或恢復預置範例以開始使用。"
+    restorePresets: "恢復預設範例"
+    restorePresetsSuccess: "已恢復預設範例"
+    restorePresetsFailed: "恢復預設範例失敗"
     # $1 = 步驟數
     stepCount:
       1: "1 個步驟"
@@ -408,6 +410,7 @@ chat:
     defaultDesc: "錄製工作流"
     replayPrompt: "請回放以下錄製操作步驟，使用 interact 工具的 sequence action 執行：\n```json\n$1\n```"
     replayPromptPrefix: "請使用 interact 工具的 sequence action 執行以下操作步驟："
+    replaySendFailed: "重放傳送失敗"
   emptyState:
     slogan: "思之所至，行之所達。"
     viewCommands: "查看命令"

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, memo } from 'react';
+import { useCallback, useEffect, useRef, useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Play,
@@ -19,9 +19,6 @@ import {
   Link2,
   ScanEye,
   SlidersHorizontal,
-  Sparkles,
-  CopyCheck,
-  BookOpen,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -43,7 +40,7 @@ import {
 import { refreshWorkflowTrigger } from '@/lib/workflow/trigger-manager';
 import { startWorkflowRun } from '@/lib/workflow/engine';
 
-import { ensurePresetWorkflows, getPresetWorkflows, PRESET_TEMPLATE_IDS } from '@/lib/workflow/presets';
+import { ensurePresetWorkflows } from '@/lib/workflow/presets';
 import { STEP_TYPE_LABELS } from '@/lib/workflow/types';
 import type { Workflow, WorkflowTriggerType } from '@/lib/workflow/types';
 import type { StepResult } from '@/lib/workflow/executor';
@@ -122,10 +119,6 @@ export function WorkflowsSection() {
   const [varDialogWorkflow, setVarDialogWorkflow] = useState<Workflow | null>(null);
   const [varValues, setVarValues] = useState<Record<string, string>>({});
 
-  // 标签页状态
-  const [activeTab, setActiveTab] = useState<'my' | 'discover'>('my');
-  const [addedPresetIds, setAddedPresetIds] = useState<Set<string>>(new Set());
-
   // 执行进度面板
   const [runProgressOpen, setRunProgressOpen] = useState(false);
   const [runProgressSteps, setRunProgressSteps] = useState<StepResult[]>([]);
@@ -135,8 +128,6 @@ export function WorkflowsSection() {
   const loadWorkflows = useCallback(async () => {
     setLoading(true);
     try {
-      // 首次加载时确保预置工作流已初始化
-      await ensurePresetWorkflows(createWorkflow, async (id) => !!(await getWorkflow(id)));
       const data = await listWorkflows();
       setWorkflows(data);
     } catch (error) {
@@ -146,6 +137,18 @@ export function WorkflowsSection() {
       setLoading(false);
     }
   }, []);
+
+  const handleRestorePresets = useCallback(async () => {
+    try {
+      await ensurePresetWorkflows(createWorkflow, async (id) => !!(await getWorkflow(id)));
+      toast.success(t('settings.workflows.restorePresetsSuccess'));
+    } catch (error) {
+      console.error('Failed to restore preset workflows', error);
+      toast.error(t('settings.workflows.restorePresetsFailed'));
+    } finally {
+      void loadWorkflows();
+    }
+  }, [loadWorkflows]);
 
   // 客户端筛选：搜索 + 触发器类型
   const filteredWorkflows = workflows.filter((wf) => {
@@ -159,33 +162,6 @@ export function WorkflowsSection() {
 
   useEffect(() => {
     void loadWorkflows();
-  }, [loadWorkflows]);
-
-  // 加载已添加的预置工作流 ID
-  useEffect(() => {
-    const ids = new Set(workflows.filter((w) => w.id.startsWith('preset-')).map((w) => w.id));
-    setAddedPresetIds(ids);
-  }, [workflows]);
-
-  // 添加预置工作流到我的自动化
-  const handleAddPreset = useCallback(async (preset: Workflow) => {
-    const now = Date.now();
-    const newWorkflow: Workflow = {
-      ...preset,
-      id: preset.id,
-      createdAt: now,
-      updatedAt: now,
-      runCount: 0,
-    };
-    try {
-      await createWorkflow(newWorkflow);
-      setAddedPresetIds((prev) => new Set(prev).add(preset.id));
-      toast.success(t('settings.workflows.discover.addSuccess', [preset.name]));
-      void loadWorkflows();
-    } catch (err) {
-      toast.error(t('settings.workflows.saveFailed')!);
-      console.error('[AddPreset]', err);
-    }
   }, [loadWorkflows]);
 
   // 导入工作流
@@ -373,78 +349,41 @@ export function WorkflowsSection() {
       <div className="px-6 pt-6 pb-4 shrink-0 border-b border-border">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold">
-              {activeTab === 'discover'
-                ? t('settings.workflows.discover.title')
-                : t('settings.workflows.title')}
-            </h2>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {activeTab === 'discover'
-                ? t('settings.workflows.discover.hint')
-                : t('settings.workflows.hint')}
-            </p>
+            <h2 className="text-base font-semibold">{t('settings.workflows.title')}</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">{t('settings.workflows.hint')}</p>
           </div>
-          {activeTab === 'my' && (
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload className="size-4 mr-1.5" />
-                {t('settings.workflows.import')}
-              </Button>
-              <Button
-                size="sm"
-                variant="default"
-                onClick={() => {
-                  setEditingWorkflow(null);
-                  setEditorOpen(true);
-                }}
-              >
-                <Plus className="size-4 mr-1.5" />
-                {t('settings.workflows.new')}
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Upload className="size-4 mr-1.5" />
+              {t('settings.workflows.import')}
+            </Button>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => {
+                setEditingWorkflow(null);
+                setEditorOpen(true);
+              }}
+            >
+              <Plus className="size-4 mr-1.5" />
+              {t('settings.workflows.new')}
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Tab Switcher */}
-      <div className="px-6 pt-3 pb-0 shrink-0">
-        <div className="flex items-center gap-1 border-b border-border">
-          <button
-            onClick={() => setActiveTab('my')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'my'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <BookOpen className="size-4" />
-            {t('settings.workflows.tabMy')}
-          </button>
-          <button
-            onClick={() => setActiveTab('discover')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === 'discover'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Sparkles className="size-4" />
-            {t('settings.workflows.tabDiscover')}
-          </button>
-        </div>
-      </div>
-
-      {activeTab === 'my' && (
-        <>
-          {/* Search & Filter */}
+      {/* Search & Filter */}
       <div className="px-6 py-3 shrink-0 border-b border-border space-y-2.5">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <Input
+            id="workflow-search"
+            name="workflow-search"
+            aria-label={t('settings.workflows.searchPlaceholder')}
             placeholder={t('settings.workflows.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -495,9 +434,22 @@ export function WorkflowsSection() {
                 : t('settings.workflows.empty.title')}
             </p>
             {!searchQuery.trim() && filterTrigger === 'all' && (
-              <p className="text-xs text-muted-foreground/70 mt-1">
-                {t('settings.workflows.empty.hint')}
-              </p>
+              <>
+                <p className="text-xs text-muted-foreground/70 mt-1">
+                  {t('settings.workflows.empty.hint')}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-4"
+                  onClick={() => {
+                    void handleRestorePresets();
+                  }}
+                >
+                  <Plus className="size-4 mr-1.5" />
+                  {t('settings.workflows.restorePresets')}
+                </Button>
+              </>
             )}
           </div>
         ) : (
@@ -519,79 +471,6 @@ export function WorkflowsSection() {
           </div>
         )}
       </div>
-        </>
-      )}
-
-      {activeTab === 'discover' && (
-        <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {getPresetWorkflows().map((preset) => {
-              const isTemplate = PRESET_TEMPLATE_IDS.has(preset.id);
-              const isExample = !isTemplate;
-              const categoryLabel = isTemplate
-                ? t('settings.workflows.discover.template')
-                : t('settings.workflows.discover.example');
-              const categoryColor = isTemplate
-                ? 'bg-amber-500/15 text-amber-400 border-amber-500/20'
-                : 'bg-blue-500/15 text-blue-400 border-blue-500/20';
-              const isAdded = addedPresetIds.has(preset.id);
-
-              return (
-                <div
-                  key={preset.id}
-                  className="flex flex-col gap-2 px-4 py-3 rounded-lg border border-border bg-card hover:bg-accent/40 transition-colors"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium truncate">
-                          {preset.name.replace(/^[^:]+[：:]\s*/, '')}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className={`text-[10px] h-5 px-1.5 font-normal shrink-0 ${categoryColor}`}
-                        >
-                          {categoryLabel}
-                        </Badge>
-                      </div>
-                      {preset.description && (
-                        <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                          {preset.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between mt-auto pt-2">
-                    <span className="text-[11px] text-muted-foreground/70">
-                      {t('settings.workflows.stepCount', preset.steps.length)}
-                    </span>
-                    <Button
-                      size="sm"
-                      variant={isAdded ? 'outline' : 'default'}
-                      disabled={isAdded}
-                      onClick={() => handleAddPreset(preset)}
-                      className="h-7 text-xs"
-                    >
-                      {isAdded ? (
-                        <>
-                          <CopyCheck className="size-3.5 mr-1" />
-                          {t('settings.workflows.discover.added')}
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="size-3.5 mr-1" />
-                          {t('settings.workflows.discover.add')}
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* 隐藏的文件输入，用于导入工作流 */}
       <input

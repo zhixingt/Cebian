@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { t } from '@/lib/i18n';
 import { apiDiscoveryEnabled } from '@/lib/storage';
@@ -148,10 +149,10 @@ export function ApiDiscoverySection() {
       {/* 启用开关 */}
       <div className="flex items-center justify-between rounded-lg border border-border p-4">
         <div className="space-y-0.5">
-          <p className="text-sm font-medium">{t('settings.apiDiscovery.enable')}</p>
+          <Label htmlFor="api-discovery-enabled" className="text-sm font-medium">{t('settings.apiDiscovery.enable')}</Label>
           <p className="text-xs text-muted-foreground">{t('settings.apiDiscovery.enableHint')}</p>
         </div>
-        <Switch checked={enabled} onCheckedChange={setEnabled} />
+        <Switch id="api-discovery-enabled" checked={enabled} onCheckedChange={setEnabled} />
       </div>
 
       {enabled && (

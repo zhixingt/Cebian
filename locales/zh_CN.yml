@@ -169,12 +169,14 @@ settings:
     title: "工作流"
     hint: "录制、编辑和运行浏览器自动化工作流。"
     tabMy: "我的自动化"
-    tabDiscover: "发现"
     new: "新建工作流"
     searchPlaceholder: "搜索工作流…"
     empty:
       title: "暂无工作流"
-      hint: "录制一次会话或创建工作流以开始使用。"
+      hint: "新建工作流、导入已有工作流，或恢复预置示例以开始使用。"
+    restorePresets: "恢复默认示例"
+    restorePresetsSuccess: "已恢复默认示例"
+    restorePresetsFailed: "恢复默认示例失败"
     # $1 = 步骤数
     stepCount:
       1: "1 个步骤"
@@ -408,6 +410,7 @@ chat:
     defaultDesc: "录制工作流"
     replayPrompt: "请回放以下录制操作步骤，使用 interact 工具的 sequence action 执行：\n```json\n$1\n```"
     replayPromptPrefix: "请使用 interact 工具的 sequence action 执行以下操作步骤："
+    replaySendFailed: "重放发送失败"
   emptyState:
     slogan: "思之所至，行之所达。"
     viewCommands: "查看命令"

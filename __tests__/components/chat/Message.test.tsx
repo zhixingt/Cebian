@@ -32,7 +32,12 @@ describe('UserMessageBubble', () => {
 
   it('shows message actions on hover', () => {
     const { container } = render(
-      <UserMessageBubble msg={makeUserMessage('Hello')} onCopy={vi.fn()} onEdit={vi.fn()} onDelete={vi.fn()} />,
+      <UserMessageBubble
+        msg={makeUserMessage('Hello')}
+        onCopy={vi.fn()}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />,
     );
     // MessageActions uses group-hover:opacity-100; simulate hover on the parent group
     const group = container.querySelector('.group');
@@ -199,21 +204,56 @@ describe('AgentMessage', () => {
   });
 
   it('does not show action buttons while streaming', () => {
-    render(<AgentMessage isStreaming copyText="copy me">Hello</AgentMessage>);
+    render(
+      <AgentMessage isStreaming copyText="copy me">
+        Hello
+      </AgentMessage>,
+    );
     expect(screen.queryByLabelText('common.copy')).not.toBeInTheDocument();
   });
 });
 
 describe('CollapsibleContainer via AgentTextBlock', () => {
   let originalGetComputedStyle: typeof window.getComputedStyle;
+  let originalResizeObserverLocal: typeof globalThis.ResizeObserver;
+  let originalScrollHeightLocal: PropertyDescriptor | undefined;
+  let originalClientHeightLocal: PropertyDescriptor | undefined;
+  let roCallbacks: Array<(entries: unknown[]) => void> = [];
 
   beforeEach(() => {
     vi.restoreAllMocks();
     originalGetComputedStyle = window.getComputedStyle;
+    originalResizeObserverLocal = globalThis.ResizeObserver;
+    originalScrollHeightLocal = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'scrollHeight',
+    );
+    originalClientHeightLocal = Object.getOwnPropertyDescriptor(
+      HTMLElement.prototype,
+      'clientHeight',
+    );
+    roCallbacks = [];
+    globalThis.ResizeObserver = class MockResizeObserver {
+      cb: (entries: unknown[]) => void;
+      constructor(cb: (entries: unknown[]) => void) {
+        this.cb = cb;
+        roCallbacks.push(cb);
+      }
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as unknown as typeof ResizeObserver;
   });
 
   afterEach(() => {
     window.getComputedStyle = originalGetComputedStyle;
+    globalThis.ResizeObserver = originalResizeObserverLocal;
+    if (originalScrollHeightLocal) {
+      Object.defineProperty(HTMLElement.prototype, 'scrollHeight', originalScrollHeightLocal);
+    }
+    if (originalClientHeightLocal) {
+      Object.defineProperty(HTMLElement.prototype, 'clientHeight', originalClientHeightLocal);
+    }
   });
 
   it('renders markdown content', () => {
@@ -226,7 +266,7 @@ describe('CollapsibleContainer via AgentTextBlock', () => {
   });
 
   it('does not show expand button when content is short', () => {
-    window.getComputedStyle = () => ({ lineHeight: '24px' } as CSSStyleDeclaration);
+    window.getComputedStyle = () => ({ lineHeight: '24px' }) as CSSStyleDeclaration;
     render(
       <TooltipProvider>
         <AgentTextBlock content="Short" />
@@ -235,8 +275,21 @@ describe('CollapsibleContainer via AgentTextBlock', () => {
     expect(screen.queryByText('chat.expand')).not.toBeInTheDocument();
   });
 
-  it('shows expand button when content exceeds max lines', async () => {
-    window.getComputedStyle = () => ({ lineHeight: '24px' } as CSSStyleDeclaration);
+  it('shows collapse button when content exceeds max lines', async () => {
+    window.getComputedStyle = () => ({ lineHeight: '24px' }) as CSSStyleDeclaration;
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+      configurable: true,
+      get() {
+        return 1000;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      get() {
+        return 200;
+      },
+    });
+
     // Mock scrollHeight by overriding the prototype after render
     const longContent = Array.from({ length: 50 }, (_, i) => `Line ${i}`).join('\n\n');
     const { container } = render(
@@ -244,19 +297,25 @@ describe('CollapsibleContainer via AgentTextBlock', () => {
         <AgentTextBlock content={longContent} />
       </TooltipProvider>,
     );
+    // Trigger ResizeObserver callbacks so needsCollapse becomes true and the
+    // collapse button is rendered.
+    roCallbacks.forEach((cb) => cb([]));
+
+    // Default state is expanded, so the content wrapper has no overflow-hidden class.
+    // First collapse it so we can locate the constrained content div for dimension mocking.
+    fireEvent.click(screen.getByText('chat.collapse'));
+
     // Find the content div and mock its scrollHeight
     const contentDiv = container.querySelector('.overflow-hidden')?.firstChild as HTMLElement;
     expect(contentDiv).not.toBeNull();
     Object.defineProperty(contentDiv, 'scrollHeight', { value: 1000, configurable: true });
     Object.defineProperty(contentDiv, 'clientHeight', { value: 200, configurable: true });
-    // Trigger ResizeObserver callback manually
-    const ro = (globalThis as any).ResizeObserver;
-    const roInstance = ro.prototype;
-    // The ResizeObserver mock in setup.ts is a no-op; we need to manually invoke the callback
-    // that CollapsibleContainer registered. Since we can't easily access it, we can force a re-render
-    // by updating a prop or use a different approach. Instead, let's directly test CollapsibleContainer
-    // behavior by creating a standalone test component with mocked dimensions.
-    expect(true).toBe(true); // Placeholder; real assertion below in dedicated test
+
+    // Trigger ResizeObserver callbacks manually
+    roCallbacks.forEach((cb) => cb([]));
+
+    // After detecting tall content, the expand button should reappear (collapsed view).
+    expect(screen.getByText('chat.expand')).toBeInTheDocument();
   });
 });
 
@@ -285,7 +344,7 @@ describe('CollapsibleContainer behavior', () => {
 
     // Mock getComputedStyle globally for these tests
     Object.defineProperty(window, 'getComputedStyle', {
-      value: () => ({ lineHeight: '20px' } as CSSStyleDeclaration),
+      value: () => ({ lineHeight: '20px' }) as CSSStyleDeclaration,
       configurable: true,
     });
 
@@ -304,18 +363,22 @@ describe('CollapsibleContainer behavior', () => {
     }
   });
 
-  it('shows expand button when content is tall and toggles on click', () => {
+  it('shows collapse button when content is tall and toggles on click', () => {
     // Set prototype-level scrollHeight so every element reports a tall height
     Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
       configurable: true,
-      get() { return 1000; },
+      get() {
+        return 1000;
+      },
     });
     Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
       configurable: true,
-      get() { return 200; },
+      get() {
+        return 200;
+      },
     });
 
-    const { container } = render(
+    render(
       <TooltipProvider>
         <AgentTextBlock content={Array.from({ length: 50 }, (_, i) => `Line ${i}`).join('\n\n')} />
       </TooltipProvider>,
@@ -324,26 +387,30 @@ describe('CollapsibleContainer behavior', () => {
     // Trigger ResizeObserver callbacks manually
     callbacks.forEach((cb) => cb([]));
 
-    // After callback, expand button should appear
-    expect(screen.getByText('chat.expand')).toBeInTheDocument();
-
-    // Click expand
-    fireEvent.click(screen.getByText('chat.expand'));
+    // Default state is expanded, so collapse button should appear
     expect(screen.getByText('chat.collapse')).toBeInTheDocument();
 
     // Click collapse
     fireEvent.click(screen.getByText('chat.collapse'));
     expect(screen.getByText('chat.expand')).toBeInTheDocument();
+
+    // Click expand
+    fireEvent.click(screen.getByText('chat.expand'));
+    expect(screen.getByText('chat.collapse')).toBeInTheDocument();
   });
 
   it('does not show expand button for short content', () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
       configurable: true,
-      get() { return 50; },
+      get() {
+        return 50;
+      },
     });
     Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
       configurable: true,
-      get() { return 200; },
+      get() {
+        return 200;
+      },
     });
 
     render(

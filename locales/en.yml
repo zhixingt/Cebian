@@ -173,12 +173,14 @@ settings:
     title: "Workflows"
     hint: "Record, edit and run browser automation workflows."
     tabMy: "My Workflows"
-    tabDiscover: "Discover"
     new: "New workflow"
     searchPlaceholder: "Search workflows…"
     empty:
       title: "No workflows yet"
-      hint: "Record a session or create a workflow to get started."
+      hint: "Create a workflow, import one, or restore preset examples to get started."
+    restorePresets: "Restore preset examples"
+    restorePresetsSuccess: "Preset examples restored"
+    restorePresetsFailed: "Failed to restore preset examples"
     # $1 = step count
     stepCount:
       1: "1 step"
@@ -412,6 +414,7 @@ chat:
     defaultDesc: "Recorded workflow"
     replayPrompt: "Please replay the following recorded steps using interact tool's sequence action:\n```json\n$1\n```"
     replayPromptPrefix: "Please execute the following steps using interact tool's sequence action:"
+    replaySendFailed: "Failed to send replay"
   emptyState:
     slogan: "As Thought Reaches, So Action Arrives."
     viewCommands: "View commands"

@@ -1,4 +1,17 @@
-import { Bot, ChevronRight, Lightbulb, CircleHelp, CheckCircle, Send, Crosshair, FileText, Film, Copy, Trash2, Pencil } from 'lucide-react';
+import {
+  Bot,
+  ChevronRight,
+  Lightbulb,
+  CircleHelp,
+  CheckCircle,
+  Send,
+  Crosshair,
+  FileText,
+  Film,
+  Copy,
+  Trash2,
+  Pencil,
+} from 'lucide-react';
 import { useState, useEffect, useRef, useMemo, type ReactNode, type KeyboardEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +26,15 @@ import { copyText as copyToClipboard } from '@/lib/clipboard';
 import type { Message } from '@earendil-works/pi-ai';
 
 /* ─── Message Actions (hover copy + edit + delete) ─── */
-function MessageActions({ onCopy, onEdit, onDelete }: { onCopy?: () => void; onEdit?: () => void; onDelete?: () => void }) {
+function MessageActions({
+  onCopy,
+  onEdit,
+  onDelete,
+}: {
+  onCopy?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+}) {
   return (
     <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
       {onCopy && (
@@ -77,8 +98,13 @@ export function UserMessageBubble({
   onDelete?: () => void;
 }) {
   const text = msg ? extractUserText(msg) : null;
-  const attachments = useMemo(() => msg ? extractUserAttachments(msg) : null, [msg]);
-  const hasAttachments = attachments && (attachments.images.length > 0 || attachments.elements.length > 0 || attachments.files.length > 0 || attachments.recordings.length > 0);
+  const attachments = useMemo(() => (msg ? extractUserAttachments(msg) : null), [msg]);
+  const hasAttachments =
+    attachments &&
+    (attachments.images.length > 0 ||
+      attachments.elements.length > 0 ||
+      attachments.files.length > 0 ||
+      attachments.recordings.length > 0);
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(text ?? '');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -117,7 +143,14 @@ export function UserMessageBubble({
         {!isEditing && (
           <MessageActions
             onCopy={onCopy ?? (text ? () => copyToClipboard(text) : undefined)}
-            onEdit={onEdit ? () => { setEditText(text ?? ''); setIsEditing(true); } : undefined}
+            onEdit={
+              onEdit
+                ? () => {
+                    setEditText(text ?? '');
+                    setIsEditing(true);
+                  }
+                : undefined
+            }
             onDelete={onDelete}
           />
         )}
@@ -136,7 +169,10 @@ export function UserMessageBubble({
                 variant="ghost"
                 size="sm"
                 className="h-7 text-xs"
-                onClick={() => { setIsEditing(false); setEditText(text ?? ''); }}
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditText(text ?? '');
+                }}
               >
                 {t('common.cancel')}
               </Button>
@@ -153,7 +189,10 @@ export function UserMessageBubble({
             </div>
           </div>
         ) : (
-          <div className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed w-fit ml-auto whitespace-pre-wrap break-all text-justify" style={{ textAlignLast: 'left' }}>
+          <div
+            className="bg-card border border-border px-4 py-3 rounded-2xl text-[0.9rem] leading-relaxed w-fit ml-auto whitespace-pre-wrap break-all text-justify"
+            style={{ textAlignLast: 'left' }}
+          >
             {text ?? children}
           </div>
         )}
@@ -171,9 +210,11 @@ export function UserMessageBubble({
                 src={`data:${img.mimeType};base64,${img.data}`}
                 alt={t('chat.attachments.imageAlt')}
                 className="h-3.5 w-auto rounded-sm object-cover cursor-pointer"
-                onClick={() => showDialog('image-preview', {
-                  src: `data:${img.mimeType};base64,${img.data}`,
-                })}
+                onClick={() =>
+                  showDialog('image-preview', {
+                    src: `data:${img.mimeType};base64,${img.data}`,
+                  })
+                }
               />
               {t('chat.attachments.image')}
             </Badge>
@@ -208,7 +249,11 @@ export function UserMessageBubble({
             >
               <Film className="size-2.5 shrink-0" />
               <span className="truncate max-w-40">
-                {r.name} · {t('chat.attachments.recordingMeta', [String(r.eventCount), formatDuration(r.durationMs)])}
+                {r.name} ·{' '}
+                {t('chat.attachments.recordingMeta', [
+                  String(r.eventCount),
+                  formatDuration(r.durationMs),
+                ])}
                 {r.truncated ? ` · ${t('chat.attachments.recordingTruncated')}` : ''}
               </span>
             </Badge>
@@ -274,8 +319,14 @@ export function AgentMessage({
 }
 
 /* ─── Collapsible Container (auto-fold long messages) ─── */
-function CollapsibleContainer({ children, maxLines = 30 }: { children: ReactNode; maxLines?: number }) {
-  const [isExpanded, setIsExpanded] = useState(false);
+function CollapsibleContainer({
+  children,
+  maxLines = 5,
+}: {
+  children: ReactNode;
+  maxLines?: number;
+}) {
+  const [isExpanded, setIsExpanded] = useState(true);
   const [needsCollapse, setNeedsCollapse] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -306,13 +357,17 @@ function CollapsibleContainer({ children, maxLines = 30 }: { children: ReactNode
       {needsCollapse && (
         <button
           type="button"
-          onClick={() => setIsExpanded(v => !v)}
+          onClick={() => setIsExpanded((v) => !v)}
           className="mt-1 text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors"
         >
           {isExpanded ? (
-            <>{t('chat.collapse')} <ChevronRight className="size-3 -rotate-90" /></>
+            <>
+              {t('chat.collapse')} <ChevronRight className="size-3 -rotate-90" />
+            </>
           ) : (
-            <>{t('chat.expand')} <ChevronRight className="size-3 rotate-90" /></>
+            <>
+              {t('chat.expand')} <ChevronRight className="size-3 rotate-90" />
+            </>
           )}
         </button>
       )}
@@ -361,7 +416,9 @@ export function ThinkingBlock({ content, isLive }: { content: string; isLive?: b
           isOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         }`}
       >
-        <div className={`overflow-hidden transition-opacity duration-200 ease-in-out ${isOpen ? 'opacity-100' : 'opacity-0'}`}>
+        <div
+          className={`overflow-hidden transition-opacity duration-200 ease-in-out ${isOpen ? 'opacity-100' : 'opacity-0'}`}
+        >
           <div className="px-3 py-3 border-t border-dashed border-border text-muted-foreground font-mono text-[0.75rem] leading-relaxed bg-card/50">
             <MarkdownRenderer content={content} />
           </div>
@@ -402,7 +459,9 @@ export function AskUserBlock({
   };
 
   return (
-    <div className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answered ? 'opacity-60 pointer-events-none' : ''}`}>
+    <div
+      className={`relative mt-3 p-3.5 border border-primary/20 bg-primary/5 rounded-lg ${answered ? 'opacity-60 pointer-events-none' : ''}`}
+    >
       <div className="flex items-center gap-2 text-primary font-medium text-[0.85rem] mb-1.5">
         <CircleHelp className="size-4.5 shrink-0" />
         {question}
@@ -413,8 +472,11 @@ export function AskUserBlock({
         // Defensive: model may stream partial JSON or return wrong type (string / object).
         // Only render when options is a real array of objects with a label.
         const safeOptions = Array.isArray(options)
-          ? options.filter((o): o is { label: string; description?: string } =>
-              !!o && typeof o === 'object' && typeof (o as { label?: unknown }).label === 'string'
+          ? options.filter(
+              (o): o is { label: string; description?: string } =>
+                !!o &&
+                typeof o === 'object' &&
+                typeof (o as { label?: unknown }).label === 'string',
             )
           : [];
         if (safeOptions.length === 0) return null;

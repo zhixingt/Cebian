@@ -3,20 +3,14 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { SquarePen, ArrowDown } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChatInput, type ChatInputHandle } from '@/components/chat/ChatInput';
 import { QuickActionsBar, type QuickToolId } from '@/components/chat/QuickActionsBar';
-import {
-  UserMessageBubble,
-  AgentMessage,
-} from '@/components/chat/Message';
+import { UserMessageBubble, AgentMessage } from '@/components/chat/Message';
 import { AssistantMessageItem } from '@/components/chat/AssistantMessageItem';
 import { ToolResultBubble } from '@/components/chat/ToolResultBubble';
 import type { Message, ToolResultMessage, UserMessage } from '@earendil-works/pi-ai';
+import type { AgentMessage as AgentCoreMessage } from '@earendil-works/pi-agent-core';
 import {
   getAssistantText,
   extractUserText,
@@ -36,7 +30,10 @@ import { toast } from 'sonner';
 
 // ─── ChatPage ───
 
-export function ChatPage({ onOpenSettings, onTitleChange }: {
+export function ChatPage({
+  onOpenSettings,
+  onTitleChange,
+}: {
   onOpenSettings?: () => void;
   onTitleChange?: (title: string) => void;
 }) {
@@ -63,15 +60,21 @@ export function ChatPage({ onOpenSettings, onTitleChange }: {
     deleteMessage,
     resolveTool,
   } = useBackgroundAgent({
-    onSessionCreated: useCallback((sessionId: string, title: string) => {
-      onTitleChange?.(title);
-      navigate(`/chat/${sessionId}`, { replace: true });
-    }, [navigate, onTitleChange]),
-    onSessionLoaded: useCallback((session: SessionRecord | null) => {
-      if (!session) {
-        navigate('/chat/new', { replace: true });
-      }
-    }, [navigate]),
+    onSessionCreated: useCallback(
+      (sessionId: string, title: string) => {
+        onTitleChange?.(title);
+        navigate(`/chat/${sessionId}`, { replace: true });
+      },
+      [navigate, onTitleChange],
+    ),
+    onSessionLoaded: useCallback(
+      (session: SessionRecord | null) => {
+        if (!session) {
+          navigate('/chat/new', { replace: true });
+        }
+      },
+      [navigate],
+    ),
     // 2026-06-07: forward onOpenSettings so the web_provider_needs_relogin
     // flow (handleWebProviderNeedsRelogin → callbacks.onOpenSettings) can
     // actually navigate to /settings. Without this the optional-chaining
@@ -89,7 +92,14 @@ export function ChatPage({ onOpenSettings, onTitleChange }: {
   // routeSessionId) — at that point isNewChat is still true, so the effect
   // would hit portUnsubscribe() and wipe the optimistic user message.
   const activeSessionIdRef = useRef<string | null>(null);
-  activeSessionIdRef.current = activeSessionId;
+  useEffect(() => {
+    activeSessionIdRef.current = activeSessionId;
+  }, [activeSessionId]);
+
+  // Holds a context-menu prompt that needs to be sent after navigating to a
+  // fresh chat. Using a ref avoids stale closures and replaces the previous
+  // fixed 100ms timeout with a state-driven approach.
+  const pendingContextPromptRef = useRef<string | null>(null);
 
   // When an interactive tool (e.g. ask_user) is pending, the agent is blocked
   // waiting for user input — treat as "not running" so the input is usable.
@@ -141,16 +151,28 @@ export function ChatPage({ onOpenSettings, onTitleChange }: {
         if (isNewChat) {
           send(text, undefined, null);
         } else {
-          // 已有会话，在新聊天中发送
+          // 已有会话：记录待发送 prompt 并导航到新聊天；发送将在
+          // isNewChat 变化时由下面的 effect 触发，避免固定 timeout
+          // 导致的竞态条件（可能在旧会话中发送）。
+          pendingContextPromptRef.current = text;
           navigate('/chat/new');
-          // 等待导航完成后再发送
-          setTimeout(() => send(text, undefined, null), 100);
         }
       }
     };
     chrome.runtime.onMessage.addListener(listener);
     return () => chrome.runtime.onMessage.removeListener(listener);
   }, [send, isNewChat, navigate]);
+
+  // Send a context-menu prompt once the route has switched to a new chat.
+  // This replaces the previous fixed 100ms timeout and guarantees we send
+  // only after navigation has actually completed.
+  useEffect(() => {
+    if (isNewChat && pendingContextPromptRef.current) {
+      const text = pendingContextPromptRef.current;
+      pendingContextPromptRef.current = null;
+      send(text, undefined, null);
+    }
+  }, [isNewChat, send]);
 
   // Auto-scroll: stick to bottom while content streams, but stop following
   // as soon as the user scrolls up. Resumes when the user scrolls back near
@@ -174,10 +196,35 @@ export function ChatPage({ onOpenSettings, onTitleChange }: {
     }
   }, [messageCount, scrollToBottom]);
 
+  // Force-pin to bottom when agent finishes running — the final message content
+  // (including tool cards, markdown render) has fully settled and the user
+  // should see the complete result without manual scrolling.
+  //
+  // Uses double-rAF + setTimeout to account for async rendering (tool-card
+  // expansion, MarkdownRenderer layout, image decode) that happens after
+  // isAgentRunning flips to false.
+  const prevRunningRef = useRef(effectiveRunning);
+  useEffect(() => {
+    if (prevRunningRef.current && !effectiveRunning) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          scrollToBottom({ force: true });
+        });
+      });
+      // Second pass: catch late-layout shifts (e.g. images finishing decode).
+      setTimeout(() => scrollToBottom({ force: true }), 300);
+    }
+    prevRunningRef.current = effectiveRunning;
+  }, [effectiveRunning, scrollToBottom]);
+
   // Force-pin when the user sends a new message — sending is an explicit
   // intent to see the latest output.
   const handleSend = useCallback(
-    async (text: string, attachments: Attachment[] | undefined, expectedSessionId: string | null) => {
+    async (
+      text: string,
+      attachments: Attachment[] | undefined,
+      expectedSessionId: string | null,
+    ) => {
       const result = await send(text, attachments, expectedSessionId);
       if (result.status === 'dispatched') {
         scrollToBottom({ force: true });
@@ -188,58 +235,66 @@ export function ChatPage({ onOpenSettings, onTitleChange }: {
   );
 
   // Quick tool actions — one-click prompt + optional screenshot
-  const handleQuickTool = useCallback(async (toolId: QuickToolId) => {
-    if (effectiveRunning && toolId !== 'watch-page') return;
-    switch (toolId) {
-      case 'read-page':
-        await send(t('chat.quickTool.prompts.readPage'));
-        break;
-      case 'screenshot-analyze': {
-        try {
-          const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 85 });
-          const base64 = dataUrl.split(',', 2)[1] ?? '';
-          await send(
-            t('chat.quickTool.prompts.screenshotAnalyze'),
-            [{ type: 'image', source: 'screenshot', data: base64, mimeType: 'image/jpeg' }],
-          );
-        } catch {
-          // 截图失败时退回纯文本 prompt
-          await send(t('chat.quickTool.prompts.screenshotFallback'));
-        }
-        break;
-      }
-      case 'operate-page':
-        await send(t('chat.quickTool.prompts.operatePage'));
-        break;
-      case 'fill-form':
-        await send(t('chat.quickTool.prompts.fillForm'));
-        break;
-      case 'watch-page': {
-        try {
-          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-          if (!tab?.id) break;
-          if (isWatching) {
-            await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: stopPageWatcher });
-            setIsWatching(false);
-            toast.info(t('chat.quickActions.watchStopped'));
-          } else {
-            const results = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: startPageWatcher });
-            const status = results?.[0]?.result as string;
-            if (status === 'already_watching') {
-              toast.info(t('chat.quickActions.watchAlreadyActive'));
-            } else {
-              toast.success(t('chat.quickActions.watchStarted'));
-            }
-            setIsWatching(true);
+  const handleQuickTool = useCallback(
+    async (toolId: QuickToolId) => {
+      if (effectiveRunning && toolId !== 'watch-page') return;
+      switch (toolId) {
+        case 'read-page':
+          await send(t('chat.quickTool.prompts.readPage'));
+          break;
+        case 'screenshot-analyze': {
+          try {
+            const dataUrl = await chrome.tabs.captureVisibleTab({ format: 'jpeg', quality: 85 });
+            const base64 = dataUrl.split(',', 2)[1] ?? '';
+            await send(t('chat.quickTool.prompts.screenshotAnalyze'), [
+              { type: 'image', source: 'screenshot', data: base64, mimeType: 'image/jpeg' },
+            ]);
+          } catch {
+            // 截图失败时退回纯文本 prompt
+            await send(t('chat.quickTool.prompts.screenshotFallback'));
           }
-        } catch {
-          toast.error(t('chat.quickActions.watchFailed'));
+          break;
         }
-        break;
+        case 'operate-page':
+          await send(t('chat.quickTool.prompts.operatePage'));
+          break;
+        case 'fill-form':
+          await send(t('chat.quickTool.prompts.fillForm'));
+          break;
+        case 'watch-page': {
+          try {
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tab?.id) break;
+            if (isWatching) {
+              await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: stopPageWatcher,
+              });
+              setIsWatching(false);
+              toast.info(t('chat.quickActions.watchStopped'));
+            } else {
+              const results = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: startPageWatcher,
+              });
+              const status = results?.[0]?.result as string;
+              if (status === 'already_watching') {
+                toast.info(t('chat.quickActions.watchAlreadyActive'));
+              } else {
+                toast.success(t('chat.quickActions.watchStarted'));
+              }
+              setIsWatching(true);
+            }
+          } catch {
+            toast.error(t('chat.quickActions.watchFailed'));
+          }
+          break;
+        }
       }
-    }
-    if (toolId !== 'watch-page') scrollToBottom({ force: true });
-  }, [send, scrollToBottom, effectiveRunning, isWatching]);
+      if (toolId !== 'watch-page') scrollToBottom({ force: true });
+    },
+    [send, scrollToBottom, effectiveRunning, isWatching],
+  );
 
   // 监听页面变化通知
   useEffect(() => {
@@ -257,22 +312,35 @@ export function ChatPage({ onOpenSettings, onTitleChange }: {
   }, []);
 
   const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
-  const showWaitingPlaceholder = effectiveRunning && lastMsg && 'role' in lastMsg && lastMsg.role === 'user';
+  const showWaitingPlaceholder =
+    effectiveRunning && lastMsg && 'role' in lastMsg && lastMsg.role === 'user';
 
   // History of user-typed prompts in this session, oldest first; consumed by
   // ChatInput's ↑/↓ navigation. Strips the <user-request> wrapper added by
   // buildStructuredMessage so what comes back is exactly what the user typed.
   const userHistory = useMemo(
-    () => messages
-      .filter((m): m is UserMessage => 'role' in m && m.role === 'user')
-      .map(extractUserText)
-      .filter((s) => s.length > 0),
+    () =>
+      messages
+        .filter((m): m is UserMessage => 'role' in m && m.role === 'user')
+        .map(extractUserText)
+        .filter((s) => s.length > 0),
     [messages],
   );
 
   // Session loading state: any route/state mismatch means the current
   // message array belongs to a different chat and must not be rendered.
   const sessionLoading = !isNewChat && routeSessionId !== activeSessionId;
+
+  // Force-pin to bottom when a restored session finishes loading.
+  const prevLoadingRef = useRef(sessionLoading);
+  useEffect(() => {
+    if (prevLoadingRef.current && !sessionLoading && messages.length > 0) {
+      requestAnimationFrame(() => {
+        scrollToBottom({ force: true });
+      });
+    }
+    prevLoadingRef.current = sessionLoading;
+  }, [sessionLoading, messages.length, scrollToBottom]);
 
   // Ref into ChatInput so QuickActionsBar can drive the same composer state
   // (value, focus, slash-menu close) without mirroring it up here. Forwarded
@@ -283,6 +351,68 @@ export function ChatPage({ onOpenSettings, onTitleChange }: {
   const toolResultIndex = useMemo(() => buildToolResultIndex(messages as Message[]), [messages]);
   const turnMetaMap = useMemo(() => buildTurnMetaMap(messages as Message[]), [messages]);
 
+  // Curried action factories. The bound callbacks below are memoized per
+  // message so bubbles do not re-render on every parent render.
+  const makeHandleDelete = useCallback(
+    (idx: number, _msg: AgentCoreMessage) => () => {
+      const sid = activeSessionId ?? routeSessionId;
+      if (sid && sid !== 'new') deleteMessage(sid, idx);
+    },
+    [activeSessionId, routeSessionId, deleteMessage],
+  );
+
+  const makeHandleEdit = useCallback(
+    (idx: number, _msg: AgentCoreMessage) => async (newText: string) => {
+      const sid = activeSessionId ?? routeSessionId;
+      if (!sid || sid === 'new') return;
+      deleteMessage(sid, idx);
+      // deleteMessage 通过 postMessage 发送，没有返回 Promise/回调，
+      // 短暂等待让 background 处理完删除再发送新消息，避免删除与发送竞态。
+      await new Promise((r) => setTimeout(r, 80));
+      await send(newText);
+    },
+    [activeSessionId, routeSessionId, deleteMessage, send],
+  );
+
+  const messageCallbacks = useMemo(() => {
+    const map = new Map<
+      number,
+      { onDelete: () => void; onEdit: (text: string) => Promise<void> }
+    >();
+    messages.forEach((msg, idx) => {
+      if (!('role' in msg)) return;
+      map.set(idx, {
+        onDelete: makeHandleDelete(idx, msg),
+        onEdit: makeHandleEdit(idx, msg),
+      });
+    });
+    return map;
+  }, [messages, makeHandleDelete, makeHandleEdit]);
+
+  // O(n) pre-computation of assistant header positions: only the first
+  // assistant message in each consecutive group (after a user message or a
+  // toolResult rendered as a user bubble) shows the header.
+  const assistantHeaderStarts = useMemo(() => {
+    const starts = new Set<number>();
+    let boundary = true;
+    messages.forEach((msg, idx) => {
+      if (!('role' in msg)) return;
+      if (msg.role === 'assistant') {
+        if (boundary) starts.add(idx);
+        boundary = false;
+      } else if (msg.role === 'toolResult') {
+        const tr = msg as ToolResultMessage;
+        const info = uiToolRegistry.get(tr.toolName);
+        if (info?.renderResultAsUserBubble && !tr.details?.cancelled) {
+          boundary = true;
+        }
+      } else {
+        boundary = true;
+      }
+    });
+    return starts;
+  }, [messages]);
+
   return (
     <>
       <div className="flex-1 min-h-0 relative flex flex-col">
@@ -291,146 +421,128 @@ export function ChatPage({ onOpenSettings, onTitleChange }: {
             {sessionLoading && (
               <div className="text-center text-sm text-muted-foreground py-12">
                 {t('chat.session.loading')}
-            </div>
-          )}
-
-          {!sessionLoading && messages.map((msg, idx) => {
-            if (!('role' in msg)) return null;
-
-            const handleDelete = () => {
-              const sid = activeSessionId ?? routeSessionId;
-              if (sid && sid !== 'new') deleteMessage(sid, idx);
-            };
-
-            const handleEdit = async (newText: string) => {
-              const sid = activeSessionId ?? routeSessionId;
-              if (!sid || sid === 'new') return;
-              // Truncate from this message onward, then re-send with new text.
-              deleteMessage(sid, idx);
-              // Small delay so the BG processes delete before the prompt.
-              await new Promise(r => setTimeout(r, 80));
-              await send(newText);
-            };
-
-            if (msg.role === 'user') {
-              return (
-                <UserMessageBubble key={`user-${idx}`} msg={msg} onDelete={handleDelete} onEdit={handleEdit} />
-              );
-            }
-
-            if (msg.role === 'assistant') {
-              const assistantMsg = msg as import('@earendil-works/pi-ai').AssistantMessage;
-              const isLast = idx === messages.length - 1;
-
-              // Show header only for the first assistant message in a consecutive group
-              let showHeader = true;
-              for (let i = idx - 1; i >= 0; i--) {
-                const prev = messages[i];
-                if (!('role' in prev)) continue;
-                if (prev.role === 'toolResult') {
-                  const tr = prev as ToolResultMessage;
-                  const info = uiToolRegistry.get(tr.toolName);
-                  if (info?.renderResultAsUserBubble && !tr.details?.cancelled) break;
-                  continue;
-                }
-                if (prev.role === 'assistant') showHeader = false;
-                break;
-              }
-
-              // Meta row: show only on the assistant message that *closes*
-              // the turn (stopReason !== 'toolUse'), so multi-tool-round
-              // turns get one consolidated meta at the very end instead of
-              // one per intermediate model call.
-              const turnEnded = !isLast || !isAgentRunning;
-              const isTurnClosing =
-                turnEnded && assistantMsg.stopReason !== 'toolUse';
-              const plainText = getAssistantText(assistantMsg).trim();
-              const copyText = isTurnClosing && plainText.length > 0 ? plainText : undefined;
-              const meta = isTurnClosing ? turnMetaMap.get(idx) : undefined;
-
-              // Retry button: only on the very last message in the timeline,
-              // only when the turn has actually closed (no pending tool round),
-              // and only when the agent is idle (no overlapping run).
-              const canRetry = isLast && isTurnClosing && !isAgentRunning;
-              const onRetry = canRetry ? retry : undefined;
-
-              return (
-                <AssistantMessageItem
-                  key={`asst-${idx}`}
-                  idx={idx}
-                  msg={assistantMsg}
-                  isLast={isLast}
-                  isAgentRunning={isAgentRunning}
-                  effectiveRunning={effectiveRunning}
-                  showHeader={showHeader}
-                  meta={meta}
-                  copyText={copyText}
-                  canRetry={canRetry}
-                  onRetry={onRetry}
-                  onDelete={handleDelete}
-                  toolResultIndex={toolResultIndex}
-                  pendingTools={pendingTools}
-                  resolveTool={resolveTool}
-                />
-              );
-            }
-
-            // Generic: render interactive tool results as user bubbles
-            if (msg.role === 'toolResult') {
-              return (
-                <ToolResultBubble
-                  key={`tr-${idx}`}
-                  msg={msg as ToolResultMessage}
-                  idx={idx}
-                />
-              );
-            }
-
-            return null;
-          })}
-
-          {/* Waiting placeholder */}
-          {showWaitingPlaceholder && (
-            <AgentMessage isStreaming />
-          )}
-
-          {/* Error display */}
-          {lastError && !isAgentRunning && (
-            <div className="text-sm text-destructive bg-destructive/15 border border-destructive/30 rounded-lg px-3 py-2">
-              {lastError}
-            </div>
-          )}
-
-          {!sessionLoading && messages.length === 0 && !isAgentRunning && (
-            <div className="flex flex-col items-center gap-4 pt-20 pb-12 text-center">
-              <div className="w-10 h-10 rounded-xl bg-primary/10 grid place-items-center">
-                <SquarePen className="size-5 text-primary" />
               </div>
-              {!currentModel ? (
-                <p className="text-sm text-muted-foreground">{t('chat.composer.needModel')}</p>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-2xl text-foreground/80 leading-relaxed" style={{ fontFamily: "var(--font-serif)" }}>
-                    {t('chat.emptyState.slogan')}
-                  </p>
-                  <p className="text-sm text-muted-foreground tracking-wide" style={{ fontFamily: "var(--font-serif)" }}>
-                    As Thought Reaches, So Action Arrives.
-                  </p>
-                  <div className="flex flex-wrap items-center justify-center gap-1.5 pt-3 text-xs text-muted-foreground/70">
-                    <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/50 text-[10px]">/</kbd>
-                    <span>{t('chat.emptyState.viewCommands')}</span>
-                    <span className="text-border">·</span>
-                    <span>{t('chat.emptyState.startChat')}</span>
-                    <span className="text-border">·</span>
-                    <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/50 text-[10px]">↑↓</kbd>
-                    <span>{t('chat.emptyState.historyInput')}</span>
-                  </div>
+            )}
+
+            {!sessionLoading &&
+              messages.map((msg, idx) => {
+                if (!('role' in msg)) return null;
+
+                const callbacks = messageCallbacks.get(idx);
+
+                if (msg.role === 'user') {
+                  return (
+                    <UserMessageBubble
+                      key={`user-${idx}`}
+                      msg={msg}
+                      onDelete={callbacks?.onDelete}
+                      onEdit={callbacks?.onEdit}
+                    />
+                  );
+                }
+
+                if (msg.role === 'assistant') {
+                  const assistantMsg = msg as import('@earendil-works/pi-ai').AssistantMessage;
+                  const isLast = idx === messages.length - 1;
+                  const showHeader = assistantHeaderStarts.has(idx);
+
+                  // Meta row: show only on the assistant message that *closes*
+                  // the turn (stopReason !== 'toolUse'), so multi-tool-round
+                  // turns get one consolidated meta at the very end instead of
+                  // one per intermediate model call.
+                  const turnEnded = !isLast || !isAgentRunning;
+                  const isTurnClosing = turnEnded && assistantMsg.stopReason !== 'toolUse';
+                  const plainText = getAssistantText(assistantMsg).trim();
+                  const copyText = isTurnClosing && plainText.length > 0 ? plainText : undefined;
+                  const meta = isTurnClosing ? turnMetaMap.get(idx) : undefined;
+
+                  // Retry button: only on the very last message in the timeline,
+                  // only when the turn has actually closed (no pending tool round),
+                  // and only when the agent is idle (no overlapping run).
+                  const canRetry = isLast && isTurnClosing && !isAgentRunning;
+                  const onRetry = canRetry ? retry : undefined;
+
+                  return (
+                    <AssistantMessageItem
+                      key={`asst-${idx}`}
+                      idx={idx}
+                      msg={assistantMsg}
+                      isLast={isLast}
+                      isAgentRunning={isAgentRunning}
+                      effectiveRunning={effectiveRunning}
+                      showHeader={showHeader}
+                      meta={meta}
+                      copyText={copyText}
+                      canRetry={canRetry}
+                      onRetry={onRetry}
+                      onDelete={callbacks?.onDelete}
+                      toolResultIndex={toolResultIndex}
+                      pendingTools={pendingTools}
+                      resolveTool={resolveTool}
+                    />
+                  );
+                }
+
+                // Generic: render interactive tool results as user bubbles
+                if (msg.role === 'toolResult') {
+                  return (
+                    <ToolResultBubble key={`tr-${idx}`} msg={msg as ToolResultMessage} idx={idx} />
+                  );
+                }
+
+                return null;
+              })}
+
+            {/* Waiting placeholder */}
+            {showWaitingPlaceholder && <AgentMessage isStreaming />}
+
+            {/* Error display */}
+            {lastError && !isAgentRunning && (
+              <div className="text-sm text-destructive bg-destructive/15 border border-destructive/30 rounded-lg px-3 py-2">
+                {lastError}
+              </div>
+            )}
+
+            {!sessionLoading && messages.length === 0 && !isAgentRunning && (
+              <div className="flex flex-col items-center gap-4 pt-20 pb-12 text-center">
+                <div className="w-10 h-10 rounded-xl bg-primary/10 grid place-items-center">
+                  <SquarePen className="size-5 text-primary" />
                 </div>
-              )}
-            </div>
-          )}
-        </div>
-      </ScrollArea>
+                {!currentModel ? (
+                  <p className="text-sm text-muted-foreground">{t('chat.composer.needModel')}</p>
+                ) : (
+                  <div className="space-y-2">
+                    <p
+                      className="text-2xl text-foreground/80 leading-relaxed"
+                      style={{ fontFamily: 'var(--font-serif)' }}
+                    >
+                      {t('chat.emptyState.slogan')}
+                    </p>
+                    <p
+                      className="text-sm text-muted-foreground tracking-wide"
+                      style={{ fontFamily: 'var(--font-serif)' }}
+                    >
+                      As Thought Reaches, So Action Arrives.
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center gap-1.5 pt-3 text-xs text-muted-foreground/70">
+                      <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/50 text-[10px]">
+                        /
+                      </kbd>
+                      <span>{t('chat.emptyState.viewCommands')}</span>
+                      <span className="text-border">·</span>
+                      <span>{t('chat.emptyState.startChat')}</span>
+                      <span className="text-border">·</span>
+                      <kbd className="px-1.5 py-0.5 rounded bg-muted border border-border/50 text-[10px]">
+                        ↑↓
+                      </kbd>
+                      <span>{t('chat.emptyState.historyInput')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </ScrollArea>
 
         {!isAtBottom && (
           <Tooltip>
@@ -459,13 +571,15 @@ export function ChatPage({ onOpenSettings, onTitleChange }: {
         <button
           type="button"
           onClick={() => setPageChangeAlert(null)}
-          className="mx-4 mb-1.5 px-3 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center justify-between hover:bg-amber-100 transition-colors"
+          className="mx-auto mb-1.5 px-3 py-1.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center justify-between hover:bg-amber-100 transition-colors w-[calc(100%-2rem)] box-border"
         >
-          <span className="flex items-center gap-1.5">
-            <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
-            {t('chat.quickActions.pageChanged', [String(pageChangeAlert.count)])}
+          <span className="flex items-center gap-1.5 min-w-0">
+            <span className="size-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" />
+            <span className="truncate">
+              {t('chat.quickActions.pageChanged', [String(pageChangeAlert.count)])}
+            </span>
           </span>
-          <span className="text-amber-600/70">{t('chat.dismiss')}</span>
+          <span className="text-amber-600/70 shrink-0 ml-2">{t('chat.dismiss')}</span>
         </button>
       )}
 
@@ -476,7 +590,7 @@ export function ChatPage({ onOpenSettings, onTitleChange }: {
         isAgentRunning={effectiveRunning}
         onOpenSettings={onOpenSettings}
         userHistory={userHistory}
-        sessionId={isNewChat ? activeSessionId : routeSessionId ?? null}
+        sessionId={isNewChat ? activeSessionId : (routeSessionId ?? null)}
         onQuickTool={handleQuickTool}
         isWatching={isWatching}
       />

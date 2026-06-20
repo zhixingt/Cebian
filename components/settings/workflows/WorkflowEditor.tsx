@@ -61,16 +61,22 @@ export function WorkflowEditor({ workflow, open, onOpenChange, onSave }: Workflo
   const [creds] = useStorageItem(providerCredentials, {});
   const [customProvs] = useStorageItem(customProviders, []);
 
-  // 在 open/workflow 变化时同步状态
+  // 在 open/workflow 变化时同步状态：编辑时回填数据，新建时清空
   useEffect(() => {
-    if (open && workflow) {
+    if (!open) return;
+    if (workflow) {
       setName(workflow.name);
       setDescription(workflow.description ?? '');
       setSteps([...workflow.steps]);
       setTrigger(workflow.trigger ?? { type: 'manual' });
-      setAiOpen(false);
-      setAiGoal('');
+    } else {
+      setName('');
+      setDescription('');
+      setSteps([]);
+      setTrigger({ type: 'manual' });
     }
+    setAiOpen(false);
+    setAiGoal('');
   }, [open, workflow?.id]);
 
   const handleSave = useCallback(async () => {
@@ -209,8 +215,6 @@ export function WorkflowEditor({ workflow, open, onOpenChange, onSave }: Workflo
       setAiLoading(false);
     }
   }, [aiGoal, aiLoading, currentActiveModel, creds, customProvs]);
-
-  if (!workflow) return null;
 
   return (
     <>

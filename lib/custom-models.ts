@@ -16,7 +16,8 @@ export function isCustomProvider(provider: string): boolean {
 }
 
 /** Extract the custom provider id from a provider key */
-export function customProviderId(provider: string): string {
+export function customProviderId(provider: string): string | undefined {
+  if (!isCustomProvider(provider)) return undefined;
   return provider.slice(CUSTOM_PREFIX.length);
 }
 
@@ -28,11 +29,11 @@ export function toModel(config: CustomProviderConfig, model: CustomModelDef): Mo
   return {
     id: model.modelId,
     name: model.name,
-    api: 'openai-completions' as Api,
+    api: 'openai-completions' satisfies Api,
     provider: customProviderKey(config.id),
     baseUrl: config.baseUrl,
     reasoning: model.reasoning,
-    input: (model.image ? ['text', 'image'] : ['text']) as ('text' | 'image')[],
+    input: (model.image ? ['text', 'image'] : ['text']) satisfies ('text' | 'image')[],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: model.contextWindow ?? DEFAULT_CONTEXT_WINDOW,
     maxTokens: model.maxTokens ?? DEFAULT_MAX_TOKENS,
@@ -41,7 +42,7 @@ export function toModel(config: CustomProviderConfig, model: CustomModelDef): Mo
 
 /** Get all Model objects for a custom provider */
 export function getCustomModels(config: CustomProviderConfig): Model<Api>[] {
-  return config.models.map(m => toModel(config, m));
+  return config.models.map((m) => toModel(config, m));
 }
 
 /** Find a custom provider config by provider key (e.g. "custom:deepseek") */
@@ -51,7 +52,8 @@ export function findCustomProvider(
 ): CustomProviderConfig | undefined {
   if (!isCustomProvider(providerKey)) return undefined;
   const id = customProviderId(providerKey);
-  return providers.find(p => p.id === id);
+  if (!id) return undefined;
+  return providers.find((p) => p.id === id);
 }
 
 /** Find a specific model from custom providers */
@@ -62,7 +64,7 @@ export function findCustomModel(
 ): Model<Api> | undefined {
   const config = findCustomProvider(providers, providerKey);
   if (!config) return undefined;
-  const md = config.models.find(m => m.modelId === modelId);
+  const md = config.models.find((m) => m.modelId === modelId);
   return md ? toModel(config, md) : undefined;
 }
 
@@ -89,7 +91,7 @@ export async function fetchRemoteModels(
 
   try {
     const res = await fetch(url, {
-      headers: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {},
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
       signal: controller.signal,
     });
 

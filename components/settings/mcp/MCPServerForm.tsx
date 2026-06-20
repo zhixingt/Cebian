@@ -47,9 +47,10 @@ export function formToInput(values: MCPFormValues): {
   transport: MCPTransportConfig;
   auth: MCPAuthConfig;
 } {
-  const auth: MCPAuthConfig = values.authType === 'bearer'
-    ? { type: 'bearer', token: values.bearerToken.trim() }
-    : { type: 'none' };
+  const auth: MCPAuthConfig =
+    values.authType === 'bearer'
+      ? { type: 'bearer', token: values.bearerToken.trim() }
+      : { type: 'none' };
 
   // Aggregate header rows: skip empty keys, normalize via Headers (case-
   // insensitive, last write wins). Only attach `headers` when non-empty so
@@ -63,7 +64,9 @@ export function formToInput(values: MCPFormValues): {
       h.set(k, row.value);
     }
     const out: Record<string, string> = {};
-    h.forEach((v, k) => { out[k] = v; });
+    h.forEach((v, k) => {
+      out[k] = v;
+    });
     if (Object.keys(out).length > 0) headers = out;
   }
 
@@ -73,6 +76,15 @@ export function formToInput(values: MCPFormValues): {
     ...(headers ? { headers } : {}),
   };
   return { name: values.name.trim(), transport, auth };
+}
+
+function isSubmitDisabled(values: MCPFormValues, busy: boolean): boolean {
+  return (
+    busy ||
+    !values.name.trim() ||
+    !values.url.trim() ||
+    (values.authType === 'bearer' && !values.bearerToken.trim())
+  );
 }
 
 // ─── Shared form body ───
@@ -107,8 +119,12 @@ export function MCPFormBody({
   return (
     <div className="space-y-3 border border-border rounded-lg p-3">
       <div className="space-y-2">
-        <Label className="text-xs">{t('settings.mcp.form.name')}</Label>
+        <Label htmlFor="mcp-server-name" className="text-xs">
+          {t('settings.mcp.form.name')}
+        </Label>
         <Input
+          id="mcp-server-name"
+          name="mcp-server-name"
           value={values.name}
           onChange={(e) => onChange({ name: e.target.value })}
           onKeyDown={onEnter}
@@ -139,8 +155,12 @@ export function MCPFormBody({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs">{t('settings.mcp.form.url')}</Label>
+        <Label htmlFor="mcp-server-url" className="text-xs">
+          {t('settings.mcp.form.url')}
+        </Label>
         <Input
+          id="mcp-server-url"
+          name="mcp-server-url"
           value={values.url}
           onChange={(e) => onChange({ url: e.target.value })}
           onKeyDown={onEnter}
@@ -177,8 +197,12 @@ export function MCPFormBody({
 
       {values.authType === 'bearer' && (
         <div className="space-y-2">
-          <Label className="text-xs">{t('settings.mcp.form.bearerToken')}</Label>
+          <Label htmlFor="mcp-server-bearer-token" className="text-xs">
+            {t('settings.mcp.form.bearerToken')}
+          </Label>
           <Input
+            id="mcp-server-bearer-token"
+            name="mcp-server-bearer-token"
             type="password"
             value={values.bearerToken}
             onChange={(e) => onChange({ bearerToken: e.target.value })}
@@ -198,9 +222,14 @@ export function MCPFormBody({
             {values.headers.map((row, idx) => (
               <div key={idx} className="flex items-center gap-1">
                 <Input
+                  id={`mcp-server-header-key-${idx}`}
+                  name={`mcp-server-header-key-${idx}`}
+                  aria-label={`${t('settings.mcp.form.headers')} - ${t('settings.mcp.form.headerKeyPlaceholder')}`}
                   value={row.key}
                   onChange={(e) => {
-                    const next = values.headers.map((r, i) => (i === idx ? { ...r, key: e.target.value } : r));
+                    const next = values.headers.map((r, i) =>
+                      i === idx ? { ...r, key: e.target.value } : r,
+                    );
                     onChange({ headers: next });
                   }}
                   onKeyDown={onHeaderKeyDown}
@@ -208,9 +237,14 @@ export function MCPFormBody({
                   className="h-8 text-sm font-mono flex-1"
                 />
                 <Input
+                  id={`mcp-server-header-value-${idx}`}
+                  name={`mcp-server-header-value-${idx}`}
+                  aria-label={`${t('settings.mcp.form.headers')} - ${t('settings.mcp.form.headerValuePlaceholder')}`}
                   value={row.value}
                   onChange={(e) => {
-                    const next = values.headers.map((r, i) => (i === idx ? { ...r, value: e.target.value } : r));
+                    const next = values.headers.map((r, i) =>
+                      i === idx ? { ...r, value: e.target.value } : r,
+                    );
                     onChange({ headers: next });
                   }}
                   onKeyDown={onHeaderKeyDown}
@@ -244,8 +278,12 @@ export function MCPFormBody({
       </div>
 
       <div className="flex justify-end gap-2 pt-1">
-        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>{t('common.cancel')}</Button>
-        <Button type="button" size="sm" onClick={onSubmit} disabled={submitDisabled}>{submitLabel}</Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+          {t('common.cancel')}
+        </Button>
+        <Button type="button" size="sm" onClick={onSubmit} disabled={submitDisabled}>
+          {submitLabel}
+        </Button>
       </div>
     </div>
   );
@@ -285,10 +323,7 @@ export function MCPServerAddForm() {
     );
   }
 
-  const submitDisabled = busy
-    || !values.name.trim()
-    || !values.url.trim()
-    || (values.authType === 'bearer' && !values.bearerToken.trim());
+  const submitDisabled = isSubmitDisabled(values, busy);
 
   return (
     <MCPFormBody
@@ -345,10 +380,7 @@ export function MCPServerEditForm({ server, onDone }: MCPServerEditFormProps) {
     }
   };
 
-  const submitDisabled = busy
-    || !values.name.trim()
-    || !values.url.trim()
-    || (values.authType === 'bearer' && !values.bearerToken.trim());
+  const submitDisabled = isSubmitDisabled(values, busy);
 
   return (
     <MCPFormBody

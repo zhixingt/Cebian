@@ -16,6 +16,8 @@
  */
 
 import { createServer } from 'node:http';
+import { existsSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -23,9 +25,24 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { TextContent, ImageContent } from '@modelcontextprotocol/sdk/types.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 
-const HERMES_PYTHON = process.env.HERMES_PYTHON ?? 'C:\\Users\\xiaoz\\AppData\\Local\\hermes\\hermes-agent\\venv\\Scripts\\python.exe';
+const HERMES_PYTHON = process.env.HERMES_PYTHON;
+if (!HERMES_PYTHON) {
+  console.error('[HermesBridge] HERMES_PYTHON environment variable is required');
+  console.error('[HermesBridge] Example: HERMES_PYTHON=/path/to/python.exe pnpm hermes-bridge');
+  process.exit(1);
+}
+
+// Validate the provided interpreter path exists before spawning the child process.
+if (!existsSync(HERMES_PYTHON)) {
+  console.error(`[HermesBridge] Python interpreter not found: ${HERMES_PYTHON}`);
+  process.exit(1);
+}
 const HERMES_MODULE = 'agent.transports.hermes_tools_mcp_server';
-const PORT = Number(process.argv.find((a, i, arr) => arr[i - 1] === '--port') ?? process.env.HERMES_BRIDGE_PORT ?? '3000');
+const PORT = Number(
+  process.argv.find((a, i, arr) => arr[i - 1] === '--port') ??
+    process.env.HERMES_BRIDGE_PORT ??
+    '3000',
+);
 
 interface ToolDef {
   name: string;
@@ -58,12 +75,17 @@ async function main() {
 
   // 2. 获取 Hermes 的工具列表
   const toolsResult = await hermesClient.listTools();
-  const hermesTools: ToolDef[] = (toolsResult.tools ?? []).map((t) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: t.inputSchema as Record<string, unknown> | undefined,
-  }));
-  console.log(`[HermesBridge] Discovered ${hermesTools.length} tools from Hermes`);
+  const hermesTools = new Map<string, ToolDef>(
+    (toolsResult.tools ?? []).map((t) => [
+      t.name,
+      {
+        name: t.name,
+        description: t.description,
+        inputSchema: t.inputSchema as Record<string, unknown> | undefined,
+      },
+    ]),
+  );
+  console.log(`[HermesBridge] Discovered ${hermesTools.size} tools from Hermes`);
 
   // 3. 创建代理 MCP Server（将 Hermes 的工具暴露出去）
   const proxyServer = new Server(
@@ -73,7 +95,7 @@ async function main() {
 
   proxyServer.setRequestHandler(ListToolsRequestSchema, async () => {
     return {
-      tools: hermesTools.map((t) => ({
+      tools: Array.from(hermesTools.values()).map((t) => ({
         name: t.name,
         description: t.description ?? `Hermes tool: ${t.name}`,
         inputSchema: t.inputSchema ?? { type: 'object', properties: {} },
@@ -82,9 +104,46 @@ async function main() {
   });
 
   proxyServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const tool = hermesTools.get(request.params.name);
+    if (!tool) {
+      return {
+        content: [{ type: 'text' as const, text: `Unknown tool: ${request.params.name}` }],
+        isError: true,
+      };
+    }
+
+    const args = request.params.arguments ?? {};
+    if (typeof args !== 'object' || args === null || Array.isArray(args)) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: `Invalid arguments for tool ${tool.name}: expected object`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    if (tool.inputSchema?.type === 'object' && Array.isArray(tool.inputSchema.required)) {
+      for (const key of tool.inputSchema.required) {
+        if (!(key in args)) {
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: `Missing required argument "${key}" for tool ${tool.name}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+      }
+    }
+
     const result = await hermesClient.callTool({
-      name: request.params.name,
-      arguments: request.params.arguments ?? {},
+      name: tool.name,
+      arguments: args,
     });
     const textParts = (result.content ?? [])
       .filter((c): c is TextContent => c.type === 'text')
@@ -94,26 +153,41 @@ async function main() {
       .filter((c): c is ImageContent => c.type === 'image')
       .map((c) => ({ type: 'image' as const, data: c.data, mimeType: c.mimeType }));
     return {
-      content: [
-        ...(textParts ? [{ type: 'text' as const, text: textParts }] : []),
-        ...imageParts,
-      ],
+      content: [...(textParts ? [{ type: 'text' as const, text: textParts }] : []), ...imageParts],
     };
   });
 
   // 4. 启动 Streamable HTTP Server
+  // 使用 session mode：每个客户端持有独立的 mcp-session-id，
+  // 避免 stateless transport 在跨请求复用时出现 message ID 冲突。
   const httpTransport = new StreamableHTTPServerTransport({
-    sessionIdGenerator: undefined, // stateless mode
+    sessionIdGenerator: () => randomUUID(),
+    onsessioninitialized: (sessionId) => {
+      console.log(`[HermesBridge] Session initialized: ${sessionId}`);
+    },
   });
 
   await proxyServer.connect(httpTransport);
 
   const httpServer = createServer(async (req, res) => {
     if (req.url === '/mcp' || req.url?.startsWith('/mcp')) {
-      await httpTransport.handleRequest(req, res);
+      try {
+        await httpTransport.handleRequest(req, res);
+      } catch (err) {
+        console.error('[HermesBridge] handleRequest error:', err);
+        if (!res.headersSent) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: String(err) }));
+        }
+      }
     } else if (req.url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok', tools: hermesTools.map((t) => t.name) }));
+      res.end(
+        JSON.stringify({
+          status: 'ok',
+          tools: Array.from(hermesTools.values()).map((t) => t.name),
+        }),
+      );
     } else {
       res.writeHead(404);
       res.end('Not Found');
@@ -123,7 +197,11 @@ async function main() {
   httpServer.listen(PORT, '127.0.0.1', () => {
     console.log(`[HermesBridge] Streamable HTTP Server listening on http://127.0.0.1:${PORT}/mcp`);
     console.log(`[HermesBridge] Health check: http://127.0.0.1:${PORT}/health`);
-    console.log(`[HermesBridge] Exposed tools: ${hermesTools.map((t) => t.name).join(', ')}`);
+    console.log(
+      `[HermesBridge] Exposed tools: ${Array.from(hermesTools.values())
+        .map((t) => t.name)
+        .join(', ')}`,
+    );
   });
 
   // 优雅关闭
