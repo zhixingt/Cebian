@@ -41,7 +41,8 @@ export function canAutoInvokeSkill(skill: AutoSkillDefinition, effectiveMethod?:
 
   const methodToCheck = effectiveMethod ?? skill.method;
   if (!methodToCheck || methodToCheck.toUpperCase() !== 'GET') {
-    return { allowed: false, reason: `Auto-invoke only allowed for GET skills, got ${methodToCheck}` };
+    const writeMethodHint = effectiveMethod ? ' (write-capable method)' : '';
+    return { allowed: false, reason: `Auto-invoke only allowed for GET skills, got ${methodToCheck}${writeMethodHint}` };
   }
 
   const confidence = getEffectiveConfidence(skill);

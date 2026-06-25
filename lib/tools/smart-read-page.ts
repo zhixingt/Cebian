@@ -64,7 +64,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
           return await fallbackToDom(`No matching API skill for ${method ?? 'GET'} ${url}`);
         }
 
-        const policy = canAutoInvokeSkill(skill);
+        const policy = canAutoInvokeSkill(skill, method);
         if (!policy.allowed) {
           return await fallbackToDom(policy.reason);
         }

@@ -255,35 +255,19 @@ describe('smart-read-page', () => {
       expect((result.content[0] as { text: string }).text).toContain('[path: dom');
     });
 
-    it('uses POST method from matched skill in json mode', async () => {
-      mockExecuteApiFirst.mockResolvedValue({
-        success: true,
-        data: { hits: [] },
-        status: 200,
-        latencyMs: 120,
-        skillName: 'auto-algolia-query',
-        confidence: 0.85,
-        path: 'api',
-        method: 'POST',
-      });
-
+    it('blocks POST method override and falls back to DOM', async () => {
       const result = await smartReadPageTool.execute('call-1', {
         tabId: 1,
         mode: 'json',
-        url: 'https://algolia.example.com/1/indexes/Item/query',
+        url: 'https://example.com/query',
         method: 'POST',
         data: { query: 'machine learning' },
       });
 
+      expect(mockExecuteApiFirst).not.toHaveBeenCalled();
       const text = (result.content[0] as { text: string }).text;
-      expect(text).toContain('"method": "POST"');
-      expect(mockExecuteApiFirst).toHaveBeenCalledWith(
-        'https://algolia.example.com/1/indexes/Item/query',
-        'POST',
-        undefined,
-        { query: 'machine learning' },
-        expect.anything(),
-      );
+      expect(text).toContain('[path: dom');
+      expect(text).toContain('write-capable method');
     });
   });
 
