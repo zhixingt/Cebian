@@ -5,6 +5,8 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { executeApiFirst, NoMatchError } from '@/lib/capture/api-executor';
+import { findMatchingSkill } from '@/lib/capture/skill-registry';
+import { canAutoInvokeSkill, requiresConfirmation } from '@/lib/capture/api-policy';
 import { interactTool } from './interact';
 
 const smartInteractSchema = Type.Object({
@@ -21,6 +23,7 @@ const smartInteractSchema = Type.Object({
   url: Type.Optional(Type.String({ description: '当 action=api_* 时，目标 API URL' })),
   intent: Type.Optional(Type.String({ description: '操作意图描述' })),
   data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'API 请求体数据' })),
+  confirmed: Type.Optional(Type.Boolean({ description: 'Set to true after user explicitly approved a write-capable API call.' })),
   selector: Type.Optional(Type.String({ description: 'CSS 选择器（DOM 回退时使用）' })),
   text: Type.Optional(Type.String({ description: '输入文本（DOM 回退时使用）' })),
 });
@@ -35,8 +38,40 @@ export const smartInteractTool: AgentTool<typeof smartInteractSchema> = {
 
     if ((action === 'api_submit' || action === 'api_fill_form') && url) {
       try {
+        // 查找匹配的 Skill，同时检查未启用的 Skill，以便给出明确错误
+        const skill = await findMatchingSkill(url, intent, true);
+        if (!skill) {
+          const fallbackMethod = action === 'api_submit' ? 'POST' : 'GET';
+          throw new NoMatchError(`No matching API skill for ${fallbackMethod} ${url}`);
+        }
+
+        // Skill 未启用时直接拒绝，不进入确认流程
+        if (!skill.enabled) {
+          return {
+            content: [{
+              type: 'text' as const,
+              text: `API skill is disabled: ${skill.method} ${skill.pathname}. Enable it before use.`,
+            }],
+            details: {},
+          } satisfies AgentToolResult<unknown>;
+        }
+
         const method = action === 'api_submit' ? 'POST' : 'GET';
-        const result = await executeApiFirst(url, method, intent, data);
+
+        // 写操作或高风险 API 需要用户确认
+        if (requiresConfirmation(skill) && params.confirmed !== true) {
+          const policy = canAutoInvokeSkill(skill);
+          return {
+            content: [{
+              type: 'text' as const,
+              text: `This API call requires user confirmation before execution: ${skill.method} ${skill.pathname}. Risk reason: ${policy.reason}. Please ask the user for approval and call again with confirmed=true.`,
+            }],
+            details: {},
+          } satisfies AgentToolResult<unknown>;
+        }
+
+        // 已确认或无需确认，执行 API 调用（传入已匹配的 Skill 避免重复查找）
+        const result = await executeApiFirst(url, method, intent, data, skill);
 
         return {
           content: [{

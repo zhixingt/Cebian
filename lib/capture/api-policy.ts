@@ -59,3 +59,18 @@ export function canAutoInvokeSkill(skill: AutoSkillDefinition): ApiPolicyResult 
 
   return { allowed: true, reason: 'Read-only GET skill with sufficient confidence' };
 }
+
+/**
+ * 判断指定 API Skill 是否需要用户确认后才能执行。
+ *
+ * 规则：
+ * 1. Skill 未启用时不需要确认（由调用方直接拒绝）。
+ * 2. 可被自动调用（低风险 GET）时不需要确认。
+ * 3. 其他情况（写方法、低置信度、含写关键词）需要确认。
+ */
+export function requiresConfirmation(skill: AutoSkillDefinition): boolean {
+  if (!skill.enabled) {
+    return false;
+  }
+  return !canAutoInvokeSkill(skill).allowed;
+}

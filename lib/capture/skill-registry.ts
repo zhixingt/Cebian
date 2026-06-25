@@ -169,9 +169,14 @@ export async function getEnabledSkills(): Promise<AutoSkillDefinition[]> {
 
 /**
  * 查找匹配指定 URL 和 intent 的 Skill。
+ * @param includeDisabled 是否同时返回未启用的 Skill（默认 false，仅匹配已启用）
  * @returns 匹配的 Skill（按置信度降序），或 null
  */
-export async function findMatchingSkill(url: string, intent?: string): Promise<AutoSkillDefinition | null> {
+export async function findMatchingSkill(
+  url: string,
+  intent?: string,
+  includeDisabled: boolean = false,
+): Promise<AutoSkillDefinition | null> {
   await loadFromDb();
 
   let parsed: URL;
@@ -188,7 +193,7 @@ export async function findMatchingSkill(url: string, intent?: string): Promise<A
 
   // pathname 匹配评分
   const scored = candidates
-    .filter(s => s.enabled)
+    .filter(s => includeDisabled || s.enabled)
     .map((s) => {
       const score = computeMatchScore(s, parsed, intent);
       return { skill: s, score };
