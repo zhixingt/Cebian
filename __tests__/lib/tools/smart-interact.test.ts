@@ -172,6 +172,8 @@ describe('smart-interact', () => {
         { name: 'bob' },
         postSkill,
       );
+      // 策略检查应使用 action 推导出的 POST 方法
+      expect(mockCanAutoInvokeSkill).toHaveBeenCalledWith(postSkill, 'POST');
       // 不应该调用 interactTool
       expect(mockInteractExecute).not.toHaveBeenCalled();
 
@@ -243,6 +245,8 @@ describe('smart-interact', () => {
         undefined,
         getSkill,
       );
+      // 策略检查应使用 action 推导出的 GET 方法
+      expect(mockCanAutoInvokeSkill).toHaveBeenCalledWith(getSkill, 'GET');
       expect(mockInteractExecute).not.toHaveBeenCalled();
 
       // 返回值是 JSON 字符串
@@ -379,7 +383,7 @@ describe('smart-interact', () => {
         undefined,
         getSkill,
       );
-      expect(mockCanAutoInvokeSkill).toHaveBeenCalledWith(getSkill);
+      expect(mockCanAutoInvokeSkill).toHaveBeenCalledWith(getSkill, 'GET');
       const parsed = JSON.parse((result.content[0] as { text: string }).text);
       expect(parsed).toMatchObject({ success: true, skill_id: 'auto-fill-skill' });
     });
@@ -408,6 +412,34 @@ describe('smart-interact', () => {
       const text = (result.content[0] as { text: string }).text;
       expect(text).toContain('disabled');
       expect(text).toContain('POST /users');
+    });
+
+    it('Skill 声明为 GET 但 action=api_submit 时按 POST 进行策略检查', async () => {
+      const getSkill = makeSkill({
+        name: 'auto-get-skill',
+        method: 'GET',
+        pathname: '/users',
+        initialConfidence: 0.85,
+      });
+      mockFindMatchingSkill.mockResolvedValue(getSkill);
+      mockCanAutoInvokeSkill.mockReturnValue({
+        allowed: false,
+        reason: 'Auto-invoke only allowed for GET skills, got POST',
+      });
+
+      const result = await smartInteractTool.execute('call-1', {
+        tabId: 42,
+        action: 'api_submit',
+        url: 'https://api.example.com/users',
+        intent: 'create user',
+        data: { name: 'bob' },
+      });
+
+      expect(mockCanAutoInvokeSkill).toHaveBeenCalledWith(getSkill, 'POST');
+      expect(mockExecuteApiFirst).not.toHaveBeenCalled();
+      expect(result.content[0].type).toBe('text');
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('requires user confirmation');
     });
   });
 

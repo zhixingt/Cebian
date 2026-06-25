@@ -127,6 +127,34 @@ describe('canAutoInvokeSkill', () => {
     const result = canAutoInvokeSkill(skill);
     expect(result.allowed).toBe(true);
   });
+
+  it('effectiveMethod 优先于 skill.method：声明 GET 但实际 POST 时阻止', () => {
+    const skill = makeSkill({
+      method: 'GET',
+      initialConfidence: 0.85,
+    });
+    const result = canAutoInvokeSkill(skill, 'POST');
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toContain('POST');
+  });
+
+  it('effectiveMethod 优先于 skill.method：声明 POST 但实际 GET 时允许', () => {
+    const skill = makeSkill({
+      method: 'POST',
+      initialConfidence: 0.85,
+    });
+    const result = canAutoInvokeSkill(skill, 'GET');
+    expect(result.allowed).toBe(true);
+    expect(result.reason).toContain('Read-only GET skill');
+  });
+
+  it('未传入 effectiveMethod 时回退到 skill.method', () => {
+    const getSkill = makeSkill({ method: 'GET', initialConfidence: 0.85 });
+    expect(canAutoInvokeSkill(getSkill).allowed).toBe(true);
+
+    const postSkill = makeSkill({ method: 'POST', initialConfidence: 0.85 });
+    expect(canAutoInvokeSkill(postSkill).allowed).toBe(false);
+  });
 });
 
 // ─── requiresConfirmation 测试 ───

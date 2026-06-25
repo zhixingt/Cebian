@@ -59,7 +59,8 @@ export const smartInteractTool: AgentTool<typeof smartInteractSchema> = {
         const method = action === 'api_submit' ? 'POST' : 'GET';
 
         // 判断是否可以自动调用；不允许自动调用且未获得用户确认时，请求确认
-        const policy = canAutoInvokeSkill(skill);
+        // 使用 action 推导的实际执行方法进行策略检查，避免 skill.method 与真实请求方法不一致导致错误放行
+        const policy = canAutoInvokeSkill(skill, method);
         if (!policy.allowed && confirmed !== true) {
           return {
             content: [{

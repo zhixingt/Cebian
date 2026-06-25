@@ -283,6 +283,11 @@ export async function updateSkillStats(skillName: string, success: boolean): Pro
 
 // ─── 辅助函数 ───
 
+/** 转义正则特殊字符 */
+function escapeRegExp(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 /** 获取 Skill 的有效置信度（动态 > 初始） */
 export function getEffectiveConfidence(skill: AutoSkillDefinition): number {
   if (skill.stats.callCount >= SKILL_ENABLE_MIN_CALLS) {
@@ -314,12 +319,22 @@ export async function getEnabledSkillsForHostname(
 /** 计算匹配评分 */
 function computeMatchScore(skill: AutoSkillDefinition, url: URL, intent?: string): number {
   // pathname 必须匹配（将占位符转为通配符比较）
-  const skillPath = skill.pathname
-    .replace(/\{id\}/g, '[^/]+')
-    .replace(/\{uuid\}/g, '[^/]+')
-    .replace(/\{hash\}/g, '[^/]+');
+  // 先用不冲突的临时标记替换路径参数，再对剩余字面量转义，最后恢复为通配符，避免注入正则特殊字符
+  const ID_MARKER = '__PARAM_ID__';
+  const UUID_MARKER = '__PARAM_UUID__';
+  const HASH_MARKER = '__PARAM_HASH__';
 
-  const pathRe = new RegExp(`^${skillPath}$`);
+  const skillPath = skill.pathname
+    .replace(/\{id\}/g, ID_MARKER)
+    .replace(/\{uuid\}/g, UUID_MARKER)
+    .replace(/\{hash\}/g, HASH_MARKER);
+
+  const escapedPath = escapeRegExp(skillPath)
+    .replaceAll(ID_MARKER, '[^/]+')
+    .replaceAll(UUID_MARKER, '[^/]+')
+    .replaceAll(HASH_MARKER, '[^/]+');
+
+  const pathRe = new RegExp(`^${escapedPath}$`);
   if (!pathRe.test(url.pathname)) return 0;
 
   let score = 0.5;

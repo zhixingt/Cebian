@@ -484,6 +484,28 @@ describe('findMatchingSkill', () => {
     expect(matched).not.toBeNull();
     expect(matched!.name).toBe('s-enabled-low');
   });
+
+  it('pathname 中的正则特殊字符应被正确转义', async () => {
+    await addSkills([
+      makeSkill({
+        name: 's-escape',
+        hostname: 'api.example.com',
+        pathname: '/api/users.list/{id}',
+        enabled: true,
+      }),
+    ]);
+    // 未转义时 '.' 会匹配任意字符，导致 /api/usersXlist/123 也被匹配
+    const matchedLiteral = await findMatchingSkill(
+      'https://api.example.com/api/users.list/123',
+    );
+    expect(matchedLiteral).not.toBeNull();
+    expect(matchedLiteral!.name).toBe('s-escape');
+
+    const matchedWildcard = await findMatchingSkill(
+      'https://api.example.com/api/usersXlist/123',
+    );
+    expect(matchedWildcard).toBeNull();
+  });
 });
 
 // ─── updateSkillStats ───

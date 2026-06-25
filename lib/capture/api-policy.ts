@@ -30,14 +30,18 @@ const AUTO_INVOKE_MIN_CONFIDENCE = 0.8;
  * 2. 仅允许 HTTP GET 方法。
  * 3. 有效置信度必须 >= AUTO_INVOKE_MIN_CONFIDENCE。
  * 4. pathname 与 description 中不得包含写操作关键词。
+ *
+ * @param skill 要判断的 Skill
+ * @param effectiveMethod 实际执行方法（可选）。若提供，将替代 skill.method 进行方法检查。
  */
-export function canAutoInvokeSkill(skill: AutoSkillDefinition): ApiPolicyResult {
+export function canAutoInvokeSkill(skill: AutoSkillDefinition, effectiveMethod?: string): ApiPolicyResult {
   if (!skill.enabled) {
     return { allowed: false, reason: 'skill is disabled' };
   }
 
-  if (!skill.method || skill.method.toUpperCase() !== 'GET') {
-    return { allowed: false, reason: `Auto-invoke only allowed for GET skills, got ${skill.method}` };
+  const methodToCheck = effectiveMethod ?? skill.method;
+  if (!methodToCheck || methodToCheck.toUpperCase() !== 'GET') {
+    return { allowed: false, reason: `Auto-invoke only allowed for GET skills, got ${methodToCheck}` };
   }
 
   const confidence = getEffectiveConfidence(skill);
@@ -67,10 +71,13 @@ export function canAutoInvokeSkill(skill: AutoSkillDefinition): ApiPolicyResult 
  * 1. Skill 未启用时不需要确认（由调用方直接拒绝）。
  * 2. 可被自动调用（低风险 GET）时不需要确认。
  * 3. 其他情况（写方法、低置信度、含写关键词）需要确认。
+ *
+ * @param skill 要判断的 Skill
+ * @param effectiveMethod 实际执行方法（可选）。若提供，将替代 skill.method 进行方法检查。
  */
-export function requiresConfirmation(skill: AutoSkillDefinition): boolean {
+export function requiresConfirmation(skill: AutoSkillDefinition, effectiveMethod?: string): boolean {
   if (!skill.enabled) {
     return false;
   }
-  return !canAutoInvokeSkill(skill).allowed;
+  return !canAutoInvokeSkill(skill, effectiveMethod).allowed;
 }
