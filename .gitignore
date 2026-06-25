@@ -27,3 +27,5 @@ debug-*.md
 
 # Agents skills (local)
 .agents/
+
+.worktrees/
