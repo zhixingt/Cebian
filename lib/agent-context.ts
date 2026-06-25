@@ -63,7 +63,8 @@ function buildParamList(skill: AutoSkillDefinition): string[] {
 }
 
 function formatParam(param: PathParamDef | QueryParamDef | BodyFieldDef): string {
-  const type = 'type' in param ? param.type : 'string';
-  const required = 'required' in param ? param.required : true;
-  return `${param.name}(${type}, ${required ? 'required' : 'optional'})`;
+  if ('type' in param) {
+    return `${param.name}(${param.type}, ${param.required ? 'required' : 'optional'})`;
+  }
+  return `${param.name}(string, required)`;
 }

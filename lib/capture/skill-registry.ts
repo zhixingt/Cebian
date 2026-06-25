@@ -154,15 +154,17 @@ export async function getAllSkills(): Promise<AutoSkillDefinition[]> {
 
 /**
  * 查询所有已启用的 Skill（展示给 Agent）。
- * 仅返回置信度达标且调用次数足够的 Skill。
+ * 仅返回置信度达标且调用次数足够的 Skill，按有效置信度降序排序。
  */
 export async function getEnabledSkills(): Promise<AutoSkillDefinition[]> {
   await loadFromDb();
-  return Array.from(skillsByName.values()).filter((s) => {
-    if (!s.enabled) return false;
-    const confidence = getEffectiveConfidence(s);
-    return confidence >= SKILL_MIN_CONFIDENCE;
-  });
+  return Array.from(skillsByName.values())
+    .filter((s) => {
+      if (!s.enabled) return false;
+      const confidence = getEffectiveConfidence(s);
+      return confidence >= SKILL_MIN_CONFIDENCE;
+    })
+    .sort(sortByConfidenceDesc);
 }
 
 /**
@@ -266,6 +268,11 @@ export function getEffectiveConfidence(skill: AutoSkillDefinition): number {
   return skill.initialConfidence;
 }
 
+/** 按有效置信度降序排序 */
+function sortByConfidenceDesc(a: AutoSkillDefinition, b: AutoSkillDefinition): number {
+  return getEffectiveConfidence(b) - getEffectiveConfidence(a);
+}
+
 /**
  * 查询指定 hostname 下已启用且有效置信度达标的 Skill。
  * 用于 Agent system prompt 注入，按有效置信度降序返回。
@@ -278,7 +285,7 @@ export async function getEnabledSkillsForHostname(
   const skills = skillsByHostname.get(hostname) ?? [];
   return skills
     .filter((s) => s.enabled && getEffectiveConfidence(s) >= minConfidence)
-    .sort((a, b) => getEffectiveConfidence(b) - getEffectiveConfidence(a));
+    .sort(sortByConfidenceDesc);
 }
 
 /** 计算匹配评分 */

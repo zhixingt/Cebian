@@ -19,6 +19,7 @@ import {
   getSkillsByHostname,
   getAllSkills,
   getEnabledSkills,
+  getEnabledSkillsForHostname,
   enableSkill,
   disableSkill,
   deleteSkill,
@@ -208,6 +209,110 @@ describe('getEnabledSkills', () => {
     ]);
     const enabled = await getEnabledSkills();
     expect(enabled).toHaveLength(1);
+  });
+
+  it('按有效置信度降序排序', async () => {
+    await addSkills([
+      makeSkill({
+        name: 's-low',
+        enabled: true,
+        initialConfidence: 0.6,
+      }),
+      makeSkill({
+        name: 's-high',
+        enabled: true,
+        initialConfidence: 0.9,
+      }),
+      makeSkill({
+        name: 's-mid',
+        enabled: true,
+        initialConfidence: 0.75,
+      }),
+    ]);
+    const enabled = await getEnabledSkills();
+    expect(enabled.map(s => s.name)).toEqual(['s-high', 's-mid', 's-low']);
+  });
+});
+
+// ─── getEnabledSkillsForHostname ───
+
+describe('getEnabledSkillsForHostname', () => {
+  it('返回已启用且置信度达标的 Skill', async () => {
+    await addSkills([
+      makeSkill({
+        name: 's-enabled',
+        hostname: 'api.example.com',
+        enabled: true,
+        initialConfidence: 0.8,
+      }),
+      makeSkill({
+        name: 's-disabled',
+        hostname: 'api.example.com',
+        enabled: false,
+        initialConfidence: 0.8,
+      }),
+    ]);
+    const result = await getEnabledSkillsForHostname('api.example.com');
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('s-enabled');
+  });
+
+  it('按有效置信度降序排序', async () => {
+    await addSkills([
+      makeSkill({
+        name: 's-low',
+        hostname: 'api.example.com',
+        enabled: true,
+        initialConfidence: 0.6,
+      }),
+      makeSkill({
+        name: 's-high',
+        hostname: 'api.example.com',
+        enabled: true,
+        initialConfidence: 0.9,
+      }),
+      makeSkill({
+        name: 's-mid',
+        hostname: 'api.example.com',
+        enabled: true,
+        initialConfidence: 0.75,
+      }),
+    ]);
+    const result = await getEnabledSkillsForHostname('api.example.com');
+    expect(result.map(s => s.name)).toEqual(['s-high', 's-mid', 's-low']);
+  });
+
+  it('hostname 不匹配返回空数组', async () => {
+    await addSkills([
+      makeSkill({
+        name: 's-enabled',
+        hostname: 'api.example.com',
+        enabled: true,
+        initialConfidence: 0.8,
+      }),
+    ]);
+    const result = await getEnabledSkillsForHostname('other.com');
+    expect(result).toEqual([]);
+  });
+
+  it('低于 minConfidence 被过滤', async () => {
+    await addSkills([
+      makeSkill({
+        name: 's-above',
+        hostname: 'api.example.com',
+        enabled: true,
+        initialConfidence: 0.8,
+      }),
+      makeSkill({
+        name: 's-below',
+        hostname: 'api.example.com',
+        enabled: true,
+        initialConfidence: 0.5,
+      }),
+    ]);
+    const result = await getEnabledSkillsForHostname('api.example.com', 0.6);
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe('s-above');
   });
 });
 

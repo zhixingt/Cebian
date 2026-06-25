@@ -68,6 +68,12 @@ describe('buildApiSkillPreamble', () => {
     expect(mockGetEnabledSkillsForHostname).toHaveBeenCalledWith('api.example.com');
   });
 
+  it('getEnabledSkillsForHostname 抛出异常时返回空字符串', async () => {
+    mockGetEnabledSkillsForHostname.mockRejectedValue(new Error('db failed'));
+    const result = await buildApiSkillPreamble('api.example.com');
+    expect(result).toBe('');
+  });
+
   it('有可用 GET Skill 时返回正确前导文本', async () => {
     mockGetEnabledSkillsForHostname.mockResolvedValue([
       makeSkill({
@@ -88,6 +94,59 @@ describe('buildApiSkillPreamble', () => {
     );
     expect(result).toContain(
       'For write operations (POST/PUT/DELETE), ask the user for confirmation first unless the skill has been converted to a regular skill.',
+    );
+  });
+
+  it('多 Skill 时 preamble 顺序反映 getEnabledSkillsForHostname 的降序排序结果', async () => {
+    // 模拟 getEnabledSkillsForHostname 已按有效置信度降序排序
+    mockGetEnabledSkillsForHostname.mockResolvedValue([
+      makeSkill({
+        name: 's-high',
+        pathname: '/high',
+        method: 'GET',
+        initialConfidence: 0.9,
+      }),
+      makeSkill({
+        name: 's-mid',
+        pathname: '/mid',
+        method: 'GET',
+        initialConfidence: 0.75,
+      }),
+      makeSkill({
+        name: 's-low',
+        pathname: '/low',
+        method: 'GET',
+        initialConfidence: 0.6,
+      }),
+    ]);
+
+    const result = await buildApiSkillPreamble('api.example.com');
+    const highIndex = result.indexOf('- GET /high [confidence=90%]');
+    const midIndex = result.indexOf('- GET /mid [confidence=75%]');
+    const lowIndex = result.indexOf('- GET /low [confidence=60%]');
+    expect(highIndex).toBeGreaterThan(-1);
+    expect(midIndex).toBeGreaterThan(-1);
+    expect(lowIndex).toBeGreaterThan(-1);
+    expect(highIndex).toBeLessThan(midIndex);
+    expect(midIndex).toBeLessThan(lowIndex);
+  });
+
+  it('混合参数类型（path + query + body）格式正确', async () => {
+    mockGetEnabledSkillsForHostname.mockResolvedValue([
+      makeSkill({
+        name: 's-mixed',
+        pathname: '/users/{id}/posts',
+        method: 'POST',
+        pathParams: [{ name: 'id', placeholder: '{id}' }],
+        queryParams: [{ name: 'draft', type: 'boolean', required: false, samples: [] }],
+        bodyFields: [{ name: 'title', type: 'string', required: true, samples: [] }],
+        initialConfidence: 0.85,
+      }),
+    ]);
+
+    const result = await buildApiSkillPreamble('api.example.com');
+    expect(result).toContain(
+      '- POST /users/{id}/posts [confidence=85%]: id(string, required) draft(boolean, optional) title(string, required)',
     );
   });
 });
