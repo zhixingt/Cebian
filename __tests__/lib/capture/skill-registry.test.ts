@@ -12,7 +12,7 @@
  * 每个 beforeEach 需要清空内存索引和 DB 表以保证测试隔离。
  */
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getDb } from '@/lib/db';
 import {
   addSkills,
@@ -26,8 +26,15 @@ import {
   findMatchingSkill,
   updateSkillStats,
   getEffectiveConfidence,
+  convertToRegularSkill,
+  type ConvertResult,
 } from '@/lib/capture/skill-registry';
 import type { AutoSkillDefinition } from '@/lib/capture/types';
+
+vi.mock('@/lib/capture/skill-converter', () => ({
+  convertAutoSkillToRegularSkill: vi.fn(),
+}));
+import { convertAutoSkillToRegularSkill } from '@/lib/capture/skill-converter';
 import {
   SKILL_ENABLE_MIN_CALLS,
   SKILL_MIN_CONFIDENCE,
@@ -651,5 +658,58 @@ describe('getEffectiveConfidence', () => {
       },
     });
     expect(getEffectiveConfidence(skill)).toBe(0.92);
+  });
+});
+
+// ─── convertToRegularSkill ───
+
+describe('convertToRegularSkill', () => {
+  beforeEach(() => {
+    vi.mocked(convertAutoSkillToRegularSkill).mockReset();
+  });
+
+  it('转换成功：调用 converter，禁用原 skill，返回 regularSkillName', async () => {
+    vi.mocked(convertAutoSkillToRegularSkill).mockResolvedValue({
+      dirName: 'api-example-com-get-api-users-id',
+      dirPath: '~/.cebian/skills/api-example-com-get-api-users-id',
+      skillMdPath: '~/.cebian/skills/api-example-com-get-api-users-id/SKILL.md',
+      scriptPath: '~/.cebian/skills/api-example-com-get-api-users-id/scripts/api.js',
+    });
+
+    await addSkills([makeSkill({ name: 's1', enabled: true })]);
+
+    const result: ConvertResult = await convertToRegularSkill('s1');
+
+    expect(result.ok).toBe(true);
+    expect(result.regularSkillName).toBe('api-example-com-get-api-users-id');
+    expect(convertAutoSkillToRegularSkill).toHaveBeenCalledTimes(1);
+
+    const all = await getAllSkills();
+    expect(all).toHaveLength(1);
+    expect(all[0].enabled).toBe(false);
+  });
+
+  it('skill 不存在时返回 ok:false', async () => {
+    const result = await convertToRegularSkill('nonexistent');
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('not found');
+    expect(convertAutoSkillToRegularSkill).not.toHaveBeenCalled();
+  });
+
+  it('转换失败时原 skill 保持启用状态', async () => {
+    vi.mocked(convertAutoSkillToRegularSkill).mockRejectedValue(
+      new Error('Directory already exists.'),
+    );
+
+    await addSkills([makeSkill({ name: 's1', enabled: true })]);
+
+    const result: ConvertResult = await convertToRegularSkill('s1');
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe('Directory already exists.');
+
+    const all = await getAllSkills();
+    expect(all).toHaveLength(1);
+    expect(all[0].enabled).toBe(true);
   });
 });

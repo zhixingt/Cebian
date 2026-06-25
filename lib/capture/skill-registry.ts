@@ -16,6 +16,8 @@ import {
   SKILL_MIN_CONFIDENCE,
   SKILL_ENABLE_MIN_CALLS,
 } from './types';
+import { convertAutoSkillToRegularSkill } from './skill-converter';
+import { CEBIAN_SKILLS_DIR } from '@/lib/constants';
 import { getDb } from '@/lib/db';
 
 // ─── 内存索引 ───
@@ -250,6 +252,39 @@ export async function disableSkill(skillName: string): Promise<void> {
 export async function deleteSkill(skillName: string): Promise<void> {
   removeFromMemory(skillName);
   await deleteFromDb(skillName);
+}
+
+export interface ConvertResult {
+  ok: boolean;
+  regularSkillName?: string;
+  error?: string;
+}
+
+/**
+ * 将指定 auto-skill 转换为普通 Skill。
+ * 转换成功后，原 auto-skill 会被禁用（不再参与自动触发），但不会删除，保留历史统计。
+ */
+export async function convertToRegularSkill(skillName: string): Promise<ConvertResult> {
+  await loadFromDb();
+
+  const skill = skillsByName.get(skillName);
+  if (!skill) {
+    return { ok: false, error: `Auto skill "${skillName}" not found.` };
+  }
+
+  try {
+    const result = await convertAutoSkillToRegularSkill(skill, CEBIAN_SKILLS_DIR);
+
+    skill.enabled = false;
+    await persistSkill(skill);
+
+    return { ok: true, regularSkillName: result.dirName };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 /**

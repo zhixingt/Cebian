@@ -342,6 +342,9 @@ settings:
     skills: "API Skill 列表"
     refresh: "刷新"
     noSkills: "暂无自动发现的 API Skill。开始捕获流量以发现 API。"
+    convert: "转为普通 Skill"
+    convertSuccess: "已转为普通 Skill：$1"
+    convertFailed: "转换失败"
   editor:
     selectFile: "选择一个文件开始编辑"
     saving: "保存中…"

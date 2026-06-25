@@ -125,6 +125,13 @@ function makeReadPageResult(text: string = '# Page content') {
   };
 }
 
+/** 从带 API/DOM 前缀的文本中提取 JSON 主体 */
+function extractJsonFromPrefixedText(text: string): any {
+  const parts = text.split('\n\n');
+  const body = parts.length > 1 ? parts.slice(1).join('\n\n') : text;
+  return JSON.parse(body);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   // 默认返回一个可通过策略检查的高置信度 GET Skill
@@ -167,10 +174,12 @@ describe('smart-read-page', () => {
       // 不应该调用 readPageTool
       expect(mockReadPageExecute).not.toHaveBeenCalled();
 
-      // 返回值是 JSON 字符串
+      // 返回值是带前缀的 JSON 字符串
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      const parsed = JSON.parse((result.content[0] as { text: string }).text);
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('[API GET /api/users/{id}]');
+      const parsed = extractJsonFromPrefixedText(text);
       expect(parsed).toEqual({
         path: 'api',
         data: { id: 1, name: 'alice' },
@@ -225,7 +234,9 @@ describe('smart-read-page', () => {
         expect.any(Object),
       );
 
-      const parsed = JSON.parse((result.content[0] as { text: string }).text);
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('[API GET /api/users/{id}]');
+      const parsed = extractJsonFromPrefixedText(text);
       expect(parsed.method).toBe('GET');
       expect(parsed.skill_id).toBe('auto-get-skill');
     });
@@ -249,7 +260,7 @@ describe('smart-read-page', () => {
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
       expect(result.content[0]).toMatchObject({
         type: 'text',
-        text: expect.stringContaining('[path: dom'),
+        text: expect.stringContaining('[DOM fallback]'),
       });
       expect((result.content[0] as { text: string }).text).toContain('# DOM content');
     });
@@ -269,7 +280,7 @@ describe('smart-read-page', () => {
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
       expect(result.content[0]).toMatchObject({
         type: 'text',
-        text: expect.stringContaining('[path: dom'),
+        text: expect.stringContaining('[DOM fallback]'),
       });
     });
   });
@@ -291,11 +302,11 @@ describe('smart-read-page', () => {
       // 应该调用 readPageTool，使用 markdown 模式
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
 
-      // 返回值前面加上 [path: dom, fallback reason: ...]
+      // 返回值前面加上 [DOM fallback] reason: ...
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
       const text = (result.content[0] as { text: string }).text;
-      expect(text).toContain('[path: dom, fallback reason: No matching API skill');
+      expect(text).toContain('[DOM fallback] reason: No matching API skill');
       expect(text).toContain('# Hello');
     });
 
@@ -349,13 +360,13 @@ describe('smart-read-page', () => {
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
       expect(result.content[0]).toMatchObject({
         type: 'text',
-        text: expect.stringContaining('[path: dom'),
+        text: expect.stringContaining('[DOM fallback]'),
       });
       expect((result.content[0] as { text: string }).text).toContain('Network timeout');
       expect((result.content[0] as { text: string }).text).toContain('# DOM content');
     });
 
-    it('字符串错误被捕获并回退到 DOM，结果包含 [path: dom', async () => {
+    it('字符串错误被捕获并回退到 DOM，结果包含 [DOM fallback]', async () => {
       mockExecuteApiFirst.mockRejectedValue('some string error');
       mockReadPageExecute.mockResolvedValue(makeReadPageResult('# DOM content'));
 
@@ -368,7 +379,7 @@ describe('smart-read-page', () => {
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
       expect(result.content[0]).toMatchObject({
         type: 'text',
-        text: expect.stringContaining('[path: dom'),
+        text: expect.stringContaining('[DOM fallback]'),
       });
       expect((result.content[0] as { text: string }).text).toContain('some string error');
       expect((result.content[0] as { text: string }).text).toContain('# DOM content');

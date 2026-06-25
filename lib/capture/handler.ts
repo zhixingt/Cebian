@@ -14,6 +14,7 @@ import {
   enableSkill,
   disableSkill,
   deleteSkill,
+  convertToRegularSkill,
 } from './skill-registry';
 import type { ApiDiscoveryControlMessage, ApiDiscoveryStatusMessage } from './types';
 import { API_DISCOVERY_MSG } from './types';
@@ -157,6 +158,15 @@ export async function handleApiDiscoveryMessage(
     case 'delete_skill': {
       await deleteSkill(msg.skillName);
       return { ok: true };
+    }
+
+    case 'convert_skill': {
+      const result = await convertToRegularSkill(msg.skillName);
+      if (result.ok) {
+        const skills = await getAllSkills();
+        broadcast({ type: 'skills_list', skills });
+      }
+      return result;
     }
 
     default:

@@ -222,7 +222,8 @@ export type ApiDiscoveryControlMessage =
   | { type: 'list_auto_skills' }
   | { type: 'enable_skill'; skillName: string }
   | { type: 'disable_skill'; skillName: string }
-  | { type: 'delete_skill'; skillName: string };
+  | { type: 'delete_skill'; skillName: string }
+  | { type: 'convert_skill'; skillName: string };
 
 /** Background → Sidepanel 的状态消息 */
 export type ApiDiscoveryStatusMessage =

@@ -137,6 +137,21 @@ export function ApiDiscoverySection() {
     toast.success('Skill deleted');
   };
 
+  // 将 auto-skill 转换为普通 skill
+  const handleConvertSkill = async (skillName: string) => {
+    const result = await sendApiDiscoveryMessage({ type: 'convert_skill', skillName }) as {
+      ok: boolean;
+      regularSkillName?: string;
+      error?: string;
+    };
+    if (result.ok) {
+      toast.success(t('settings.apiDiscovery.convertSuccess', [result.regularSkillName ?? skillName]));
+      await refreshSkills();
+    } else {
+      toast.error(result.error ?? t('settings.apiDiscovery.convertFailed'));
+    }
+  };
+
   const isCapturing = captureState?.status === 'capturing' || captureState?.status === 'attaching';
 
   return (
@@ -230,6 +245,14 @@ export function ApiDiscoverySection() {
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span>Confidence: {(skill.initialConfidence * 100).toFixed(0)}%</span>
                       <span>Samples: {skill.stats.callCount}</span>
+                      <Button
+                        onClick={() => handleConvertSkill(skill.name)}
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 px-2 text-xs"
+                      >
+                        {t('settings.apiDiscovery.convert')}
+                      </Button>
                       <Button
                         onClick={() => handleDeleteSkill(skill.name)}
                         variant="ghost"

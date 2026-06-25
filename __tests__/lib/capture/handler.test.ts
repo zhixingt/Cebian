@@ -265,7 +265,7 @@ describe('handler', () => {
 
       expect(result).toEqual({
         ok: false,
-        error: '无法获取标签页 hostname',
+        error: 'Unable to resolve tab hostname',
       });
       // 不应该调用 captureSession.start
       expect(mockCaptureStart).not.toHaveBeenCalled();

@@ -346,6 +346,9 @@ settings:
     skills: "API Skills"
     refresh: "Refresh"
     noSkills: "No auto-discovered API Skills yet. Start capturing traffic to discover APIs."
+    convert: "Convert to regular skill"
+    convertSuccess: "Converted to regular skill: $1"
+    convertFailed: "Failed to convert skill"
   editor:
     selectFile: "Select a file to start editing"
     saving: "Saving…"

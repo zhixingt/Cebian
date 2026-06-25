@@ -8,6 +8,7 @@ import { executeApiFirst } from '@/lib/capture/api-executor';
 import { findMatchingSkill } from '@/lib/capture/skill-registry';
 import { canAutoInvokeSkill } from '@/lib/capture/api-policy';
 import { readPageTool } from './read-page';
+import type { AutoSkillDefinition } from '@/lib/capture/types';
 
 const smartReadPageSchema = Type.Object({
   tabId: Type.Integer({ description: '目标标签页 ID' }),
@@ -20,6 +21,11 @@ const smartReadPageSchema = Type.Object({
   intent: Type.Optional(Type.String({ description: '操作意图描述，用于 API Skill 匹配' })),
   method: Type.Optional(Type.Literal('GET', { description: 'HTTP 方法：仅支持 GET（只读）' })),
 });
+
+function formatApiPrefix(skill: AutoSkillDefinition, result: { latencyMs: number; confidence: number }): string {
+  const confidencePct = Math.round(result.confidence * 100);
+  return `[API ${skill.method} ${skill.pathname}] latency=${result.latencyMs}ms confidence=${confidencePct}%`;
+}
 
 export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
   name: 'smart_read_page',
@@ -36,7 +42,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
           ...fallback,
           content: [{
             type: 'text' as const,
-            text: `[path: dom, fallback reason: ${reason}]\n\n${fallback.content[0].text}`,
+            text: `[DOM fallback] reason: ${reason}\n\n${fallback.content[0].text}`,
           }],
         };
       }
@@ -57,17 +63,19 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
         }
 
         const result = await executeApiFirst(url, method, intent, undefined, skill);
+        const prefix = formatApiPrefix(skill, result);
+        const body = JSON.stringify({
+          path: 'api',
+          data: result.data,
+          latency_ms: result.latencyMs,
+          skill_id: result.skillName,
+          confidence: result.confidence,
+          method: result.method,
+        }, null, 2);
         return {
           content: [{
             type: 'text' as const,
-            text: JSON.stringify({
-              path: 'api',
-              data: result.data,
-              latency_ms: result.latencyMs,
-              skill_id: result.skillName,
-              confidence: result.confidence,
-              method: result.method,
-            }, null, 2),
+            text: `${prefix}\n\n${body}`,
           }],
           details: {},
         } satisfies AgentToolResult<unknown>;

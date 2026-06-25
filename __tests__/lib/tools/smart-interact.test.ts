@@ -104,6 +104,13 @@ function makeInteractResult(text: string = 'Clicked: #btn') {
   };
 }
 
+/** 从带 API/DOM 前缀的文本中提取 JSON 主体 */
+function extractJsonFromPrefixedText(text: string): any {
+  const parts = text.split('\n\n');
+  const body = parts.length > 1 ? parts.slice(1).join('\n\n') : text;
+  return JSON.parse(body);
+}
+
 /** 构造一个 AutoSkillDefinition（用于 findMatchingSkill mock） */
 function makeSkill(overrides: Partial<AutoSkillDefinition> = {}): AutoSkillDefinition {
   return {
@@ -177,10 +184,12 @@ describe('smart-interact', () => {
       // 不应该调用 interactTool
       expect(mockInteractExecute).not.toHaveBeenCalled();
 
-      // 返回值是 JSON 字符串
+      // 返回值是带前缀的 JSON 字符串
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      const parsed = JSON.parse((result.content[0] as { text: string }).text);
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('[API POST /users]');
+      const parsed = extractJsonFromPrefixedText(text);
       expect(parsed).toEqual({
         success: true,
         path: 'api',
@@ -249,8 +258,10 @@ describe('smart-interact', () => {
       expect(mockCanAutoInvokeSkill).toHaveBeenCalledWith(getSkill, 'GET');
       expect(mockInteractExecute).not.toHaveBeenCalled();
 
-      // 返回值是 JSON 字符串
-      const parsed = JSON.parse((result.content[0] as { text: string }).text);
+      // 返回值是带前缀的 JSON 字符串
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('[API GET /form]');
+      const parsed = extractJsonFromPrefixedText(text);
       expect(parsed).toEqual({
         success: true,
         path: 'api',
@@ -350,7 +361,9 @@ describe('smart-interact', () => {
         { name: 'bob' },
         postSkill,
       );
-      const parsed = JSON.parse((result.content[0] as { text: string }).text);
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('[API POST /users]');
+      const parsed = extractJsonFromPrefixedText(text);
       expect(parsed).toMatchObject({ success: true, skill_id: 'auto-submit-skill' });
     });
 
@@ -384,7 +397,9 @@ describe('smart-interact', () => {
         getSkill,
       );
       expect(mockCanAutoInvokeSkill).toHaveBeenCalledWith(getSkill, 'GET');
-      const parsed = JSON.parse((result.content[0] as { text: string }).text);
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('[API GET /form]');
+      const parsed = extractJsonFromPrefixedText(text);
       expect(parsed).toMatchObject({ success: true, skill_id: 'auto-fill-skill' });
     });
 
@@ -469,9 +484,9 @@ describe('smart-interact', () => {
         text: 'submit text',
       });
 
-      // 返回值前面加上 [fallback: ...]
+      // 返回值前面加上 [DOM fallback] ...
       const text = (result.content[0] as { text: string }).text;
-      expect(text).toContain('[fallback: No matching API skill');
+      expect(text).toContain('[DOM fallback] reason: No matching API skill');
       expect(text).toContain('Clicked: #submit');
     });
 
@@ -498,7 +513,7 @@ describe('smart-interact', () => {
       });
 
       const text = (result.content[0] as { text: string }).text;
-      expect(text).toContain('[fallback: no match');
+      expect(text).toContain('[DOM fallback] reason: no match');
       expect(text).toContain('Typed "bob" into: #name');
     });
 

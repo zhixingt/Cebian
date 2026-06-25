@@ -8,6 +8,7 @@ import { executeApiFirst, NoMatchError } from '@/lib/capture/api-executor';
 import { findMatchingSkill } from '@/lib/capture/skill-registry';
 import { canAutoInvokeSkill } from '@/lib/capture/api-policy';
 import { interactTool } from './interact';
+import type { AutoSkillDefinition } from '@/lib/capture/types';
 
 const smartInteractSchema = Type.Object({
   tabId: Type.Integer({ description: '目标标签页 ID' }),
@@ -27,6 +28,11 @@ const smartInteractSchema = Type.Object({
   selector: Type.Optional(Type.String({ description: 'CSS 选择器（DOM 回退时使用）' })),
   text: Type.Optional(Type.String({ description: '输入文本（DOM 回退时使用）' })),
 });
+
+function formatApiPrefix(skill: AutoSkillDefinition, result: { latencyMs: number; confidence: number }): string {
+  const confidencePct = Math.round(result.confidence * 100);
+  return `[API ${skill.method} ${skill.pathname}] latency=${result.latencyMs}ms confidence=${confidencePct}%`;
+}
 
 export const smartInteractTool: AgentTool<typeof smartInteractSchema> = {
   name: 'smart_interact',
@@ -73,18 +79,20 @@ export const smartInteractTool: AgentTool<typeof smartInteractSchema> = {
 
         // 已确认或无需确认，执行 API 调用（传入已匹配的 Skill 避免重复查找）
         const result = await executeApiFirst(url, method, intent, data, skill);
+        const prefix = formatApiPrefix(skill, result);
+        const body = JSON.stringify({
+          success: true,
+          path: 'api',
+          response: result.data,
+          latency_ms: result.latencyMs,
+          skill_id: result.skillName,
+          confidence: result.confidence,
+        }, null, 2);
 
         return {
           content: [{
             type: 'text' as const,
-            text: JSON.stringify({
-              success: true,
-              path: 'api',
-              response: result.data,
-              latency_ms: result.latencyMs,
-              skill_id: result.skillName,
-              confidence: result.confidence,
-            }, null, 2),
+            text: `${prefix}\n\n${body}`,
           }],
           details: {},
         } satisfies AgentToolResult<unknown>;
@@ -102,7 +110,7 @@ export const smartInteractTool: AgentTool<typeof smartInteractSchema> = {
               ...fallback,
               content: [{
                 type: 'text' as const,
-                text: `[fallback: ${err.message}]\n\n${fallback.content[0].text}`,
+                text: `[DOM fallback] reason: ${err.message}\n\n${fallback.content[0].text}`,
               }],
             };
           }
