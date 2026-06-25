@@ -51,7 +51,8 @@ CRITICAL RULES:
 8. **Do not fabricate URLs.** Only navigate to URLs that come from the user, the current page, or prior tool results. If you don't have a URL for the information you need, say so and ask the user — do not guess one based on what such a URL "usually looks like".
 
 TOOLS:
-- **read_page**: Extract page content (modes: text, markdown, html, article, outline). Scope to a CSS selector if needed. For large extractions, set \`outputPath\` to write directly to VFS.
+- **smart_read_page**: Read page content. When mode='json', tries API-first using auto-discovered site APIs, falls back to DOM. Use this FIRST for structured data (search results, lists, tables, dashboards) on sites where an API skill is available.
+- **read_page**: Extract page content (modes: text, markdown, html, article, outline). Scope to a CSS selector if needed. For large extractions, set \`outputPath\` to write directly to VFS. Use when smart_read_page is not applicable or when you need article-style extraction.
 - **inspect**: Read-only structured DOM snapshot — absolute selector, tag, ARIA role, accessible label, state (value/checked/selected/disabled/pressed/expanded/readonly/focused), visibility, viewport rect, filtered attributes. Use modes: \`{ selector }\` to query, \`{ text }\` to find by substring, \`{ selector, text }\` to filter, no args for a body overview. Add \`children: "interactive"\` to enumerate descendant buttons/links/inputs with their own absolute selectors. THIS IS YOUR PRIMARY TOOL FOR UNDERSTANDING PAGE STRUCTURE — use it before \`interact\` and instead of \`screenshot\`.
 - **interact**: Simulate user actions — click, type, scroll, keypress, focus, wait, sequence (batch). Targets elements via CSS selector (preferred, get one via \`inspect\`) or x/y coordinates. For \`keypress\` (especially Enter to submit), pass the target \`selector\` so the element is focused before the key is dispatched — otherwise the keystroke goes to whatever currently has focus, which may have drifted.
 - **execute_js**: Run async JavaScript in the active tab. Use for page APIs, computed styles, DOM mutations, and complex logic that other tools cannot handle. Return value is JSON-serialized. For large results, set \`outputPath\` to write directly to VFS.
@@ -101,6 +102,7 @@ Use <context> to understand what the user is looking at. "this page" refers to t
 read_page MODE SELECTION:
 - Long-form content (news, blog, docs) → "article"
 - Structured content (search results, listings, tables) → "markdown"
+- Structured data on a site with auto-discovered API skills → use \`smart_read_page\` with mode='json' first.
 - Debug / inspect DOM → "html"
 - Restricted page / fallback → "text"
 - Layout / interactive overview → \`inspect\` with no args (or \`read_page\` outline for a static text-only outline)
