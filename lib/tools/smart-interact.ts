@@ -29,9 +29,12 @@ const smartInteractSchema = Type.Object({
   text: Type.Optional(Type.String({ description: '输入文本（DOM 回退时使用）' })),
 });
 
-function formatApiPrefix(skill: AutoSkillDefinition, result: { latencyMs: number; confidence: number }): string {
+function formatApiPrefix(
+  skill: AutoSkillDefinition,
+  result: { method: string; latencyMs: number; confidence: number },
+): string {
   const confidencePct = Math.round(result.confidence * 100);
-  return `[API ${skill.method} ${skill.pathname}] latency=${result.latencyMs}ms confidence=${confidencePct}%`;
+  return `[API ${result.method} ${skill.pathname}] latency=${result.latencyMs}ms confidence=${confidencePct}%`;
 }
 
 export const smartInteractTool: AgentTool<typeof smartInteractSchema> = {

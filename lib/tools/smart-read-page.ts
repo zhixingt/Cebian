@@ -29,9 +29,12 @@ const smartReadPageSchema = Type.Object({
   data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'POST/PUT/PATCH 请求体' })),
 });
 
-function formatApiPrefix(skill: AutoSkillDefinition, result: { latencyMs: number; confidence: number }): string {
+function formatApiPrefix(
+  skill: AutoSkillDefinition,
+  result: { method: string; latencyMs: number; confidence: number },
+): string {
   const confidencePct = Math.round(result.confidence * 100);
-  return `[API ${skill.method} ${skill.pathname}] latency=${result.latencyMs}ms confidence=${confidencePct}%`;
+  return `[API ${result.method} ${skill.pathname}] latency=${result.latencyMs}ms confidence=${confidencePct}%`;
 }
 
 export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {

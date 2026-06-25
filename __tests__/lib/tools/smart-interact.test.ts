@@ -161,6 +161,7 @@ describe('smart-interact', () => {
         latencyMs: 30,
         skillName: 'auto-submit-skill',
         confidence: 0.8,
+        method: 'POST',
       }));
 
       const result = await smartInteractTool.execute('call-1', {
@@ -343,6 +344,7 @@ describe('smart-interact', () => {
         latencyMs: 30,
         skillName: 'auto-submit-skill',
         confidence: 0.8,
+        method: 'POST',
       }));
 
       const result = await smartInteractTool.execute('call-1', {
