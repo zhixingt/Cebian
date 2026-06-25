@@ -4,7 +4,7 @@
 
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
-import { executeApiFirst, NoMatchError } from '@/lib/capture/api-executor';
+import { executeApiFirst } from '@/lib/capture/api-executor';
 import { findMatchingSkill } from '@/lib/capture/skill-registry';
 import { canAutoInvokeSkill } from '@/lib/capture/api-policy';
 import { readPageTool } from './read-page';
@@ -36,7 +36,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
           ...fallback,
           content: [{
             type: 'text' as const,
-            text: `[fallback: ${reason}]\n\n${fallback.content[0].text}`,
+            text: `[path: dom, fallback reason: ${reason}]\n\n${fallback.content[0].text}`,
           }],
         };
       }
@@ -72,10 +72,9 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
           details: {},
         } satisfies AgentToolResult<unknown>;
       } catch (err) {
-        if (err instanceof NoMatchError) {
-          return await fallbackToDom(err.message);
-        }
-        throw err;
+        // API 路径任何异常都透明回退到 DOM，用户感知为一次工具调用
+        const reason = err instanceof Error ? err.message : String(err);
+        return await fallbackToDom(reason);
       }
     }
 

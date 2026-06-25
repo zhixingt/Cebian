@@ -5,7 +5,7 @@
  * - mode='json' + url 时走 API 路径（成功）
  * - 匹配 Skill 未通过自动调用策略时直接回退 DOM
  * - NoMatchError 时回退到 readPageTool（markdown 模式）
- * - 非 NoMatchError 异常时 re-throw
+ * - 非 NoMatchError 异常时也回退到 readPageTool（markdown 模式）
  * - mode='markdown' 时直接走 DOM
  * - mode='text' 时直接走 DOM
  * - 无 url 时直接走 DOM
@@ -249,7 +249,7 @@ describe('smart-read-page', () => {
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
       expect(result.content[0]).toMatchObject({
         type: 'text',
-        text: expect.stringContaining('[fallback:'),
+        text: expect.stringContaining('[path: dom'),
       });
       expect((result.content[0] as { text: string }).text).toContain('# DOM content');
     });
@@ -258,7 +258,7 @@ describe('smart-read-page', () => {
       mockFindMatchingSkill.mockResolvedValue(makeSkill({ initialConfidence: 0.75 }));
       mockReadPageExecute.mockResolvedValue(makeReadPageResult());
 
-      await smartReadPageTool.execute('call-1', {
+      const result = await smartReadPageTool.execute('call-1', {
         tabId: 42,
         mode: 'json',
         url: 'https://api.example.com/users/1',
@@ -267,6 +267,10 @@ describe('smart-read-page', () => {
 
       expect(mockExecuteApiFirst).not.toHaveBeenCalled();
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
+      expect(result.content[0]).toMatchObject({
+        type: 'text',
+        text: expect.stringContaining('[path: dom'),
+      });
     });
   });
 
@@ -287,11 +291,11 @@ describe('smart-read-page', () => {
       // 应该调用 readPageTool，使用 markdown 模式
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
 
-      // 返回值前面加上 [fallback: ...]
+      // 返回值前面加上 [path: dom, fallback reason: ...]
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
       const text = (result.content[0] as { text: string }).text;
-      expect(text).toContain('[fallback: No matching API skill');
+      expect(text).toContain('[path: dom, fallback reason: No matching API skill');
       expect(text).toContain('# Hello');
     });
 
@@ -328,37 +332,46 @@ describe('smart-read-page', () => {
     });
   });
 
-  // ─── 非 NoMatchError 异常时 re-throw ───
+  // ─── 非 NoMatchError 异常时回退到 DOM ───
 
-  describe('非 NoMatchError 异常时 re-throw', () => {
-    it('普通 Error 被重新抛出', async () => {
+  describe('非 NoMatchError 异常时回退到 DOM', () => {
+    it('普通 Error 被捕获并回退到 DOM，结果包含 [path: dom', async () => {
       const err = new Error('Network timeout');
       mockExecuteApiFirst.mockRejectedValue(err);
+      mockReadPageExecute.mockResolvedValue(makeReadPageResult('# DOM content'));
 
-      await expect(
-        smartReadPageTool.execute('call-1', {
-          tabId: 42,
-          mode: 'json',
-          url: 'https://api.example.com/users/1',
-        }),
-      ).rejects.toThrow('Network timeout');
+      const result = await smartReadPageTool.execute('call-1', {
+        tabId: 42,
+        mode: 'json',
+        url: 'https://api.example.com/users/1',
+      });
 
-      // 不应该调用 readPageTool
-      expect(mockReadPageExecute).not.toHaveBeenCalled();
+      expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
+      expect(result.content[0]).toMatchObject({
+        type: 'text',
+        text: expect.stringContaining('[path: dom'),
+      });
+      expect((result.content[0] as { text: string }).text).toContain('Network timeout');
+      expect((result.content[0] as { text: string }).text).toContain('# DOM content');
     });
 
-    it('字符串错误被重新抛出', async () => {
+    it('字符串错误被捕获并回退到 DOM，结果包含 [path: dom', async () => {
       mockExecuteApiFirst.mockRejectedValue('some string error');
+      mockReadPageExecute.mockResolvedValue(makeReadPageResult('# DOM content'));
 
-      await expect(
-        smartReadPageTool.execute('call-1', {
-          tabId: 42,
-          mode: 'json',
-          url: 'https://api.example.com/users/1',
-        }),
-      ).rejects.toBe('some string error');
+      const result = await smartReadPageTool.execute('call-1', {
+        tabId: 42,
+        mode: 'json',
+        url: 'https://api.example.com/users/1',
+      });
 
-      expect(mockReadPageExecute).not.toHaveBeenCalled();
+      expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
+      expect(result.content[0]).toMatchObject({
+        type: 'text',
+        text: expect.stringContaining('[path: dom'),
+      });
+      expect((result.content[0] as { text: string }).text).toContain('some string error');
+      expect((result.content[0] as { text: string }).text).toContain('# DOM content');
     });
   });
 
