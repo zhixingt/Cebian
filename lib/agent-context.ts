@@ -5,8 +5,8 @@
  * 格式化为 system prompt 前导文本，让 Agent 知道可以优先调用哪些站点 API。
  */
 
-import { getEnabledSkillsForHostname, getEffectiveConfidence } from './capture/skill-registry';
-import type { AutoSkillDefinition, BodyFieldDef, PathParamDef, QueryParamDef } from './capture/types';
+import { getEnabledSkillsForHostname, getEffectiveConfidence } from '@/lib/capture/skill-registry';
+import type { AutoSkillDefinition, BodyFieldDef, PathParamDef, QueryParamDef } from '@/lib/capture/types';
 
 /**
  * 构建当前站点的自动发现 API Skill 前导文本。

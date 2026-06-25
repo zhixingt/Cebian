@@ -3,7 +3,7 @@ import type { Api, Model, Message } from '@earendil-works/pi-ai';
 import { providerCredentials, type OAuthCredential } from './storage';
 import { getValidOAuthToken } from './oauth';
 import { DEFAULT_SYSTEM_PROMPT } from './constants';
-import { buildApiSkillPreamble } from './agent-context';
+import { buildApiSkillPreamble } from '@/lib/agent-context';
 import { buildMemoryPrompt } from './memory/prompt-builder';
 
 // ─── Agent factory ───
