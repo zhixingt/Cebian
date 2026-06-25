@@ -18,8 +18,15 @@ const smartReadPageSchema = Type.Object({
     Type.Literal('text'),
   ], { description: '读取模式：markdown（默认）| json（API优先）| text' })),
   url: Type.Optional(Type.String({ description: '当 mode=json 时，目标 API URL' })),
+  method: Type.Optional(Type.Union([
+    Type.Literal('GET'),
+    Type.Literal('POST'),
+    Type.Literal('PUT'),
+    Type.Literal('PATCH'),
+    Type.Literal('DELETE'),
+  ], { description: 'HTTP 方法；默认从匹配的 API Skill 读取，未匹配时默认 GET' })),
   intent: Type.Optional(Type.String({ description: '操作意图描述，用于 API Skill 匹配' })),
-  method: Type.Optional(Type.Literal('GET', { description: 'HTTP 方法：仅支持 GET（只读）' })),
+  data: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: 'POST/PUT/PATCH 请求体' })),
 });
 
 function formatApiPrefix(skill: AutoSkillDefinition, result: { latencyMs: number; confidence: number }): string {
@@ -33,7 +40,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
   description: 'Read page content. When mode=json, tries API-first (auto-discovered), falls back to DOM.',
   parameters: smartReadPageSchema,
   execute: async (_toolCallId, params) => {
-    const { tabId, mode, url, intent, method } = params;
+    const { tabId, mode, url, intent, method, data } = params;
 
     async function fallbackToDom(reason: string): Promise<AgentToolResult<unknown>> {
       const fallback = await readPageTool.execute(_toolCallId, { tabId, mode: 'markdown' });
@@ -62,7 +69,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
           return await fallbackToDom(policy.reason);
         }
 
-        const result = await executeApiFirst(url, method, intent, undefined, skill);
+        const result = await executeApiFirst(url, method ?? 'GET', intent, data);
         const prefix = formatApiPrefix(skill, result);
         const body = JSON.stringify({
           path: 'api',

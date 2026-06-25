@@ -166,10 +166,9 @@ describe('smart-read-page', () => {
       );
       expect(mockExecuteApiFirst).toHaveBeenCalledWith(
         'https://api.example.com/users/1',
-        undefined,
+        'GET',
         'get user',
         undefined,
-        expect.any(Object),
       );
       // 不应该调用 readPageTool
       expect(mockReadPageExecute).not.toHaveBeenCalled();
@@ -205,10 +204,9 @@ describe('smart-read-page', () => {
       );
       expect(mockExecuteApiFirst).toHaveBeenCalledWith(
         'https://api.example.com/users/1',
+        'GET',
         undefined,
         undefined,
-        undefined,
-        expect.any(Object),
       );
     });
 
@@ -231,7 +229,6 @@ describe('smart-read-page', () => {
         'GET',
         'get user',
         undefined,
-        expect.any(Object),
       );
 
       const text = (result.content[0] as { text: string }).text;
@@ -239,6 +236,36 @@ describe('smart-read-page', () => {
       const parsed = extractJsonFromPrefixedText(text);
       expect(parsed.method).toBe('GET');
       expect(parsed.skill_id).toBe('auto-get-skill');
+    });
+
+    it('uses POST method from matched skill in json mode', async () => {
+      vi.mocked(executeApiFirst).mockResolvedValue({
+        success: true,
+        data: { hits: [] },
+        status: 200,
+        latencyMs: 120,
+        skillName: 'auto-algolia-query',
+        confidence: 0.85,
+        path: 'api',
+        method: 'POST',
+      });
+
+      const result = await smartReadPageTool.execute('call-1', {
+        tabId: 1,
+        mode: 'json',
+        url: 'https://algolia.example.com/1/indexes/Item/query',
+        method: 'POST',
+        data: { query: 'machine learning' },
+      });
+
+      const text = (result.content[0] as { text: string }).text;
+      expect(text).toContain('"method": "POST"');
+      expect(executeApiFirst).toHaveBeenCalledWith(
+        'https://algolia.example.com/1/indexes/Item/query',
+        'POST',
+        undefined,
+        { query: 'machine learning' },
+      );
     });
   });
 
