@@ -6,6 +6,9 @@
  * - 非 GET 方法阻止
  * - 低置信度阻止
  * - pathname/description 含写操作关键词阻止
+ * - Skill 未启用阻止
+ * - 动态置信度优先
+ * - 关键词词边界匹配
  */
 import 'fake-indexeddb/auto';
 import { describe, it, expect } from 'vitest';
@@ -87,6 +90,40 @@ describe('canAutoInvokeSkill', () => {
 
   it('边界置信度 0.8 允许自动调用', () => {
     const skill = makeSkill({ method: 'GET', initialConfidence: 0.8 });
+    const result = canAutoInvokeSkill(skill);
+    expect(result.allowed).toBe(true);
+  });
+
+  it('enabled: false 被阻止', () => {
+    const skill = makeSkill({ enabled: false });
+    const result = canAutoInvokeSkill(skill);
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe('skill is disabled');
+  });
+
+  it('动态置信度（callCount >= 3）优先于 initialConfidence', () => {
+    const skill = makeSkill({
+      method: 'GET',
+      initialConfidence: 0.75,
+      stats: {
+        callCount: 3,
+        successCount: 3,
+        failureCount: 0,
+        lastCalledAt: Date.now(),
+        dynamicConfidence: 0.9,
+      },
+    });
+    const result = canAutoInvokeSkill(skill);
+    expect(result.allowed).toBe(true);
+    expect(result.reason).toContain('Read-only GET skill');
+  });
+
+  it('关键词词边界：pathname 含 "posts" 子串时不应误阻止', () => {
+    const skill = makeSkill({
+      method: 'GET',
+      initialConfidence: 0.85,
+      pathname: '/api/posts',
+    });
     const result = canAutoInvokeSkill(skill);
     expect(result.allowed).toBe(true);
   });

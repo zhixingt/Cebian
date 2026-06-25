@@ -3,6 +3,7 @@
  *
  * 覆盖范围：
  * - mode='json' + url 时走 API 路径（成功）
+ * - 匹配 Skill 未通过自动调用策略时直接回退 DOM
  * - NoMatchError 时回退到 readPageTool（markdown 模式）
  * - 非 NoMatchError 异常时 re-throw
  * - mode='markdown' 时直接走 DOM
@@ -11,6 +12,7 @@
  *
  * mock 策略：
  * - vi.mock '@/lib/capture/api-executor' 的 executeApiFirst 和 NoMatchError
+ * - vi.mock '@/lib/capture/skill-registry' 的 findMatchingSkill
  * - vi.mock './read-page' 的 readPageTool
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -34,6 +36,14 @@ vi.mock('@/lib/capture/api-executor', () => ({
   NoMatchError,
 }));
 
+vi.mock(import('@/lib/capture/skill-registry'), async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    findMatchingSkill: vi.fn(),
+  };
+});
+
 vi.mock('@/lib/tools/read-page', () => ({
   readPageTool: {
     name: 'read_page',
@@ -45,14 +55,42 @@ vi.mock('@/lib/tools/read-page', () => ({
 
 import { smartReadPageTool } from '@/lib/tools/smart-read-page';
 import { executeApiFirst, NoMatchError as MockNoMatchError } from '@/lib/capture/api-executor';
+import { findMatchingSkill } from '@/lib/capture/skill-registry';
 import { readPageTool } from '@/lib/tools/read-page';
+import type { AutoSkillDefinition } from '@/lib/capture/types';
 
 // ─── mock 引用 ───
 
 const mockExecuteApiFirst = vi.mocked(executeApiFirst);
+const mockFindMatchingSkill = vi.mocked(findMatchingSkill);
 const mockReadPageExecute = vi.mocked(readPageTool.execute);
 
 // ─── 测试辅助 ───
+
+function makeSkill(overrides: Partial<AutoSkillDefinition> = {}): AutoSkillDefinition {
+  return {
+    name: 'auto-api-example-com-get-api-users-id',
+    description: 'Auto-discovered API: GET /api/users/{id}',
+    endpointId: 'GET|/api/users/{id}',
+    hostname: 'api.example.com',
+    method: 'GET',
+    authType: 'none',
+    pathname: '/api/users/{id}',
+    bgFetchPatterns: ['https://api.example.com/api/users/*'],
+    script: '',
+    initialConfidence: 0.85,
+    enabled: true,
+    createdAt: Date.now(),
+    stats: {
+      callCount: 0,
+      successCount: 0,
+      failureCount: 0,
+      lastCalledAt: null,
+      dynamicConfidence: 0,
+    },
+    ...overrides,
+  };
+}
 
 /** 构造一个成功的 executeApiFirst 返回值 */
 function makeApiResult(overrides: Partial<{
@@ -88,6 +126,8 @@ function makeReadPageResult(text: string = '# Page content') {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // 默认返回一个可通过策略检查的高置信度 GET Skill
+  mockFindMatchingSkill.mockResolvedValue(makeSkill());
 });
 
 // ─── 测试套件 ───
@@ -111,7 +151,11 @@ describe('smart-read-page', () => {
         intent: 'get user',
       });
 
-      // 应该调用 executeApiFirst（未传 method，由 executeApiFirst 回退到 skill.method）
+      // 应该调用 findMatchingSkill 与 executeApiFirst
+      expect(mockFindMatchingSkill).toHaveBeenCalledWith(
+        'https://api.example.com/users/1',
+        'get user',
+      );
       expect(mockExecuteApiFirst).toHaveBeenCalledWith(
         'https://api.example.com/users/1',
         undefined,
@@ -144,6 +188,10 @@ describe('smart-read-page', () => {
         url: 'https://api.example.com/users/1',
       });
 
+      expect(mockFindMatchingSkill).toHaveBeenCalledWith(
+        'https://api.example.com/users/1',
+        undefined,
+      );
       expect(mockExecuteApiFirst).toHaveBeenCalledWith(
         'https://api.example.com/users/1',
         undefined,
@@ -252,6 +300,45 @@ describe('smart-read-page', () => {
     });
   });
 
+  // ─── 自动调用策略拦截：直接回退 DOM ───
+
+  describe('自动调用策略拦截：直接回退 DOM', () => {
+    it('当匹配到的 Skill 是 POST 时，由于 canAutoInvokeSkill 返回 false，应 fallback 到 DOM，不调用 executeApiFirst', async () => {
+      mockFindMatchingSkill.mockResolvedValue(makeSkill({ method: 'POST' }));
+      mockReadPageExecute.mockResolvedValue(makeReadPageResult('# DOM content'));
+
+      const result = await smartReadPageTool.execute('call-1', {
+        tabId: 42,
+        mode: 'json',
+        url: 'https://api.example.com/users',
+        intent: 'create user',
+      });
+
+      expect(mockExecuteApiFirst).not.toHaveBeenCalled();
+      expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
+      expect(result.content[0]).toMatchObject({
+        type: 'text',
+        text: expect.stringContaining('[fallback:'),
+      });
+      expect((result.content[0] as { text: string }).text).toContain('# DOM content');
+    });
+
+    it('当匹配到的 Skill 置信度低于 0.8 时，应 fallback 到 DOM', async () => {
+      mockFindMatchingSkill.mockResolvedValue(makeSkill({ initialConfidence: 0.75 }));
+      mockReadPageExecute.mockResolvedValue(makeReadPageResult());
+
+      await smartReadPageTool.execute('call-1', {
+        tabId: 42,
+        mode: 'json',
+        url: 'https://api.example.com/users/1',
+        intent: 'get user',
+      });
+
+      expect(mockExecuteApiFirst).not.toHaveBeenCalled();
+      expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
+    });
+  });
+
   // ─── NoMatchError 时回退到 readPageTool（markdown 模式） ───
 
   describe('NoMatchError 时回退到 readPageTool', () => {
@@ -355,6 +442,7 @@ describe('smart-read-page', () => {
         mode: 'markdown',
       });
 
+      expect(mockFindMatchingSkill).not.toHaveBeenCalled();
       expect(mockExecuteApiFirst).not.toHaveBeenCalled();
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
       expect(result.content[0]).toMatchObject({ type: 'text', text: '# Markdown' });
@@ -369,6 +457,7 @@ describe('smart-read-page', () => {
         url: 'https://api.example.com/users/1',
       });
 
+      expect(mockFindMatchingSkill).not.toHaveBeenCalled();
       expect(mockExecuteApiFirst).not.toHaveBeenCalled();
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
     });
@@ -385,6 +474,7 @@ describe('smart-read-page', () => {
         mode: 'text',
       });
 
+      expect(mockFindMatchingSkill).not.toHaveBeenCalled();
       expect(mockExecuteApiFirst).not.toHaveBeenCalled();
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'text' });
       expect(result.content[0]).toMatchObject({ type: 'text', text: 'plain text' });
@@ -399,6 +489,7 @@ describe('smart-read-page', () => {
         url: 'https://api.example.com/users/1',
       });
 
+      expect(mockFindMatchingSkill).not.toHaveBeenCalled();
       expect(mockExecuteApiFirst).not.toHaveBeenCalled();
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'text' });
     });
@@ -416,6 +507,7 @@ describe('smart-read-page', () => {
         // 无 url
       });
 
+      expect(mockFindMatchingSkill).not.toHaveBeenCalled();
       expect(mockExecuteApiFirst).not.toHaveBeenCalled();
       // mode=json 但无 url → 走 DOM，domMode 为 'markdown'（因为 mode !== 'text'）
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
@@ -429,6 +521,7 @@ describe('smart-read-page', () => {
         tabId: 42,
       });
 
+      expect(mockFindMatchingSkill).not.toHaveBeenCalled();
       expect(mockExecuteApiFirst).not.toHaveBeenCalled();
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
     });

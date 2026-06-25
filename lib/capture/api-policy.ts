@@ -16,23 +16,8 @@ export interface ApiPolicyResult {
   reason: string;
 }
 
-/** 写操作关键词：命中任一关键词即视为潜在写操作 */
-const WRITE_KEYWORDS = [
-  'submit',
-  'delete',
-  'remove',
-  'update',
-  'create',
-  'pay',
-  'order',
-  'purchase',
-  'post',
-  'write',
-  'send',
-  'cancel',
-  'approve',
-  'reject',
-];
+/** 写操作关键词：命中任一关键词即视为潜在写操作（使用词边界避免误杀子串） */
+const WRITE_KEYWORDS = /\b(submit|delete|remove|update|create|pay|order|purchase|post|write|send|cancel|approve|reject)\b/i;
 
 /** 自动调用所需最低有效置信度 */
 const AUTO_INVOKE_MIN_CONFIDENCE = 0.8;
@@ -41,11 +26,16 @@ const AUTO_INVOKE_MIN_CONFIDENCE = 0.8;
  * 判断指定 API Skill 是否可以被自动调用。
  *
  * 规则：
- * 1. 仅允许 HTTP GET 方法。
- * 2. 有效置信度必须 >= AUTO_INVOKE_MIN_CONFIDENCE。
- * 3. pathname 与 description 中不得包含写操作关键词。
+ * 1. Skill 必须处于启用状态。
+ * 2. 仅允许 HTTP GET 方法。
+ * 3. 有效置信度必须 >= AUTO_INVOKE_MIN_CONFIDENCE。
+ * 4. pathname 与 description 中不得包含写操作关键词。
  */
 export function canAutoInvokeSkill(skill: AutoSkillDefinition): ApiPolicyResult {
+  if (!skill.enabled) {
+    return { allowed: false, reason: 'skill is disabled' };
+  }
+
   if (!skill.method || skill.method.toUpperCase() !== 'GET') {
     return { allowed: false, reason: `Auto-invoke only allowed for GET skills, got ${skill.method}` };
   }
@@ -59,11 +49,11 @@ export function canAutoInvokeSkill(skill: AutoSkillDefinition): ApiPolicyResult 
   }
 
   const textToCheck = `${skill.pathname ?? ''} ${skill.description ?? ''}`.toLowerCase();
-  const hit = WRITE_KEYWORDS.find((keyword) => textToCheck.includes(keyword));
-  if (hit) {
+  const match = WRITE_KEYWORDS.exec(textToCheck);
+  if (match) {
     return {
       allowed: false,
-      reason: `Write-operation keyword "${hit}" found in pathname or description`,
+      reason: `Write-operation keyword "${match[0]}" found in pathname or description`,
     };
   }
 

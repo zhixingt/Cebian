@@ -5,6 +5,8 @@
 import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { executeApiFirst, NoMatchError } from '@/lib/capture/api-executor';
+import { findMatchingSkill } from '@/lib/capture/skill-registry';
+import { canAutoInvokeSkill } from '@/lib/capture/api-policy';
 import { readPageTool } from './read-page';
 
 const smartReadPageSchema = Type.Object({
@@ -34,8 +36,33 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
   execute: async (_toolCallId, params) => {
     const { tabId, mode, url, intent, method, data } = params;
 
+    async function fallbackToDom(reason: string): Promise<AgentToolResult<unknown>> {
+      const fallback = await readPageTool.execute(_toolCallId, { tabId, mode: 'markdown' });
+      if (fallback.content[0]?.type === 'text') {
+        return {
+          ...fallback,
+          content: [{
+            type: 'text' as const,
+            text: `[fallback: ${reason}]\n\n${fallback.content[0].text}`,
+          }],
+        };
+      }
+      return fallback;
+    }
+
     if (mode === 'json' && url) {
       try {
+        // 在调用 API 前先检查自动调用策略：未匹配或策略拒绝时直接回退 DOM
+        const skill = await findMatchingSkill(url, intent);
+        if (!skill) {
+          return await fallbackToDom(`No matching API skill for ${method ?? 'GET'} ${url}`);
+        }
+
+        const policy = canAutoInvokeSkill(skill);
+        if (!policy.allowed) {
+          return await fallbackToDom(policy.reason);
+        }
+
         const result = await executeApiFirst(url, method, intent, data);
         return {
           content: [{
@@ -53,17 +80,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
         } satisfies AgentToolResult<unknown>;
       } catch (err) {
         if (err instanceof NoMatchError) {
-          const fallback = await readPageTool.execute(_toolCallId, { tabId, mode: 'markdown' });
-          if (fallback.content[0]?.type === 'text') {
-            return {
-              ...fallback,
-              content: [{
-                type: 'text' as const,
-                text: `[fallback: ${err.message}]\n\n${fallback.content[0].text}`,
-              }],
-            };
-          }
-          return fallback;
+          return await fallbackToDom(err.message);
         }
         throw err;
       }
