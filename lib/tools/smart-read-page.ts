@@ -16,6 +16,14 @@ const smartReadPageSchema = Type.Object({
   ], { description: '读取模式：markdown（默认）| json（API优先）| text' })),
   url: Type.Optional(Type.String({ description: '当 mode=json 时，目标 API URL' })),
   intent: Type.Optional(Type.String({ description: '操作意图描述，用于 API Skill 匹配' })),
+  method: Type.Optional(Type.Union([
+    Type.Literal('GET'),
+    Type.Literal('POST'),
+    Type.Literal('PUT'),
+    Type.Literal('PATCH'),
+    Type.Literal('DELETE'),
+  ], { description: 'HTTP 方法：默认从匹配的 API Skill 读取，未匹配时默认 GET' })),
+  data: Type.Optional(Type.Record(Type.String(), Type.Any(), { description: 'POST/PUT/PATCH 请求体数据' })),
 });
 
 export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
@@ -24,11 +32,11 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
   description: 'Read page content. When mode=json, tries API-first (auto-discovered), falls back to DOM.',
   parameters: smartReadPageSchema,
   execute: async (_toolCallId, params) => {
-    const { tabId, mode, url, intent } = params;
+    const { tabId, mode, url, intent, method, data } = params;
 
     if (mode === 'json' && url) {
       try {
-        const result = await executeApiFirst(url, 'GET', intent);
+        const result = await executeApiFirst(url, method ?? 'GET', intent, data);
         return {
           content: [{
             type: 'text' as const,
@@ -38,6 +46,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
               latency_ms: result.latencyMs,
               skill_id: result.skillName,
               confidence: result.confidence,
+              method: result.method,
             }, null, 2),
           }],
           details: {},

@@ -63,6 +63,7 @@ function makeApiResult(overrides: Partial<{
   skillName: string;
   confidence: number;
   path: 'api' | 'fallback';
+  method: string;
 }> = {}) {
   return {
     success: true,
@@ -72,6 +73,7 @@ function makeApiResult(overrides: Partial<{
     skillName: 'auto-api-example-com-get-api-users',
     confidence: 0.85,
     path: 'api' as const,
+    method: 'GET',
     ...overrides,
   };
 }
@@ -114,6 +116,7 @@ describe('smart-read-page', () => {
         'https://api.example.com/users/1',
         'GET',
         'get user',
+        undefined,
       );
       // 不应该调用 readPageTool
       expect(mockReadPageExecute).not.toHaveBeenCalled();
@@ -128,6 +131,7 @@ describe('smart-read-page', () => {
         latency_ms: 42,
         skill_id: 'auto-skill-1',
         confidence: 0.85,
+        method: 'GET',
       });
     });
 
@@ -144,6 +148,58 @@ describe('smart-read-page', () => {
         'https://api.example.com/users/1',
         'GET',
         undefined,
+        undefined,
+      );
+    });
+
+    it('当 URL 匹配到 POST Skill 时，返回结果中包含 method: POST', async () => {
+      mockExecuteApiFirst.mockResolvedValue(makeApiResult({
+        method: 'POST',
+        skillName: 'auto-post-skill',
+        data: { created: true },
+      }));
+
+      const result = await smartReadPageTool.execute('call-1', {
+        tabId: 42,
+        mode: 'json',
+        url: 'https://api.example.com/users',
+        method: 'POST',
+        data: { name: 'bob' },
+        intent: 'create user',
+      });
+
+      expect(mockExecuteApiFirst).toHaveBeenCalledWith(
+        'https://api.example.com/users',
+        'POST',
+        'create user',
+        { name: 'bob' },
+      );
+
+      const parsed = JSON.parse((result.content[0] as { text: string }).text);
+      expect(parsed.method).toBe('POST');
+      expect(parsed.skill_id).toBe('auto-post-skill');
+    });
+
+    it('executeApiFirst 被正确调用并传入 method 和 data', async () => {
+      mockExecuteApiFirst.mockResolvedValue(makeApiResult({
+        method: 'PATCH',
+        data: { updated: true },
+      }));
+
+      await smartReadPageTool.execute('call-1', {
+        tabId: 42,
+        mode: 'json',
+        url: 'https://api.example.com/users/1',
+        method: 'PATCH',
+        data: { name: 'charlie' },
+        intent: 'update user',
+      });
+
+      expect(mockExecuteApiFirst).toHaveBeenCalledWith(
+        'https://api.example.com/users/1',
+        'PATCH',
+        'update user',
+        { name: 'charlie' },
       );
     });
   });

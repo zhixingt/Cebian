@@ -35,6 +35,8 @@ export interface ApiExecuteResult {
   confidence: number;
   /** 执行路径：'api' 或 'fallback' */
   path: 'api' | 'fallback';
+  /** 实际使用的 HTTP 方法 */
+  method: string;
   /** 错误信息（失败时） */
   error?: string;
 }
@@ -191,6 +193,7 @@ export async function executeApiFirst(
       skillName: skill.name,
       confidence: getEffectiveConfidence(skill),
       path: 'api',
+      method: skill.method,
     };
   } catch (err) {
     if (err instanceof NoMatchError) throw err;

@@ -63,6 +63,7 @@ function makeApiResult(overrides: Partial<{
   skillName: string;
   confidence: number;
   path: 'api' | 'fallback';
+  method: string;
 }> = {}) {
   return {
     success: true,
@@ -72,6 +73,7 @@ function makeApiResult(overrides: Partial<{
     skillName: 'auto-skill-1',
     confidence: 0.8,
     path: 'api' as const,
+    method: 'GET',
     ...overrides,
   };
 }

@@ -495,6 +495,15 @@ describe('api-executor', () => {
       expect(result.path).toBe('api');
     });
 
+    it('成功结果包含 method 字段', async () => {
+      const skill = makeSkill({ method: 'POST', name: 'post-skill' });
+      mockFindMatchingSkill.mockResolvedValue(skill);
+
+      const result = await executeApiFirst('https://api.example.com/api/users', 'POST', undefined, { name: 'bob' });
+
+      expect(result.method).toBe('POST');
+    });
+
     it('成功结果包含解码后的响应数据', async () => {
       const skill = makeSkill();
       mockFindMatchingSkill.mockResolvedValue(skill);
