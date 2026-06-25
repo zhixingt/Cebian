@@ -126,7 +126,7 @@ function makeReadPageResult(text: string = '# Page content') {
 }
 
 /** 从带 API/DOM 前缀的文本中提取 JSON 主体 */
-function extractJsonFromPrefixedText(text: string): any {
+function extractJsonFromPrefixedText(text: string): unknown {
   const parts = text.split('\n\n');
   const body = parts.length > 1 ? parts.slice(1).join('\n\n') : text;
   return JSON.parse(body);
@@ -169,6 +169,7 @@ describe('smart-read-page', () => {
         'GET',
         'get user',
         undefined,
+        expect.anything(),
       );
       // 不应该调用 readPageTool
       expect(mockReadPageExecute).not.toHaveBeenCalled();
@@ -178,7 +179,7 @@ describe('smart-read-page', () => {
       expect(result.content[0].type).toBe('text');
       const text = (result.content[0] as { text: string }).text;
       expect(text).toContain('[API GET /api/users/{id}]');
-      const parsed = extractJsonFromPrefixedText(text);
+      const parsed = extractJsonFromPrefixedText(text) as Record<string, unknown>;
       expect(parsed).toEqual({
         path: 'api',
         data: { id: 1, name: 'alice' },
@@ -207,6 +208,7 @@ describe('smart-read-page', () => {
         'GET',
         undefined,
         undefined,
+        expect.anything(),
       );
     });
 
@@ -229,17 +231,32 @@ describe('smart-read-page', () => {
         'GET',
         'get user',
         undefined,
+        expect.anything(),
       );
 
       const text = (result.content[0] as { text: string }).text;
       expect(text).toContain('[API GET /api/users/{id}]');
-      const parsed = extractJsonFromPrefixedText(text);
+      const parsed = extractJsonFromPrefixedText(text) as Record<string, unknown>;
       expect(parsed.method).toBe('GET');
       expect(parsed.skill_id).toBe('auto-get-skill');
     });
 
+    it('falls back to DOM when findMatchingSkill returns null', async () => {
+      mockFindMatchingSkill.mockResolvedValue(null);
+      mockReadPageExecute.mockResolvedValue(makeReadPageResult('# DOM content'));
+
+      const result = await smartReadPageTool.execute('call-1', {
+        tabId: 1,
+        mode: 'json',
+        url: 'https://example.com/unknown',
+      });
+
+      expect(mockExecuteApiFirst).not.toHaveBeenCalled();
+      expect((result.content[0] as { text: string }).text).toContain('[DOM fallback]');
+    });
+
     it('uses POST method from matched skill in json mode', async () => {
-      vi.mocked(executeApiFirst).mockResolvedValue({
+      mockExecuteApiFirst.mockResolvedValue({
         success: true,
         data: { hits: [] },
         status: 200,
@@ -260,11 +277,12 @@ describe('smart-read-page', () => {
 
       const text = (result.content[0] as { text: string }).text;
       expect(text).toContain('"method": "POST"');
-      expect(executeApiFirst).toHaveBeenCalledWith(
+      expect(mockExecuteApiFirst).toHaveBeenCalledWith(
         'https://algolia.example.com/1/indexes/Item/query',
         'POST',
         undefined,
         { query: 'machine learning' },
+        expect.anything(),
       );
     });
   });
@@ -373,7 +391,7 @@ describe('smart-read-page', () => {
   // ─── 非 NoMatchError 异常时回退到 DOM ───
 
   describe('非 NoMatchError 异常时回退到 DOM', () => {
-    it('普通 Error 被捕获并回退到 DOM，结果包含 [path: dom', async () => {
+    it('普通 Error 被捕获并回退到 DOM，结果包含 [DOM fallback]', async () => {
       const err = new Error('Network timeout');
       mockExecuteApiFirst.mockRejectedValue(err);
       mockReadPageExecute.mockResolvedValue(makeReadPageResult('# DOM content'));

@@ -69,7 +69,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
           return await fallbackToDom(policy.reason);
         }
 
-        const result = await executeApiFirst(url, method ?? 'GET', intent, data);
+        const result = await executeApiFirst(url, method ?? 'GET', intent, data, skill);
         const prefix = formatApiPrefix(skill, result);
         const body = JSON.stringify({
           path: 'api',
