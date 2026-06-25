@@ -39,13 +39,8 @@ export async function createCebianAgent(options: CreateAgentOptions): Promise<Ag
     hostname,
   } = options;
 
-  // 注入当前站点已启用的高置信度 API Skill 前导文本（失败时不阻塞 Agent 创建）
-  let apiSkillPreamble = '';
-  try {
-    apiSkillPreamble = await buildApiSkillPreamble(hostname);
-  } catch (err) {
-    console.warn('[Agent] Failed to build API skill preamble:', err);
-  }
+  // 注入当前站点已启用的高置信度 API Skill 前导文本（buildApiSkillPreamble 内部已处理异常）
+  const apiSkillPreamble = await buildApiSkillPreamble(hostname);
 
   const basePrompt = DEFAULT_SYSTEM_PROMPT
     .replaceAll('{{SESSION_ID}}', sessionId);

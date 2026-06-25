@@ -10,18 +10,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildApiSkillPreamble } from '@/lib/agent-context';
 import type { AutoSkillDefinition } from '@/lib/capture/types';
 
-const mockGetEnabledSkillsForHostname = vi.fn<(hostname: string) => Promise<AutoSkillDefinition[]>>();
-const mockGetEffectiveConfidence = vi.fn<(skill: AutoSkillDefinition) => number>();
-
-vi.mock('@/lib/capture/skill-registry', () => ({
-  getEnabledSkillsForHostname: mockGetEnabledSkillsForHostname,
-  getEffectiveConfidence: mockGetEffectiveConfidence,
+const { mockGetEnabledSkillsForHostname } = vi.hoisted(() => ({
+  mockGetEnabledSkillsForHostname: vi.fn<(hostname: string) => Promise<AutoSkillDefinition[]>>(),
 }));
+
+vi.mock('@/lib/capture/skill-registry', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/lib/capture/skill-registry')>();
+  return {
+    ...mod,
+    getEnabledSkillsForHostname: mockGetEnabledSkillsForHostname,
+  };
+});
 
 beforeEach(() => {
   mockGetEnabledSkillsForHostname.mockReset();
-  mockGetEffectiveConfidence.mockReset();
-  mockGetEffectiveConfidence.mockImplementation((skill) => skill.initialConfidence);
 });
 
 function makeSkill(overrides: Partial<AutoSkillDefinition> = {}): AutoSkillDefinition {
