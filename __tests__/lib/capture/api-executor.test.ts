@@ -194,6 +194,46 @@ describe('api-executor', () => {
     });
   });
 
+  // ─── 已匹配 Skill 参数 ───
+
+  describe('已匹配 Skill 参数', () => {
+    it('传入 matchedSkill 时直接使用，不调用 findMatchingSkill', async () => {
+      const skill = makeSkill({ name: 'pre-matched-skill' });
+      mockHandleBgFetch.mockResolvedValue(makeBgFetchResponse({ ok: true }, 200));
+
+      const result = await executeApiFirst(
+        'https://api.example.com/api/users/1',
+        'GET',
+        undefined,
+        undefined,
+        skill,
+      );
+
+      expect(result.success).toBe(true);
+      expect(result.skillName).toBe('pre-matched-skill');
+      expect(mockFindMatchingSkill).not.toHaveBeenCalled();
+      expect(mockUpdateSkillStats).toHaveBeenCalledWith('pre-matched-skill', true);
+    });
+
+    it('传入 matchedSkill 时仍按结果更新统计', async () => {
+      const skill = makeSkill({ name: 'pre-matched-skill' });
+      mockHandleBgFetch.mockResolvedValue(makeBgFetchResponse({ error: 'not found' }, 404));
+
+      await expect(
+        executeApiFirst(
+          'https://api.example.com/api/users/1',
+          'GET',
+          undefined,
+          undefined,
+          skill,
+        ),
+      ).rejects.toThrow(NoMatchError);
+
+      expect(mockFindMatchingSkill).not.toHaveBeenCalled();
+      expect(mockUpdateSkillStats).toHaveBeenCalledWith('pre-matched-skill', false);
+    });
+  });
+
   // ─── 认证注入 ───
 
   describe('认证注入', () => {

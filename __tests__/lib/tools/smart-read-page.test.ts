@@ -161,6 +161,8 @@ describe('smart-read-page', () => {
         'https://api.example.com/users/1',
         undefined,
         'get user',
+        undefined,
+        expect.any(Object),
       );
       // 不应该调用 readPageTool
       expect(mockReadPageExecute).not.toHaveBeenCalled();
@@ -196,6 +198,8 @@ describe('smart-read-page', () => {
         'https://api.example.com/users/1',
         undefined,
         undefined,
+        undefined,
+        expect.any(Object),
       );
     });
 
@@ -217,6 +221,8 @@ describe('smart-read-page', () => {
         'https://api.example.com/users/1',
         'GET',
         'get user',
+        undefined,
+        expect.any(Object),
       );
 
       const parsed = JSON.parse((result.content[0] as { text: string }).text);

@@ -56,7 +56,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
           return await fallbackToDom(policy.reason);
         }
 
-        const result = await executeApiFirst(url, method, intent);
+        const result = await executeApiFirst(url, method, intent, undefined, skill);
         return {
           content: [{
             type: 'text' as const,

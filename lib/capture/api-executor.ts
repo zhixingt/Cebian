@@ -121,6 +121,7 @@ async function getDynamicAuthHeaders(
  * @param method HTTP 方法
  * @param intent 操作意图描述（用于 Skill 匹配）
  * @param data 请求体数据（POST/PUT/PATCH）
+ * @param matchedSkill 已匹配的 Skill，传入后跳过 findMatchingSkill 查询
  * @returns API 执行结果
  * @throws NoMatchError 当无匹配 Skill 或 API 调用失败时
  */
@@ -129,11 +130,12 @@ export async function executeApiFirst(
   method?: string,
   intent?: string,
   data?: Record<string, unknown>,
+  matchedSkill?: AutoSkillDefinition,
 ): Promise<ApiExecuteResult> {
   const startTime = Date.now();
 
-  // 1. 查找匹配的 Skill
-  const skill = await findMatchingSkill(url, intent);
+  // 1. 查找匹配的 Skill（调用方已提供时直接使用，避免重复查询）
+  const skill = matchedSkill ?? await findMatchingSkill(url, intent);
   if (!skill) {
     throw new NoMatchError(`No matching API skill for ${method} ${url}`);
   }
