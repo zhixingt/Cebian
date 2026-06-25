@@ -8,7 +8,7 @@
  * - 更新执行统计和动态置信度
  */
 
-import type { AutoSkillDefinition, SkillStats } from './types';
+import type { AutoSkillDefinition } from './types';
 import {
   CONFIDENCE_HISTORY_WEIGHT,
   CONFIDENCE_RECENT_WEIGHT,

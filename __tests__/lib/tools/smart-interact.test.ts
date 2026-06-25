@@ -15,7 +15,7 @@
  * mock 策略：
  * - vi.mock '@/lib/capture/api-executor' 的 executeApiFirst 和 NoMatchError
  * - vi.mock '@/lib/capture/skill-registry' 的 findMatchingSkill
- * - vi.mock '@/lib/capture/api-policy' 的 requiresConfirmation、canAutoInvokeSkill
+ * - vi.mock '@/lib/capture/api-policy' 的 canAutoInvokeSkill
  * - vi.mock './interact' 的 interactTool
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -45,7 +45,6 @@ vi.mock('@/lib/capture/skill-registry', () => ({
 }));
 
 vi.mock('@/lib/capture/api-policy', () => ({
-  requiresConfirmation: vi.fn(),
   canAutoInvokeSkill: vi.fn(),
 }));
 
@@ -61,14 +60,13 @@ vi.mock('@/lib/tools/interact', () => ({
 import { smartInteractTool } from '@/lib/tools/smart-interact';
 import { executeApiFirst, NoMatchError as MockNoMatchError } from '@/lib/capture/api-executor';
 import { findMatchingSkill } from '@/lib/capture/skill-registry';
-import { requiresConfirmation, canAutoInvokeSkill } from '@/lib/capture/api-policy';
+import { canAutoInvokeSkill } from '@/lib/capture/api-policy';
 import { interactTool } from '@/lib/tools/interact';
 
 // ─── mock 引用 ───
 
 const mockExecuteApiFirst = vi.mocked(executeApiFirst);
 const mockFindMatchingSkill = vi.mocked(findMatchingSkill);
-const mockRequiresConfirmation = vi.mocked(requiresConfirmation);
 const mockCanAutoInvokeSkill = vi.mocked(canAutoInvokeSkill);
 const mockInteractExecute = vi.mocked(interactTool.execute);
 
@@ -134,8 +132,7 @@ function makeSkill(overrides: Partial<AutoSkillDefinition> = {}): AutoSkillDefin
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // 默认无需确认，避免影响现有测试
-  mockRequiresConfirmation.mockReturnValue(false);
+  // 默认允许自动调用，避免影响现有测试
   mockCanAutoInvokeSkill.mockReturnValue({ allowed: true, reason: 'Read-only GET skill with sufficient confidence' });
 });
 
@@ -291,7 +288,6 @@ describe('smart-interact', () => {
         pathname: '/users',
       });
       mockFindMatchingSkill.mockResolvedValue(postSkill);
-      mockRequiresConfirmation.mockReturnValue(true);
       mockCanAutoInvokeSkill.mockReturnValue({
         allowed: false,
         reason: 'Auto-invoke only allowed for GET skills, got POST',
@@ -323,7 +319,10 @@ describe('smart-interact', () => {
         pathname: '/users',
       });
       mockFindMatchingSkill.mockResolvedValue(postSkill);
-      mockRequiresConfirmation.mockReturnValue(true);
+      mockCanAutoInvokeSkill.mockReturnValue({
+        allowed: false,
+        reason: 'Auto-invoke only allowed for GET skills, got POST',
+      });
       mockExecuteApiFirst.mockResolvedValue(makeApiResult({
         data: { id: 1 },
         latencyMs: 30,
@@ -359,7 +358,6 @@ describe('smart-interact', () => {
         initialConfidence: 0.9,
       });
       mockFindMatchingSkill.mockResolvedValue(getSkill);
-      mockRequiresConfirmation.mockReturnValue(false);
       mockExecuteApiFirst.mockResolvedValue(makeApiResult({
         data: { form: 'data' },
         latencyMs: 15,
@@ -381,7 +379,7 @@ describe('smart-interact', () => {
         undefined,
         getSkill,
       );
-      expect(mockRequiresConfirmation).toHaveBeenCalledWith(getSkill);
+      expect(mockCanAutoInvokeSkill).toHaveBeenCalledWith(getSkill);
       const parsed = JSON.parse((result.content[0] as { text: string }).text);
       expect(parsed).toMatchObject({ success: true, skill_id: 'auto-fill-skill' });
     });
@@ -492,9 +490,9 @@ describe('smart-interact', () => {
       mockFindMatchingSkill.mockResolvedValue(postSkill);
       mockExecuteApiFirst.mockRejectedValue(new MockNoMatchError('no match'));
       mockInteractExecute.mockResolvedValue({
-        content: [{ type: 'image' as const, data: 'base64...' }],
+        content: [{ type: 'image' as const, data: 'base64...', mimeType: 'image/png' }],
         details: {},
-      } as any);
+      });
 
       const result = await smartInteractTool.execute('call-1', {
         tabId: 42,

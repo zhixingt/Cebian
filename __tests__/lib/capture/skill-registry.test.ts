@@ -458,6 +458,32 @@ describe('findMatchingSkill', () => {
     );
     expect(matchedHash?.name).toBe('s-hash');
   });
+
+  it('includeDisabled=true 时，同路径下高分禁用 Skill 不应击败低分启用 Skill', async () => {
+    await addSkills([
+      makeSkill({
+        name: 's-disabled-high',
+        hostname: 'api.example.com',
+        pathname: '/api/users/{id}',
+        enabled: false,
+        initialConfidence: 0.95,
+      }),
+      makeSkill({
+        name: 's-enabled-low',
+        hostname: 'api.example.com',
+        pathname: '/api/users/{id}',
+        enabled: true,
+        initialConfidence: 0.65,
+      }),
+    ]);
+    const matched = await findMatchingSkill(
+      'https://api.example.com/api/users/123',
+      undefined,
+      true,
+    );
+    expect(matched).not.toBeNull();
+    expect(matched!.name).toBe('s-enabled-low');
+  });
 });
 
 // ─── updateSkillStats ───

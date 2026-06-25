@@ -6,7 +6,7 @@ import { Type } from 'typebox';
 import type { AgentTool, AgentToolResult } from '@earendil-works/pi-agent-core';
 import { executeApiFirst, NoMatchError } from '@/lib/capture/api-executor';
 import { findMatchingSkill } from '@/lib/capture/skill-registry';
-import { canAutoInvokeSkill, requiresConfirmation } from '@/lib/capture/api-policy';
+import { canAutoInvokeSkill } from '@/lib/capture/api-policy';
 import { interactTool } from './interact';
 
 const smartInteractSchema = Type.Object({
@@ -58,9 +58,9 @@ export const smartInteractTool: AgentTool<typeof smartInteractSchema> = {
 
         const method = action === 'api_submit' ? 'POST' : 'GET';
 
-        // 写操作或高风险 API 需要用户确认
-        if (requiresConfirmation(skill) && confirmed !== true) {
-          const policy = canAutoInvokeSkill(skill);
+        // 判断是否可以自动调用；不允许自动调用且未获得用户确认时，请求确认
+        const policy = canAutoInvokeSkill(skill);
+        if (!policy.allowed && confirmed !== true) {
           return {
             content: [{
               type: 'text' as const,
