@@ -495,8 +495,8 @@ describe('api-executor', () => {
       expect(result.path).toBe('api');
     });
 
-    it('成功结果包含 method 字段', async () => {
-      const skill = makeSkill({ method: 'POST', name: 'post-skill' });
+    it('成功结果包含 method 字段（使用传入 method）', async () => {
+      const skill = makeSkill({ method: 'GET', name: 'post-skill' });
       mockFindMatchingSkill.mockResolvedValue(skill);
 
       const result = await executeApiFirst('https://api.example.com/api/users', 'POST', undefined, { name: 'bob' });
@@ -545,15 +545,25 @@ describe('api-executor', () => {
       expect(init.body).toBeUndefined();
     });
 
-    it('使用 skill.method 而非传入的 method 参数', async () => {
+    it('未传 method 时使用 skill.method', async () => {
       const skill = makeSkill({ method: 'POST' });
       mockFindMatchingSkill.mockResolvedValue(skill);
 
-      // 传入 GET 但 skill.method 是 POST，应使用 skill.method
-      await executeApiFirst('https://api.example.com/api/users', 'GET');
+      await executeApiFirst('https://api.example.com/api/users');
 
       const callArgs = mockHandleBgFetch.mock.calls[0] as [string, { method: string }, unknown[]];
       expect(callArgs[1].method).toBe('POST');
+    });
+
+    it('传 method 时覆盖 skill.method', async () => {
+      const skill = makeSkill({ method: 'POST' });
+      mockFindMatchingSkill.mockResolvedValue(skill);
+
+      // skill.method 是 POST，但传入 GET 时应使用传入的 method
+      await executeApiFirst('https://api.example.com/api/users', 'GET');
+
+      const callArgs = mockHandleBgFetch.mock.calls[0] as [string, { method: string }, unknown[]];
+      expect(callArgs[1].method).toBe('GET');
     });
   });
 });

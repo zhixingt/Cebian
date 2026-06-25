@@ -126,7 +126,7 @@ async function getDynamicAuthHeaders(
  */
 export async function executeApiFirst(
   url: string,
-  method: string,
+  method?: string,
   intent?: string,
   data?: Record<string, unknown>,
 ): Promise<ApiExecuteResult> {
@@ -153,16 +153,19 @@ export async function executeApiFirst(
     skill.authHeaderName,
   );
 
+  // 调用方传入的 method 优先，否则使用 skill 声明的 method
+  const effectiveMethod = method ?? skill.method;
+
   // 构造请求 init
   const init: RequestInit = {
-    method: skill.method,
+    method: effectiveMethod,
     headers: {
       'Content-Type': 'application/json',
       ...authHeaders,
     },
   };
 
-  if (data && (skill.method === 'POST' || skill.method === 'PUT' || skill.method === 'PATCH')) {
+  if (data && (effectiveMethod === 'POST' || effectiveMethod === 'PUT' || effectiveMethod === 'PATCH')) {
     init.body = JSON.stringify(data);
   }
 
@@ -181,7 +184,7 @@ export async function executeApiFirst(
     if (!success) {
       // API 返回错误状态码，回退 DOM
       throw new NoMatchError(
-        `API ${skill.method} ${skill.pathname} returned ${response.status}`,
+        `API ${effectiveMethod} ${skill.pathname} returned ${response.status}`,
       );
     }
 
@@ -193,7 +196,7 @@ export async function executeApiFirst(
       skillName: skill.name,
       confidence: getEffectiveConfidence(skill),
       path: 'api',
-      method: skill.method,
+      method: effectiveMethod,
     };
   } catch (err) {
     if (err instanceof NoMatchError) throw err;

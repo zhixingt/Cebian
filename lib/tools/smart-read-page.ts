@@ -36,7 +36,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
 
     if (mode === 'json' && url) {
       try {
-        const result = await executeApiFirst(url, method ?? 'GET', intent, data);
+        const result = await executeApiFirst(url, method, intent, data);
         return {
           content: [{
             type: 'text' as const,
