@@ -266,6 +266,21 @@ export function getEffectiveConfidence(skill: AutoSkillDefinition): number {
   return skill.initialConfidence;
 }
 
+/**
+ * 查询指定 hostname 下已启用且有效置信度达标的 Skill。
+ * 用于 Agent system prompt 注入，按有效置信度降序返回。
+ */
+export async function getEnabledSkillsForHostname(
+  hostname: string,
+  minConfidence: number = SKILL_MIN_CONFIDENCE,
+): Promise<AutoSkillDefinition[]> {
+  await loadFromDb();
+  const skills = skillsByHostname.get(hostname) ?? [];
+  return skills
+    .filter((s) => s.enabled && getEffectiveConfidence(s) >= minConfidence)
+    .sort((a, b) => getEffectiveConfidence(b) - getEffectiveConfidence(a));
+}
+
 /** 计算匹配评分 */
 function computeMatchScore(skill: AutoSkillDefinition, url: URL, intent?: string): number {
   // pathname 必须匹配（将占位符转为通配符比较）

@@ -3,6 +3,7 @@ import type { Api, Model, Message } from '@earendil-works/pi-ai';
 import { providerCredentials, type OAuthCredential } from './storage';
 import { getValidOAuthToken } from './oauth';
 import { DEFAULT_SYSTEM_PROMPT } from './constants';
+import { buildApiSkillPreamble } from './agent-context';
 import { buildMemoryPrompt } from './memory/prompt-builder';
 
 // ─── Agent factory ───
@@ -22,6 +23,8 @@ export interface CreateAgentOptions {
   /** Session-specific tools array (includes per-session ask_user). */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tools: AgentTool<any>[];
+  /** 当前 active tab 的 hostname，用于注入自动发现的 API Skill 前导文本 */
+  hostname?: string;
 }
 
 export async function createCebianAgent(options: CreateAgentOptions): Promise<Agent> {
@@ -33,14 +36,26 @@ export async function createCebianAgent(options: CreateAgentOptions): Promise<Ag
     maxRounds,
     messages = [],
     tools: agentTools,
+    hostname,
   } = options;
+
+  // 注入当前站点已启用的高置信度 API Skill 前导文本（失败时不阻塞 Agent 创建）
+  let apiSkillPreamble = '';
+  try {
+    apiSkillPreamble = await buildApiSkillPreamble(hostname);
+  } catch (err) {
+    console.warn('[Agent] Failed to build API skill preamble:', err);
+  }
 
   const basePrompt = DEFAULT_SYSTEM_PROMPT
     .replaceAll('{{SESSION_ID}}', sessionId);
+  const promptWithApiSkills = apiSkillPreamble
+    ? `${apiSkillPreamble}\n\n${basePrompt}`
+    : basePrompt;
   const trimmedInstructions = userInstructions.trim();
   const effectivePrompt = trimmedInstructions
-    ? `${basePrompt}\n\n<user-instructions>\n${trimmedInstructions}\n</user-instructions>`
-    : basePrompt;
+    ? `${promptWithApiSkills}\n\n<user-instructions>\n${trimmedInstructions}\n</user-instructions>`
+    : promptWithApiSkills;
 
   // 分层记忆注入：检索用户画像 + 会话摘要 + Agent 记忆，追加到 system prompt。
   // 失败时不阻塞 Agent 创建（返回空字符串，使用 effectivePrompt 兜底）。

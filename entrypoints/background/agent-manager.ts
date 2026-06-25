@@ -67,6 +67,18 @@ async function buildStructuredMessage(text: string, attachments: Attachment[]): 
   return parts.join('\n\n');
 }
 
+/** 获取当前窗口 active tab 的 hostname；获取失败时返回 undefined */
+async function getActiveTabHostname(): Promise<string | undefined> {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const url = tabs[0]?.url;
+    if (!url) return undefined;
+    return new URL(url).hostname;
+  } catch {
+    return undefined;
+  }
+}
+
 // ─── Types ───
 
 /**
@@ -360,6 +372,9 @@ class AgentManager {
     // Create per-session tools with isolated bridges
     const { tools: sessionTools, ctx: toolCtx } = await createSessionTools(sessionId);
 
+    // 获取当前 active tab 的 hostname，用于注入 API Skill 前导文本
+    const hostname = await getActiveTabHostname();
+
     const agent = await createCebianAgent({
       model: resolved.model,
       sessionId,
@@ -368,6 +383,7 @@ class AgentManager {
       maxRounds: rounds || 200,
       messages,
       tools: sessionTools,
+      hostname,
     });
 
     return {

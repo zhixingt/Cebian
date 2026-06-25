@@ -187,6 +187,12 @@ export interface AutoSkillDefinition {
   authHeaderName?: string;
   /** 归一化路径 */
   pathname: string;
+  /** Path 参数（可选，兼容旧数据） */
+  pathParams?: PathParamDef[];
+  /** Query 参数（可选，兼容旧数据） */
+  queryParams?: QueryParamDef[];
+  /** Body 字段（可选，兼容旧数据） */
+  bodyFields?: BodyFieldDef[];
   /** bgFetch 权限 patterns */
   bgFetchPatterns: string[];
   /** 生成的脚本代码 */
