@@ -34,7 +34,7 @@ export const smartInteractTool: AgentTool<typeof smartInteractSchema> = {
   description: 'Interact with page. api_submit/api_fill_form try API-first, fall back to DOM.',
   parameters: smartInteractSchema,
   execute: async (_toolCallId, params) => {
-    const { tabId, action, url, intent, data, selector, text } = params;
+    const { tabId, action, url, intent, data, confirmed, selector, text } = params;
 
     if ((action === 'api_submit' || action === 'api_fill_form') && url) {
       try {
@@ -59,7 +59,7 @@ export const smartInteractTool: AgentTool<typeof smartInteractSchema> = {
         const method = action === 'api_submit' ? 'POST' : 'GET';
 
         // 写操作或高风险 API 需要用户确认
-        if (requiresConfirmation(skill) && params.confirmed !== true) {
+        if (requiresConfirmation(skill) && confirmed !== true) {
           const policy = canAutoInvokeSkill(skill);
           return {
             content: [{

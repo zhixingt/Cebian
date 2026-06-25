@@ -191,11 +191,29 @@ export async function findMatchingSkill(
 
   if (candidates.length === 0) return null;
 
-  // pathname 匹配评分
+  // 先只在启用的 Skill 中匹配，避免禁用 Skill 因分数高而遮蔽启用 Skill
+  const enabledMatch = findBestMatch(candidates, parsed, intent, s => s.enabled);
+  if (enabledMatch) return enabledMatch;
+
+  // includeDisabled=true 且未找到启用 Skill 时，才在禁用 Skill 中查找
+  if (includeDisabled) {
+    return findBestMatch(candidates, parsed, intent, s => !s.enabled);
+  }
+
+  return null;
+}
+
+/** 在符合条件的候选 Skill 中找出匹配分数最高者 */
+function findBestMatch(
+  candidates: AutoSkillDefinition[],
+  url: URL,
+  intent: string | undefined,
+  predicate: (skill: AutoSkillDefinition) => boolean,
+): AutoSkillDefinition | null {
   const scored = candidates
-    .filter(s => includeDisabled || s.enabled)
+    .filter(predicate)
     .map((s) => {
-      const score = computeMatchScore(s, parsed, intent);
+      const score = computeMatchScore(s, url, intent);
       return { skill: s, score };
     })
     .filter(({ score }) => score > 0)

@@ -12,7 +12,7 @@
  */
 import 'fake-indexeddb/auto';
 import { describe, it, expect } from 'vitest';
-import { canAutoInvokeSkill } from '@/lib/capture/api-policy';
+import { canAutoInvokeSkill, requiresConfirmation } from '@/lib/capture/api-policy';
 import type { AutoSkillDefinition } from '@/lib/capture/types';
 
 // ─── 测试辅助 ───
@@ -126,5 +126,38 @@ describe('canAutoInvokeSkill', () => {
     });
     const result = canAutoInvokeSkill(skill);
     expect(result.allowed).toBe(true);
+  });
+});
+
+// ─── requiresConfirmation 测试 ───
+
+describe('requiresConfirmation', () => {
+  it('未启用 Skill 返回 false', () => {
+    const skill = makeSkill({ enabled: false, method: 'POST' });
+    expect(requiresConfirmation(skill)).toBe(false);
+  });
+
+  it('低风险 GET Skill 返回 false', () => {
+    const skill = makeSkill({ method: 'GET', initialConfidence: 0.85 });
+    expect(requiresConfirmation(skill)).toBe(false);
+  });
+
+  it('POST Skill 返回 true', () => {
+    const skill = makeSkill({ method: 'POST', initialConfidence: 0.85 });
+    expect(requiresConfirmation(skill)).toBe(true);
+  });
+
+  it('低置信度 GET Skill 返回 true', () => {
+    const skill = makeSkill({ method: 'GET', initialConfidence: 0.75 });
+    expect(requiresConfirmation(skill)).toBe(true);
+  });
+
+  it('含写关键词 GET Skill 返回 true', () => {
+    const skill = makeSkill({
+      method: 'GET',
+      initialConfidence: 0.85,
+      pathname: '/api/orders/create',
+    });
+    expect(requiresConfirmation(skill)).toBe(true);
   });
 });
