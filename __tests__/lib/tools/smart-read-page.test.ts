@@ -16,6 +16,7 @@
  * - vi.mock './read-page' 的 readPageTool
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { AgentToolResult } from '@earendil-works/pi-agent-core';
 
 // ─── mock 外部依赖 ───
 
@@ -381,9 +382,9 @@ describe('smart-read-page', () => {
       mockExecuteApiFirst.mockRejectedValue(new MockNoMatchError('no match'));
       // 假设返回非 text content（虽然实际不会发生，但测试覆盖该分支）
       mockReadPageExecute.mockResolvedValue({
-        content: [{ type: 'image' as const, data: 'base64...' }],
+        content: [{ type: 'image' as const, data: 'base64...', mimeType: 'image/png' }],
         details: {},
-      } as any);
+      } satisfies AgentToolResult<unknown>);
 
       const result = await smartReadPageTool.execute('call-1', {
         tabId: 42,

@@ -17,7 +17,7 @@ export interface ApiPolicyResult {
 }
 
 /** 写操作关键词：命中任一关键词即视为潜在写操作（使用词边界避免误杀子串） */
-const WRITE_KEYWORDS = /\b(submit|delete|remove|update|create|pay|order|purchase|post|write|send|cancel|approve|reject)\b/i;
+const WRITE_KEYWORDS = /\b(submit|delete|remove|update|create|pay|order|purchase|write|send|cancel|approve|reject)\b/i;
 
 /** 自动调用所需最低有效置信度 */
 const AUTO_INVOKE_MIN_CONFIDENCE = 0.8;
