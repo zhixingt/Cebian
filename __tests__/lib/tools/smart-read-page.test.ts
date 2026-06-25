@@ -252,7 +252,7 @@ describe('smart-read-page', () => {
       });
 
       expect(mockExecuteApiFirst).not.toHaveBeenCalled();
-      expect((result.content[0] as { text: string }).text).toContain('[DOM fallback]');
+      expect((result.content[0] as { text: string }).text).toContain('[path: dom');
     });
 
     it('uses POST method from matched skill in json mode', async () => {
@@ -305,7 +305,7 @@ describe('smart-read-page', () => {
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
       expect(result.content[0]).toMatchObject({
         type: 'text',
-        text: expect.stringContaining('[DOM fallback]'),
+        text: expect.stringContaining('[path: dom'),
       });
       expect((result.content[0] as { text: string }).text).toContain('# DOM content');
     });
@@ -325,7 +325,7 @@ describe('smart-read-page', () => {
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
       expect(result.content[0]).toMatchObject({
         type: 'text',
-        text: expect.stringContaining('[DOM fallback]'),
+        text: expect.stringContaining('[path: dom'),
       });
     });
   });
@@ -347,12 +347,25 @@ describe('smart-read-page', () => {
       // 应该调用 readPageTool，使用 markdown 模式
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
 
-      // 返回值前面加上 [DOM fallback] reason: ...
+      // 返回值前面加上 [path: dom, fallback reason: ...
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
       const text = (result.content[0] as { text: string }).text;
-      expect(text).toContain('[DOM fallback] reason: No matching API skill');
+      expect(text).toContain('[path: dom, fallback reason: No matching API skill');
       expect(text).toContain('# Hello');
+    });
+
+    it('falls back to DOM when executeApiFirst throws NoMatchError', async () => {
+      mockExecuteApiFirst.mockRejectedValue(new MockNoMatchError('No matching API skill'));
+
+      const result = await smartReadPageTool.execute('call-1', {
+        tabId: 1,
+        mode: 'json',
+        url: 'https://example.com/unknown',
+      });
+
+      expect((result.content[0] as { text: string }).text).toContain('[path: dom');
+      expect((result.content[0] as { text: string }).text).toContain('No matching API skill');
     });
 
     it('回退时使用 _toolCallId 而非新的 id', async () => {
@@ -405,13 +418,13 @@ describe('smart-read-page', () => {
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
       expect(result.content[0]).toMatchObject({
         type: 'text',
-        text: expect.stringContaining('[DOM fallback]'),
+        text: expect.stringContaining('[path: dom'),
       });
       expect((result.content[0] as { text: string }).text).toContain('Network timeout');
       expect((result.content[0] as { text: string }).text).toContain('# DOM content');
     });
 
-    it('字符串错误被捕获并回退到 DOM，结果包含 [DOM fallback]', async () => {
+    it('字符串错误被捕获并回退到 DOM，结果包含 [path: dom', async () => {
       mockExecuteApiFirst.mockRejectedValue('some string error');
       mockReadPageExecute.mockResolvedValue(makeReadPageResult('# DOM content'));
 
@@ -424,7 +437,7 @@ describe('smart-read-page', () => {
       expect(mockReadPageExecute).toHaveBeenCalledWith('call-1', { tabId: 42, mode: 'markdown' });
       expect(result.content[0]).toMatchObject({
         type: 'text',
-        text: expect.stringContaining('[DOM fallback]'),
+        text: expect.stringContaining('[path: dom'),
       });
       expect((result.content[0] as { text: string }).text).toContain('some string error');
       expect((result.content[0] as { text: string }).text).toContain('# DOM content');

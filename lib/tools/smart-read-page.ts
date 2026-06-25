@@ -49,7 +49,7 @@ export const smartReadPageTool: AgentTool<typeof smartReadPageSchema> = {
           ...fallback,
           content: [{
             type: 'text' as const,
-            text: `[DOM fallback] reason: ${reason}\n\n${fallback.content[0].text}`,
+            text: `[path: dom, fallback reason: ${reason}]\n\n${fallback.content[0].text}`,
           }],
         };
       }
