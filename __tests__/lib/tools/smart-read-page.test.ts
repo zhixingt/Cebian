@@ -161,7 +161,6 @@ describe('smart-read-page', () => {
         'https://api.example.com/users/1',
         undefined,
         'get user',
-        undefined,
       );
       // 不应该调用 readPageTool
       expect(mockReadPageExecute).not.toHaveBeenCalled();
@@ -197,107 +196,32 @@ describe('smart-read-page', () => {
         'https://api.example.com/users/1',
         undefined,
         undefined,
-        undefined,
       );
     });
 
-    it('调用方传入 method 时覆盖 skill.method', async () => {
+    it('调用方传入 method=GET 时走 API 路径', async () => {
       mockExecuteApiFirst.mockResolvedValue(makeApiResult({
-        method: 'POST',
-        skillName: 'auto-post-skill',
-        data: { created: true },
+        method: 'GET',
+        skillName: 'auto-get-skill',
       }));
 
       const result = await smartReadPageTool.execute('call-1', {
-        tabId: 42,
-        mode: 'json',
-        url: 'https://api.example.com/users',
-        method: 'POST',
-        data: { name: 'bob' },
-        intent: 'create user',
-      });
-
-      expect(mockExecuteApiFirst).toHaveBeenCalledWith(
-        'https://api.example.com/users',
-        'POST',
-        'create user',
-        { name: 'bob' },
-      );
-
-      const parsed = JSON.parse((result.content[0] as { text: string }).text);
-      expect(parsed.method).toBe('POST');
-      expect(parsed.skill_id).toBe('auto-post-skill');
-    });
-
-    it('调用方未传 method 时，使用 skill.method', async () => {
-      mockExecuteApiFirst.mockResolvedValue(makeApiResult({
-        method: 'POST',
-        skillName: 'auto-post-skill',
-      }));
-
-      const result = await smartReadPageTool.execute('call-1', {
-        tabId: 42,
-        mode: 'json',
-        url: 'https://api.example.com/users',
-        intent: 'create user',
-      });
-
-      expect(mockExecuteApiFirst).toHaveBeenCalledWith(
-        'https://api.example.com/users',
-        undefined,
-        'create user',
-        undefined,
-      );
-
-      const parsed = JSON.parse((result.content[0] as { text: string }).text);
-      expect(parsed.method).toBe('POST');
-      expect(parsed.skill_id).toBe('auto-post-skill');
-    });
-
-    it('POST 请求体正确传递', async () => {
-      mockExecuteApiFirst.mockResolvedValue(makeApiResult({
-        method: 'POST',
-        data: { created: true },
-      }));
-
-      await smartReadPageTool.execute('call-1', {
-        tabId: 42,
-        mode: 'json',
-        url: 'https://api.example.com/users',
-        method: 'POST',
-        data: { name: 'bob' },
-        intent: 'create user',
-      });
-
-      expect(mockExecuteApiFirst).toHaveBeenCalledWith(
-        'https://api.example.com/users',
-        'POST',
-        'create user',
-        { name: 'bob' },
-      );
-    });
-
-    it('executeApiFirst 被正确调用并传入 method 和 data', async () => {
-      mockExecuteApiFirst.mockResolvedValue(makeApiResult({
-        method: 'PATCH',
-        data: { updated: true },
-      }));
-
-      await smartReadPageTool.execute('call-1', {
         tabId: 42,
         mode: 'json',
         url: 'https://api.example.com/users/1',
-        method: 'PATCH',
-        data: { name: 'charlie' },
-        intent: 'update user',
+        method: 'GET',
+        intent: 'get user',
       });
 
       expect(mockExecuteApiFirst).toHaveBeenCalledWith(
         'https://api.example.com/users/1',
-        'PATCH',
-        'update user',
-        { name: 'charlie' },
+        'GET',
+        'get user',
       );
+
+      const parsed = JSON.parse((result.content[0] as { text: string }).text);
+      expect(parsed.method).toBe('GET');
+      expect(parsed.skill_id).toBe('auto-get-skill');
     });
   });
 
